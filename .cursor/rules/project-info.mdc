@@ -1,0 +1,33 @@
+---
+description: Scanner - project info
+globs:
+alwaysApply: true
+---
+
+# About Scanner
+
+The project is a WIP. The objective of the web app will be to monitor the main launchpads from crypto and traditional VC finance and output all the launches, summarize and evaluate them as potential investments, but also have various filters only to show the launches:
+
+- from certain categories of launchpads (crypto vs traditional);
+- from certain launchpads;
+- that are highly-rated (using LLM, data gathering and certain evaluation frameworks);
+- where the devs haven't sold tokens;
+- where there's a certain minimum percentage of tokens or shares offered to the public;
+- etc.
+
+## Tech Stack
+
+- [Next.js](https://nextjs.org)
+- [Tailwind CSS](https://tailwindcss.com)
+- [Drizzle](https://orm.drizzle.team) with PostgreSQL
+
+## Project Structure
+
+Always use the following command before starting your tasks in order to understand the project structure!
+
+`tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc'`
+
+## Data Models
+
+- **Launch**: Represents a launch event from a launchpad
+  - Properties: id, title, launchpad, description, timestamps
