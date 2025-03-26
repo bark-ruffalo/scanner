@@ -30,4 +30,4 @@ Always use the following command before starting your tasks in order to understa
 ## Data Models
 
 - **Launch**: Represents a launch event from a launchpad
-  - Properties: id, title, launchpad, description, timestamps
+  - Properties: id, launchpad, title, URL, description, summary, analysis, rating, timestamps
