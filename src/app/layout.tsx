@@ -10,7 +10,7 @@ import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
 export const metadata: Metadata = {
 	title: "Scanner",
 	description: "A web app that monitors the main launchpads from crypto and traditional finance, outputting all the launches summarized and evaluated as potential investments and offering various filters.",
-	icons: [{ rel: "icon", url: "/favicon.ico" }],
+	icons: [{ rel: "icon", url: "/favicon.png" }],
 };
 
 const geist = Geist({
