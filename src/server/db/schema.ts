@@ -3,14 +3,14 @@
 
 import { sql } from "drizzle-orm";
 import {
-  index,
-  integer,
-  pgTableCreator,
-  serial,
-  text,
-  timestamp,
-  varchar,
-  check,
+	check,
+	index,
+	integer,
+	pgTableCreator,
+	serial,
+	text,
+	timestamp,
+	varchar,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -23,37 +23,37 @@ export const createTable = pgTableCreator((name) => `scanner_${name}`);
 
 // Define the 'launches' table
 export const launches = createTable(
-  "launch",
-  {
-    id: serial("id").primaryKey(),
-    launchpad: varchar("launchpad", { length: 256 })
-      .default("Added manually")
-      .notNull(),
-    title: varchar("title", { length: 256 }).notNull(),
-    url: varchar("url", { length: 1024 }).notNull(), // Increased length for URLs
-    description: text("description").notNull(),
-    summary: text("summary").default("Not done yet").notNull(),
-    analysis: text("analysis").default("Not done yet").notNull(),
-    // Rating: -1 (not rated), 0-10 (rated)
-    rating: integer("rating").default(-1).notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true })
-      .default(sql`CURRENT_TIMESTAMP`)
-      .notNull(),
-    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
-      () => new Date()
-    ),
-  },
-  (table) => ({
-    // Add indexes for columns likely used in filtering/searching
-    launchpadIdx: index("launchpad_idx").on(table.launchpad),
-    ratingIdx: index("rating_idx").on(table.rating),
-    titleIdx: index("title_idx").on(table.title),
-    // Add check constraint for rating values
-    ratingCheck: check(
-      "rating_check",
-      sql`${table.rating} >= -1 AND ${table.rating} <= 10`
-    ),
-  })
+	"launch",
+	{
+		id: serial("id").primaryKey(),
+		launchpad: varchar("launchpad", { length: 256 })
+			.default("Added manually")
+			.notNull(),
+		title: varchar("title", { length: 256 }).notNull(),
+		url: varchar("url", { length: 1024 }).notNull(), // Increased length for URLs
+		description: text("description").notNull(),
+		summary: text("summary").default("Not done yet").notNull(),
+		analysis: text("analysis").default("Not done yet").notNull(),
+		// Rating: -1 (not rated), 0-10 (rated)
+		rating: integer("rating").default(-1).notNull(),
+		createdAt: timestamp("created_at", { withTimezone: true })
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+			() => new Date(),
+		),
+	},
+	(table) => ({
+		// Add indexes for columns likely used in filtering/searching
+		launchpadIdx: index("launchpad_idx").on(table.launchpad),
+		ratingIdx: index("rating_idx").on(table.rating),
+		titleIdx: index("title_idx").on(table.title),
+		// Add check constraint for rating values
+		ratingCheck: check(
+			"rating_check",
+			sql`${table.rating} >= -1 AND ${table.rating} <= 10`,
+		),
+	}),
 );
 
 // Note on RLS:

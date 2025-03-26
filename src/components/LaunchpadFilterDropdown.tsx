@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react"; // Using lucide-react for icon
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 interface LaunchpadFilterDropdownProps {
 	launchpads: string[];
@@ -35,7 +35,10 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 			if (isOpen) {
 				// A simple check, improve with refs if needed
 				const target = event.target as HTMLElement;
-				if (!target.closest('[data-dropdown-button]') && !target.closest('[data-dropdown-menu]')) {
+				if (
+					!target.closest("[data-dropdown-button]") &&
+					!target.closest("[data-dropdown-menu]")
+				) {
 					setIsOpen(false);
 				}
 			}
@@ -47,25 +50,27 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 		};
 	}, [isOpen]);
 
-
 	return (
 		<div className="relative inline-block text-left">
 			<div>
 				<button
 					type="button"
 					data-dropdown-button // Add data attribute for outside click detection
-					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 text-sm font-semibold text-white shadow-sm ring-1 ring-inset ring-gray-600 hover:bg-gray-600"
+					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600"
 					onClick={() => setIsOpen(!isOpen)}
 				>
 					{currentFilter === "All" ? "All Launchpads" : currentFilter}
-					<ChevronDown className="-mr-1 h-5 w-5 text-gray-400" aria-hidden="true" />
+					<ChevronDown
+						className="-mr-1 h-5 w-5 text-gray-400"
+						aria-hidden="true"
+					/>
 				</button>
 			</div>
 
 			{isOpen && (
 				<div
 					data-dropdown-menu // Add data attribute for outside click detection
-					className="absolute right-0 z-10 mt-2 w-56 origin-top-right rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none max-h-60 overflow-y-auto" // Added max-height and overflow
+					className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-y-auto rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" // Added max-height and overflow
 				>
 					<div className="py-1">
 						<button
@@ -103,7 +108,11 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 // Create a main export with Suspense boundary
 export function LaunchpadFilterDropdown(props: LaunchpadFilterDropdownProps) {
 	return (
-		<Suspense fallback={<div className="h-10 w-48 animate-pulse rounded-md bg-gray-700" />}>
+		<Suspense
+			fallback={
+				<div className="h-10 w-48 animate-pulse rounded-md bg-gray-700" />
+			}
+		>
 			<FilterContent {...props} />
 		</Suspense>
 	);

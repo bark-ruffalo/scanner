@@ -3,13 +3,14 @@ import "~/styles/globals.css";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
+import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
-import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
 
 export const metadata: Metadata = {
 	title: "Scanner",
-	description: "A web app that monitors the main launchpads from crypto and traditional finance, outputting all the launches summarized and evaluated as potential investments and offering various filters.",
+	description:
+		"A web app that monitors the main launchpads from crypto and traditional finance, outputting all the launches summarized and evaluated as potential investments and offering various filters.",
 	icons: [{ rel: "icon", url: "/favicon.png" }],
 };
 
@@ -26,10 +27,14 @@ async function Navbar() {
 	const launchpadNames = distinctLaunchpads.map(({ launchpad }) => launchpad);
 
 	return (
-		<nav className="bg-gray-900 p-4 text-white sticky top-0 z-20 shadow-md">
+		<nav className="sticky top-0 z-20 bg-gray-900 p-4 text-white shadow-md">
 			<div className="container mx-auto flex flex-wrap items-center justify-between gap-4">
 				<div className="flex items-center gap-6">
-					<Link href="/" className="text-gray-300 hover:text-purple-400" aria-label="Home">
+					<Link
+						href="/"
+						className="text-gray-300 hover:text-purple-400"
+						aria-label="Home"
+					>
 						<svg
 							xmlns="http://www.w3.org/2000/svg"
 							className="h-6 w-6"
@@ -69,7 +74,7 @@ async function Navbar() {
 					</a>
 				</div>
 				<div className="flex items-center gap-2">
-					<span className="mr-1 text-sm text-gray-400">Filter:</span>
+					<span className="mr-1 text-gray-400 text-sm">Filter:</span>
 					<LaunchpadFilterDropdown launchpads={launchpadNames} />
 				</div>
 			</div>
