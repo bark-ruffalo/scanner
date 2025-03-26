@@ -2,7 +2,16 @@
 // https://orm.drizzle.team/docs/sql-schema-declaration
 
 import { sql } from "drizzle-orm";
-import { index, pgTableCreator } from "drizzle-orm/pg-core";
+import {
+  index,
+  integer,
+  pgTableCreator,
+  serial,
+  text,
+  timestamp,
+  varchar,
+  check,
+} from "drizzle-orm/pg-core";
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -12,16 +21,48 @@ import { index, pgTableCreator } from "drizzle-orm/pg-core";
  */
 export const createTable = pgTableCreator((name) => `scanner_${name}`);
 
-export const posts = createTable(
-	"post",
-	(d) => ({
-		id: d.integer().primaryKey().generatedByDefaultAsIdentity(),
-		name: d.varchar({ length: 256 }),
-		createdAt: d
-			.timestamp({ withTimezone: true })
-			.default(sql`CURRENT_TIMESTAMP`)
-			.notNull(),
-		updatedAt: d.timestamp({ withTimezone: true }).$onUpdate(() => new Date()),
-	}),
-	(t) => [index("name_idx").on(t.name)],
+// Define the 'launches' table
+export const launches = createTable(
+  "launch",
+  {
+    id: serial("id").primaryKey(),
+    launchpad: varchar("launchpad", { length: 256 })
+      .default("Added manually")
+      .notNull(),
+    title: varchar("title", { length: 256 }).notNull(),
+    url: varchar("url", { length: 1024 }).notNull(), // Increased length for URLs
+    description: text("description").notNull(),
+    summary: text("summary").default("Not done yet").notNull(),
+    analysis: text("analysis").default("Not done yet").notNull(),
+    // Rating: -1 (not rated), 0-10 (rated)
+    rating: integer("rating").default(-1).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .default(sql`CURRENT_TIMESTAMP`)
+      .notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).$onUpdate(
+      () => new Date()
+    ),
+  },
+  (table) => ({
+    // Add indexes for columns likely used in filtering/searching
+    launchpadIdx: index("launchpad_idx").on(table.launchpad),
+    ratingIdx: index("rating_idx").on(table.rating),
+    titleIdx: index("title_idx").on(table.title),
+    // Add check constraint for rating values
+    ratingCheck: check(
+      "rating_check",
+      sql`${table.rating} >= -1 AND ${table.rating} <= 10`
+    ),
+  })
 );
+
+// Note on RLS:
+// Row Level Security (RLS) needs to be enabled for the 'launches' table in your Supabase project,
+// and appropriate policies must be created based on your application's authentication and authorization logic.
+// Example SQL to enable RLS (run this in Supabase SQL editor or a migration):
+// ALTER TABLE scanner_launch ENABLE ROW LEVEL SECURITY;
+//
+// You will then need to define policies, e.g.:
+// CREATE POLICY "Allow authenticated users to read all launches" ON scanner_launch FOR SELECT TO authenticated USING (true);
+// CREATE POLICY "Allow users to insert their own launches" ON scanner_launch FOR INSERT TO authenticated WITH CHECK (auth.uid() IS NOT NULL);
+// -- Add policies for UPDATE and DELETE as needed, potentially checking ownership.
