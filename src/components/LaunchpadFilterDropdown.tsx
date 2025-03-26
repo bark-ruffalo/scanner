@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ChevronDown } from "lucide-react"; // Using lucide-react for icon
 
@@ -8,7 +8,8 @@ interface LaunchpadFilterDropdownProps {
 	launchpads: string[];
 }
 
-export function LaunchpadFilterDropdown({ launchpads }: LaunchpadFilterDropdownProps) {
+// Create a client component that uses useSearchParams
+function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 	const router = useRouter();
 	const searchParams = useSearchParams();
 	const currentFilter = searchParams.get("filter") ?? "All";
@@ -68,6 +69,7 @@ export function LaunchpadFilterDropdown({ launchpads }: LaunchpadFilterDropdownP
 				>
 					<div className="py-1">
 						<button
+							type="button"
 							onClick={() => handleSelect("All")}
 							className={`block w-full px-4 py-2 text-left text-sm ${
 								currentFilter === "All"
@@ -79,6 +81,7 @@ export function LaunchpadFilterDropdown({ launchpads }: LaunchpadFilterDropdownP
 						</button>
 						{launchpads.map((launchpad) => (
 							<button
+								type="button"
 								key={launchpad}
 								onClick={() => handleSelect(launchpad)}
 								className={`block w-full px-4 py-2 text-left text-sm ${
@@ -94,5 +97,14 @@ export function LaunchpadFilterDropdown({ launchpads }: LaunchpadFilterDropdownP
 				</div>
 			)}
 		</div>
+	);
+}
+
+// Create a main export with Suspense boundary
+export function LaunchpadFilterDropdown(props: LaunchpadFilterDropdownProps) {
+	return (
+		<Suspense fallback={<div className="h-10 w-48 animate-pulse rounded-md bg-gray-700" />}>
+			<FilterContent {...props} />
+		</Suspense>
 	);
 }
