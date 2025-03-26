@@ -23,7 +23,7 @@ The project is a WIP. The objective of the web app will be to monitor the main l
 
 ## Project Structure
 
-Always use the following command before starting your tasks in order to understand the project structure!
+Always use the following command after a new chat has started in order to understand the project structure!
 
 `tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc'`
 
@@ -31,3 +31,10 @@ Always use the following command before starting your tasks in order to understa
 
 - **Launch**: Represents a launch event from a launchpad
   - Properties: id, launchpad, title, URL, description, summary, analysis, rating, timestamps
+
+## Important Notes (also regarding tool usage)
+
+- After modifying the UI, you may use the Playwright MCP to confirm that the changes are as expected.
+- Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
+- Use pnpm instead of npm.
+- The fewer lines of code, the better.
