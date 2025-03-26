@@ -27,13 +27,13 @@ export const launches = createTable(
 	{
 		id: serial("id").primaryKey(),
 		launchpad: varchar("launchpad", { length: 256 })
-			.default("Added manually")
+			.default("added manually")
 			.notNull(),
 		title: varchar("title", { length: 256 }).notNull(),
-		url: varchar("url", { length: 1024 }).notNull(), // Increased length for URLs
+		url: varchar("url", { length: 1024 }).notNull(),
 		description: text("description").notNull(),
-		summary: text("summary").default("Not done yet").notNull(),
-		analysis: text("analysis").default("Not done yet").notNull(),
+		summary: text("summary").default("-").notNull(),
+		analysis: text("analysis").default("-").notNull(),
 		// Rating: -1 (not rated), 0-10 (rated)
 		rating: integer("rating").default(-1).notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
