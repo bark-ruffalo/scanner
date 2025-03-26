@@ -1,17 +1,23 @@
 import Link from "next/link";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema"; // Import schema
-import { eq, sql } from "drizzle-orm"; // Import eq for filtering
+import { eq } from "drizzle-orm"; // Import eq for filtering
+
+// Add this line to opt into dynamic rendering if needed,
+// though direct access might solve it. Try without it first.
+// export const dynamic = 'force-dynamic';
 
 // Define the expected shape of searchParams
 interface HomePageProps {
-  searchParams?: {
+  searchParams: { // Make searchParams non-optional, it's always provided
     filter?: string;
   };
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
-    const currentFilter = searchParams?.filter;
+    // Await searchParams before accessing its properties
+    const params = await searchParams;
+    const currentFilter = params.filter;
 
     // Fetch launches based on the filter
     const filteredLaunches = await db.query.launches.findMany({
