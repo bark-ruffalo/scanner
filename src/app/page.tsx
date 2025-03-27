@@ -1,11 +1,11 @@
 import { format, formatDistanceToNow } from "date-fns"; // Import format function
-import { eq } from "drizzle-orm"; // Import eq for filtering
 import Link from "next/link";
 import { getLaunches } from "~/server/queries";
 
-// Add this line to opt into dynamic rendering if needed,
-// though direct access might solve it. Try without it first.
-// export const dynamic = 'force-dynamic';
+// Ensure the page is dynamically rendered to pick up revalidated data
+export const dynamic = "force-dynamic";
+// Alternatively, consider using route segment config:
+// export const revalidate = 0; // Equivalent to force-dynamic for data fetching
 
 // Define the expected shape of searchParams
 interface HomePageProps {
@@ -20,7 +20,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 	const params = await searchParams;
 	const currentFilter = params.filter;
 
-	// Fetch launches using the DAL
+	// Fetch launches using the DAL - this will now refetch after revalidatePath('/') is called
 	const filteredLaunches = await getLaunches(currentFilter);
 
 	return (
