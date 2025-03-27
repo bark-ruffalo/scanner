@@ -2,7 +2,7 @@
 
 import { ChevronDown } from "lucide-react"; // Using lucide-react for icon
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useRef, useState } from "react"; // Import useRef
 
 interface LaunchpadFilterDropdownProps {
 	launchpads: string[];
@@ -14,6 +14,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 	const searchParams = useSearchParams();
 	const currentFilter = searchParams.get("filter") ?? "All";
 	const [isOpen, setIsOpen] = useState(false);
+	const dropdownRef = useRef<HTMLDivElement>(null); // Create a ref for the dropdown container
 
 	const handleSelect = (filter: string) => {
 		const params = new URLSearchParams(searchParams.toString());
@@ -30,32 +31,35 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 	// Close dropdown if clicked outside
 	useEffect(() => {
 		const handleClickOutside = (event: MouseEvent) => {
-			// Check if the click is outside the dropdown elements (you might need a ref here for more robustness)
-			// For simplicity, we'll just close it. A more robust solution involves refs.
-			if (isOpen) {
-				// A simple check, improve with refs if needed
-				const target = event.target as HTMLElement;
-				if (
-					!target.closest("[data-dropdown-button]") &&
-					!target.closest("[data-dropdown-menu]")
-				) {
-					setIsOpen(false);
-				}
+			// Check if the click is outside the dropdown element using the ref
+			if (
+				dropdownRef.current &&
+				!dropdownRef.current.contains(event.target as Node)
+			) {
+				setIsOpen(false);
 			}
 		};
 
-		document.addEventListener("mousedown", handleClickOutside);
+		// Bind the event listener only when the dropdown is open
+		if (isOpen) {
+			document.addEventListener("mousedown", handleClickOutside);
+		} else {
+			document.removeEventListener("mousedown", handleClickOutside);
+		}
+
+		// Cleanup the event listener on component unmount or when isOpen changes
 		return () => {
 			document.removeEventListener("mousedown", handleClickOutside);
 		};
-	}, [isOpen]);
+	}, [isOpen]); // Re-run effect when isOpen changes
 
 	return (
-		<div className="relative inline-block text-left">
+		// Attach the ref to the main container div
+		<div className="relative inline-block text-left" ref={dropdownRef}>
 			<div>
 				<button
 					type="button"
-					data-dropdown-button // Add data attribute for outside click detection
+					// Removed data-dropdown-button as ref is used now
 					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600"
 					onClick={() => setIsOpen(!isOpen)}
 				>
@@ -69,7 +73,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 
 			{isOpen && (
 				<div
-					data-dropdown-menu // Add data attribute for outside click detection
+					// Removed data-dropdown-menu as ref is used now
 					className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-y-auto rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none" // Added max-height and overflow
 				>
 					<div className="py-1">
