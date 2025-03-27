@@ -37,4 +37,5 @@ Always use the following command after a new chat has started in order to unders
 - After modifying the UI, you may use the Playwright MCP to confirm that the changes are as expected.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
 - Use pnpm instead of npm.
+- All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
 - The fewer lines of code, the better.
