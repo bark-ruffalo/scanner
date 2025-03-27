@@ -1,4 +1,4 @@
-import { formatDistanceToNow } from "date-fns"; // Import date-fns function
+import { format, formatDistanceToNow } from "date-fns"; // Import format function
 import { eq } from "drizzle-orm"; // Import eq for filtering
 import Link from "next/link";
 import { getLaunches } from "~/server/queries";
@@ -62,8 +62,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 											? "Not rated"
 											: `Rating: ${launch.rating}/10`}
 									</span>
-									{/* Display formatted date using date-fns */}
-									<span className="text-gray-400 text-sm">
+									{/* Display formatted date using date-fns and add title for tooltip */}
+									<span
+										className="text-gray-400 text-sm"
+										title={
+											launch.createdAt
+												? format(launch.createdAt, "yyyy-MM-dd HH:mm") // Format for tooltip
+												: "No date available"
+										}
+									>
 										{launch.createdAt
 											? formatDistanceToNow(launch.createdAt, {
 													addSuffix: true, // Adds "ago" or "in"
