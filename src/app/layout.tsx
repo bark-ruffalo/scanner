@@ -4,8 +4,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
 import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
-import { db } from "~/server/db";
-import { launches } from "~/server/db/schema";
+import { getDistinctLaunchpads } from "~/server/queries";
 
 export const metadata: Metadata = {
 	title: "Scanner",
@@ -20,11 +19,7 @@ const geist = Geist({
 });
 
 async function Navbar() {
-	const distinctLaunchpads = await db
-		.selectDistinct({ launchpad: launches.launchpad })
-		.from(launches);
-
-	const launchpadNames = distinctLaunchpads.map(({ launchpad }) => launchpad);
+	const launchpadNames = await getDistinctLaunchpads();
 
 	return (
 		<nav className="sticky top-0 z-20 bg-gray-900 p-4 text-white shadow-md">

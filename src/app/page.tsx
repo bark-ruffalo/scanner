@@ -1,7 +1,6 @@
 import { eq } from "drizzle-orm"; // Import eq for filtering
 import Link from "next/link";
-import { db } from "~/server/db";
-import { launches } from "~/server/db/schema"; // Import schema
+import { getLaunches } from "~/server/queries";
 
 // Add this line to opt into dynamic rendering if needed,
 // though direct access might solve it. Try without it first.
@@ -20,14 +19,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 	const params = await searchParams;
 	const currentFilter = params.filter;
 
-	// Fetch launches based on the filter
-	const filteredLaunches = await db.query.launches.findMany({
-		where:
-			currentFilter && currentFilter !== "All"
-				? eq(launches.launchpad, currentFilter) // Filter by launchpad if filter exists and is not 'All'
-				: undefined, // No filter applied if 'All' or no filter
-		orderBy: (launches, { desc }) => [desc(launches.createdAt)], // Optional: Order by date
-	});
+	// Fetch launches using the DAL
+	const filteredLaunches = await getLaunches(currentFilter);
 
 	return (
 		// Removed items-center justify-center, added pt-8 for spacing below navbar
