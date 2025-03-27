@@ -6,6 +6,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 # Tailwind CSS Best Practices
 
 ## Project Setup
+
 - Use proper Tailwind configuration
 - Configure theme extension properly
 - Set up proper purge configuration
@@ -14,6 +15,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Set up proper color palette
 
 ## Component Styling
+
 - Use utility classes over custom CSS
 - Group related utilities with @apply when needed
 - Use proper responsive design utilities
@@ -22,6 +24,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Keep component styles consistent
 
 ## Layout
+
 - Use Flexbox and Grid utilities effectively
 - Implement proper spacing system
 - Use container queries when needed
@@ -30,6 +33,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Implement proper alignment utilities
 
 ## Typography
+
 - Use proper font size utilities
 - Implement proper line height
 - Use proper font weight utilities
@@ -38,6 +42,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Implement proper text decoration
 
 ## Colors
+
 - Use semantic color naming
 - Implement proper color contrast
 - Use opacity utilities effectively
@@ -46,6 +51,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Implement proper hover states
 
 ## Components
+
 - Use shadcn/ui components when available
 - Extend components properly
 - Keep component variants consistent
@@ -54,6 +60,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Keep accessibility in mind
 
 ## Responsive Design
+
 - Use mobile-first approach
 - Implement proper breakpoints
 - Use container queries effectively
@@ -62,6 +69,7 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Use proper responsive spacing
 
 ## Performance
+
 - Use proper purge configuration
 - Minimize custom CSS
 - Use proper caching strategies
@@ -70,9 +78,30 @@ globs: **/*.css, **/*.tsx, **/*.jsx, tailwind.config.js, tailwind.config.ts
 - Monitor bundle size
 
 ## Best Practices
+
+- Use utility classes directly in your HTML/JSX whenever possible.
+- Extract repeated utility combinations into reusable components, not custom CSS classes.
+- Keep utility class lists readable; consider formatting long lists over multiple lines.
+- Use `theme()` function in CSS for accessing Tailwind config values if necessary.
+- Avoid premature abstraction; only create components when a pattern truly repeats.
+
+## Utility Libraries
+
+- Use libraries like `clsx` or `tailwind-merge` to conditionally apply classes and manage class name conflicts, especially in components with complex state or props.
+
+## Customization
+
+- Use utility classes directly in your HTML/JSX whenever possible.
+- Extract repeated utility combinations into reusable components, not custom CSS classes.
+- Keep utility class lists readable; consider formatting long lists over multiple lines.
+- Use `theme()` function in CSS for accessing Tailwind config values if necessary.
+- Avoid premature abstraction; only create components when a pattern truly repeats.
+
+## Accessibility
+
 - Follow naming conventions
 - Keep styles organized
 - Use proper documentation
 - Implement proper testing
 - Follow accessibility guidelines
-- Use proper version control 
+- Use proper version control
