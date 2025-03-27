@@ -1,3 +1,4 @@
+import { formatDistanceToNow } from "date-fns"; // Import date-fns function
 import { eq } from "drizzle-orm"; // Import eq for filtering
 import Link from "next/link";
 import { getLaunches } from "~/server/queries";
@@ -61,13 +62,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 											? "Not rated"
 											: `Rating: ${launch.rating}/10`}
 									</span>
-									{/* Display formatted date instead of View Details */}
+									{/* Display formatted date using date-fns */}
 									<span className="text-gray-400 text-sm">
-										{/* Assuming createdAt exists and is a Date object */}
 										{launch.createdAt
-											? launch.createdAt.toLocaleDateString("en-US", {
-													month: "2-digit",
-													day: "2-digit",
+											? formatDistanceToNow(launch.createdAt, {
+													addSuffix: true, // Adds "ago" or "in"
 												})
 											: "No date"}
 									</span>
