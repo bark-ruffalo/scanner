@@ -1,5 +1,5 @@
 import "server-only";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
@@ -75,7 +75,8 @@ export async function addLaunch(launchData: NewLaunchData) {
 		const existingLaunch = await db.query.launches.findFirst({
 			where: and(
 				eq(launches.title, launchData.title),
-				eq(launches.launchpad, launchData.launchpad),
+				// Make sure launchpad is not undefined by using the default value from the schema if needed
+				eq(launches.launchpad, launchData.launchpad || "added manually"),
 			),
 			columns: {
 				// Only need to select one column to check for existence

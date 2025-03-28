@@ -1,4 +1,6 @@
 import {
+	type GetBlockReturnType, // Import type for getBlock
+	type GetTransactionReturnType, // Import type for getTransaction
 	type Log,
 	// type TransactionReceipt, // No longer needed directly
 	createPublicClient,
@@ -6,8 +8,6 @@ import {
 	getAddress,
 	parseAbiItem,
 	webSocket,
-	type GetBlockReturnType, // Import type for getBlock
-	type GetTransactionReturnType, // Import type for getTransaction
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
@@ -329,7 +329,7 @@ async function debugFetchHistoricalEvents() {
 // --- How to run the debug function ---
 // 1. Uncomment the line below to run it when this module is loaded.
 //    Remember to comment it out again after debugging is complete.
-// debugFetchHistoricalEvents(); // <-- Remains commented out
+debugFetchHistoricalEvents(); // <-- Do not uncomment this line!
 
 // --- Conceptual Base Class (Future Refactoring Idea) ---
 // The commented-out code below outlines a potential structure for an abstract base class.
