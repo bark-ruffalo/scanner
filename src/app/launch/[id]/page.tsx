@@ -42,7 +42,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 					<BackButton />
 					<h1 className="font-bold text-2xl">{launch.title}</h1>
 				</div>
-				<div className="space-y-4 rounded border p-4">
+				<div className="flex flex-col gap-4 rounded-xl border border-white/20 bg-[#27272a] p-6">
 					<p>
 						<strong>Launchpad:</strong> {launch.launchpad}
 					</p>
