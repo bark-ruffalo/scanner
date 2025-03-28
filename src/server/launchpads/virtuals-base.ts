@@ -143,7 +143,8 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		);
 
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
-		const formattedTimestamp = new Date(Number(timestamp * 1000n));
+		// This represents the actual time the launch happened (block timestamp).
+		const launchedAtDate = new Date(Number(timestamp * 1000n));
 
 		// --- Construct Comprehensive Description ---
 		// Format the 'amount'. Assuming it represents the newly launched token's amount.
@@ -160,7 +161,7 @@ Token: ${tokenName} (${tokenSymbol})
 Token Address: ${getAddress(token)}
 Pair Address: ${getAddress(pair)}
 Creator: ${getAddress(creator)}
-Launched At: ${formattedTimestamp.toISOString()}
+Launched At: ${launchedAtDate.toISOString()}
 Amount (${tokenSymbol}): ${amountFormatted}  ${
 			" " /* Placeholder: Add $VIRTUAL amount if available elsewhere */
 		}
@@ -173,6 +174,7 @@ Transaction: https://basescan.org/tx/${transactionHash}
 			title: `${tokenName} (${tokenSymbol}) Launch`,
 			url: `https://basescan.org/address/${token}`, // Link to the token contract on the block explorer. Use pair address?
 			description: description,
+			launchedAt: launchedAtDate, // Pass the actual launch timestamp from the block
 			// summary: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
 			// analysis: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
 		};

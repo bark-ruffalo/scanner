@@ -36,6 +36,9 @@ export const launches = createTable(
 		analysis: text("analysis").default("-").notNull(),
 		// Rating: -1 (not rated), 0-10 (rated)
 		rating: integer("rating").default(-1).notNull(),
+		launchedAt: timestamp("launched_at")
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),

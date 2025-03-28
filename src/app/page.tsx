@@ -66,13 +66,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 									<span
 										className="text-gray-400 text-sm"
 										title={
-											launch.createdAt
-												? format(launch.createdAt, "yyyy-MM-dd HH:mm") // Format for tooltip
+											launch.launchedAt
+												? format(launch.launchedAt, "yyyy-MM-dd HH:mm") // Format for tooltip
 												: "No date available"
 										}
 									>
-										{launch.createdAt
-											? formatDistanceToNow(launch.createdAt, {
+										{launch.launchedAt
+											? formatDistanceToNow(launch.launchedAt, {
 													addSuffix: true, // Adds "ago" or "in"
 												})
 											: "No date"}
