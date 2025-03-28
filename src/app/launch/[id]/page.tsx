@@ -36,54 +36,56 @@ export default async function LaunchDetailPage({ params }: Props) {
 	}
 
 	return (
-		<div className="container mx-auto p-4">
-			<div className="mb-4 flex items-center gap-4">
-				<BackButton />
-				<h1 className="font-bold text-2xl">{launch.title}</h1>
-			</div>
-			<div className="space-y-4 rounded border p-4">
-				<p>
-					<strong>Launchpad:</strong> {launch.launchpad}
-				</p>
-				{launch.url && (
+		<main className="min-h-screen bg-gradient-to-b from-[#2e026d] to-[#15162c] p-8 text-white">
+			<div className="container mx-auto p-4">
+				<div className="mb-4 flex items-center gap-4">
+					<BackButton />
+					<h1 className="font-bold text-2xl">{launch.title}</h1>
+				</div>
+				<div className="space-y-4 rounded border p-4">
 					<p>
-						<strong>URL:</strong>{" "}
-						<a
-							href={launch.url}
-							target="_blank"
-							rel="noopener noreferrer"
-							className="text-blue-500 hover:underline"
-						>
-							{launch.url}
-						</a>
+						<strong>Launchpad:</strong> {launch.launchpad}
 					</p>
-				)}
-				{launch.description && launch.description !== "-" && (
-					<div>
-						<h2 className="font-semibold text-lg">Description</h2>
-						<p className="mt-1">{launch.description}</p>
-					</div>
-				)}
-				{launch.summary && launch.summary !== "-" && (
-					<div>
-						<h2 className="font-semibold text-lg">Summary</h2>
-						<p className="mt-1">{launch.summary}</p>
-					</div>
-				)}
-				{launch.analysis && launch.analysis !== "-" && (
-					<div>
-						<h2 className="font-semibold text-lg">Analysis</h2>
-						<p className="mt-1">{launch.analysis}</p>
-					</div>
-				)}
-				{launch.rating !== undefined && launch.rating !== -1 && (
-					<p>
-						<strong>Rating:</strong> {launch.rating}
-					</p>
-				)}
-				{/* Add other launch details as needed */}
+					{launch.url && (
+						<p>
+							<strong>URL:</strong>{" "}
+							<a
+								href={launch.url}
+								target="_blank"
+								rel="noopener noreferrer"
+								className="text-blue-500 hover:underline"
+							>
+								{launch.url}
+							</a>
+						</p>
+					)}
+					{launch.description && launch.description !== "-" && (
+						<div>
+							<h2 className="font-semibold text-lg">Description</h2>
+							<p className="mt-1">{launch.description}</p>
+						</div>
+					)}
+					{launch.summary && launch.summary !== "-" && (
+						<div>
+							<h2 className="font-semibold text-lg">Summary</h2>
+							<p className="mt-1">{launch.summary}</p>
+						</div>
+					)}
+					{launch.analysis && launch.analysis !== "-" && (
+						<div>
+							<h2 className="font-semibold text-lg">Analysis</h2>
+							<p className="mt-1">{launch.analysis}</p>
+						</div>
+					)}
+					{launch.rating !== undefined && launch.rating !== -1 && (
+						<p>
+							<strong>Rating:</strong> {launch.rating}
+						</p>
+					)}
+					{/* Add other launch details as needed */}
+				</div>
 			</div>
-		</div>
+		</main>
 	);
 }
 
