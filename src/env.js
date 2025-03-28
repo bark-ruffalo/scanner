@@ -12,6 +12,8 @@ export const env = createEnv({
 			.enum(["development", "test", "production"])
 			.default("development"),
 		BASE_RPC_URL: z.string().url().optional(),
+		OPENROUTER_API_KEY: z.string().min(1),
+		OPENROUTER_API_HOST: z.string().url(),
 	},
 
 	/**
@@ -31,6 +33,8 @@ export const env = createEnv({
 		POSTGRES_URL: process.env.POSTGRES_URL,
 		NODE_ENV: process.env.NODE_ENV,
 		BASE_RPC_URL: process.env.BASE_RPC_URL,
+		OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
+		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
 	},
 	/**

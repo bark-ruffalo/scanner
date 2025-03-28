@@ -3,6 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
+import { analyzeLaunch } from "./lib/ai-utils";
 
 // --- Configuration ---
 // Set to true to overwrite existing launches with the same title and launchpad,
@@ -69,6 +70,7 @@ export async function getDistinctLaunchpads() {
 /**
  * Inserts a new launch record into the database or updates it if it already exists
  * (based on title and launchpad) and OVERWRITE_EXISTING_LAUNCHES is true.
+ * Before insertion, it uses LLM to analyze, rate and summarize the launch.
  * After successful insertion or update, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
  * @param launchData An object conforming to the NewLaunchData type.
@@ -90,8 +92,43 @@ export async function addLaunch(launchData: NewLaunchData) {
 			columns: {
 				// Need the ID to perform an update
 				id: true,
+				// Also get existing analysis data to avoid reanalyzing unnecessarily
+				analysis: true,
+				summary: true,
+				rating: true,
 			},
 		});
+
+		// Enhanced data with AI analysis - only if missing or OVERWRITE_EXISTING_LAUNCHES is true
+		let enhancedData = { ...launchData };
+		const needsAnalysis =
+			!existingLaunch ||
+			(OVERWRITE_EXISTING_LAUNCHES &&
+				(existingLaunch.analysis === "-" ||
+					existingLaunch.summary === "-" ||
+					existingLaunch.rating === -1));
+
+		if (needsAnalysis) {
+			try {
+				console.log("Analyzing launch description with AI...");
+				const analysisResult = await analyzeLaunch(launchData.description);
+				console.log(`Analysis complete! Rating: ${analysisResult.rating}/10`);
+
+				// Enhance the data with AI-generated content
+				enhancedData = {
+					...launchData,
+					analysis: analysisResult.analysis,
+					summary: analysisResult.summary,
+					rating: analysisResult.rating,
+				};
+			} catch (analysisError) {
+				console.error("Error during AI analysis:", analysisError);
+				// Continue with original data if analysis fails
+				console.log("Proceeding with original data (without AI analysis).");
+			}
+		} else {
+			console.log("Skipping AI analysis (already analyzed or not needed).");
+		}
 
 		if (existingLaunch) {
 			// Launch exists, check if we should overwrite
@@ -102,7 +139,7 @@ export async function addLaunch(launchData: NewLaunchData) {
 				// Prepare data for update. Exclude fields that shouldn't be manually set on update if necessary.
 				// Assuming 'updatedAt' is handled by the database `onUpdateNow()`. If not, add `updatedAt: new Date()` here.
 				const updateData: Partial<typeof launches.$inferInsert> = {
-					...launchData,
+					...enhancedData,
 					// Explicitly set updatedAt if schema doesn't handle it automatically
 					// updatedAt: new Date(),
 				};
@@ -127,7 +164,7 @@ export async function addLaunch(launchData: NewLaunchData) {
 			console.log(
 				`"${launchData.title}" not found. Proceeding with insertion...`,
 			);
-			await db.insert(launches).values(launchData);
+			await db.insert(launches).values(enhancedData);
 			console.log(
 				`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
 			);
