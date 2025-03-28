@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { BackButton } from "~/components/BackButton";
+import { linkify } from "~/lib/utils";
 import { getLaunchById } from "~/server/queries";
 
 type Props = {
@@ -75,9 +76,24 @@ export default async function LaunchDetailPage({ params }: Props) {
 					{launch.description && launch.description !== "-" && (
 						<div className="break-words">
 							<h2 className="font-semibold text-lg">Description</h2>
-							<p className="mt-1 whitespace-pre-wrap break-words">
-								{launch.description}
-							</p>
+							<div className="mt-1 whitespace-pre-wrap break-words">
+								{linkify(launch.description).map((part, index) => {
+									if (typeof part === "string") {
+										return <span key={index}>{part}</span>;
+									}
+									return (
+										<a
+											key={index}
+											href={part.url}
+											target="_blank"
+											rel="noopener noreferrer"
+											className="break-all text-blue-500 hover:underline"
+										>
+											{part.url}
+										</a>
+									);
+								})}
+							</div>
 						</div>
 					)}
 					{launch.summary && launch.summary !== "-" && (
