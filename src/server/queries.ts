@@ -102,9 +102,17 @@ export async function addLaunch(launchData: NewLaunchData) {
 		);
 
 		// Revalidate the cache for the specified path.
-		console.log("Revalidating Next.js cache for path: /");
-		revalidatePath("/");
-		console.log("Cache revalidation triggered for /.");
+		// Wrapped in try-catch to handle "static generation store missing" error during direct script execution
+		try {
+			console.log("Attempting to revalidate Next.js cache for path: /");
+			revalidatePath("/");
+			console.log("Cache revalidation triggered for /.");
+		} catch (revalidateError) {
+			console.log(
+				"Cache revalidation skipped: not in a Next.js rendering context.",
+			);
+			// This is expected when running outside of Next.js rendering context (like in direct script execution)
+		}
 	} catch (error) {
 		// Log any errors that occur during the database check or insertion process.
 		console.error(
