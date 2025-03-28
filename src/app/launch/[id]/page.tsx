@@ -58,25 +58,25 @@ export default async function LaunchDetailPage({ params }: Props) {
 						</a>
 					</p>
 				)}
-				{launch.description && (
+				{launch.description && launch.description !== "-" && (
 					<div>
 						<h2 className="font-semibold text-lg">Description</h2>
 						<p className="mt-1">{launch.description}</p>
 					</div>
 				)}
-				{launch.summary && (
+				{launch.summary && launch.summary !== "-" && (
 					<div>
 						<h2 className="font-semibold text-lg">Summary</h2>
 						<p className="mt-1">{launch.summary}</p>
 					</div>
 				)}
-				{launch.analysis && (
+				{launch.analysis && launch.analysis !== "-" && (
 					<div>
 						<h2 className="font-semibold text-lg">Analysis</h2>
 						<p className="mt-1">{launch.analysis}</p>
 					</div>
 				)}
-				{launch.rating && (
+				{launch.rating !== undefined && launch.rating !== -1 && (
 					<p>
 						<strong>Rating:</strong> {launch.rating}
 					</p>
