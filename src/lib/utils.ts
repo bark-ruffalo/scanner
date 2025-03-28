@@ -12,10 +12,12 @@ export function linkify(
 		/(\b(https?|ftp|file):\/\/[-A-Z0-9+&@#\/%?=~_|!:,.;]*[-A-Z0-9+&@#\/%=~_|])|(\bwww\.[\-A-Z0-9+&@#\/%?=~_|!:,.;]*[\-A-Z0-9+&@#\/%=~_|])/gi;
 	const parts: (string | { type: "link"; url: string })[] = [];
 	let lastIndex = 0;
-	let match;
+
+	// Define the type for regex match results
+	let match: RegExpExecArray | null = urlRegex.exec(text);
 
 	// Iterate through all matches found by the regex
-	while ((match = urlRegex.exec(text)) !== null) {
+	while (match !== null) {
 		const url = match[0]; // The matched URL string
 		const index = match.index; // Starting index of the match
 
@@ -30,6 +32,9 @@ export function linkify(
 
 		// Update the index for the next segment
 		lastIndex = index + url.length;
+
+		// Get the next match
+		match = urlRegex.exec(text);
 	}
 
 	// Add any remaining text segment *after* the last match

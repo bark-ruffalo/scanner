@@ -79,11 +79,16 @@ export default async function LaunchDetailPage({ params }: Props) {
 							<div className="mt-1 whitespace-pre-wrap break-words">
 								{linkify(launch.description).map((part, index) => {
 									if (typeof part === "string") {
-										return <span key={index}>{part}</span>;
+										// Create a key using the content and index
+										// Using substring to limit key length for very long text
+										const textKey = `text-${part.substring(0, 10).trim()}-${index}`;
+										return <span key={textKey}>{part}</span>;
 									}
+									// Create a unique key for URLs using the URL itself
+									const urlKey = `link-${part.url.replace(/[^a-z0-9]/gi, "-").substring(0, 20)}-${index}`;
 									return (
 										<a
-											key={index}
+											key={urlKey}
 											href={part.url}
 											target="_blank"
 											rel="noopener noreferrer"
