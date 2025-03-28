@@ -1,34 +1,28 @@
 import {
-	type GetBlockReturnType, // Import type for getBlock
-	type GetTransactionReturnType, // Import type for getTransaction
 	type Log,
-	// type TransactionReceipt, // No longer needed directly
 	createPublicClient,
-	formatUnits,
 	getAddress,
 	parseAbiItem,
 	webSocket,
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import { addLaunch } from "~/server/queries"; // Import the function to add launch
+import { addLaunch } from "~/server/queries";
 
 // --- Configuration ---
 
 // The on-chain address of the Virtuals Protocol factory contract on the Base network.
 // This contract emits the 'Launched' event we are interested in.
 const VIRTUALS_FACTORY_ADDRESS: `0x${string}` =
-	"0xF66DeA7b3e897cD44A5a231c61B6B4423d613259"; // Address from python script
+	"0xF66DeA7b3e897cD44A5a231c61B6B4423d613259";
 
 // A constant string identifying the launchpad for database storage and display purposes.
 const LAUNCHPAD_NAME = "VIRTUALS Protocol (Base)";
 
-// Define the Application Binary Interface (ABI) fragment for the 'Launched' event.
-// Updated based on Basescan log 0x714aa39317ad9a7a7a99db52b44490da5d068a0b2710fffb1a1282ad3cadae1f
-// Signature: Launched(address indexed token, address indexed pair, uint256 amount)
-// Note: The name 'amount' for the uint256 is inferred; confirm if contract ABI is available.
+// Define the ABI fragment for the 'Launched' event.
+// Signature: Launched(address indexed token, address indexed pair, uint256 n)
 const launchedEventAbi = parseAbiItem(
-	"event Launched(address indexed token, address indexed pair, uint256 amount)", // Corrected ABI Signature
+	"event Launched(address indexed token, address indexed pair, uint256 n)",
 );
 
 // Define ABI fragments for standard ERC20 token functions (name, symbol, decimals).
@@ -44,13 +38,18 @@ const erc20Abi = [
 // Create a WebSocket transport for the viem client.
 // WebSockets are preferred for listening to real-time events.
 // It reads the RPC URL from the environment variables. Ensure it starts with 'wss://'.
-// Provides a fallback to the default Base mainnet WebSocket URL if the env var is not set.
-const wsTransport = webSocket(env.BASE_RPC_URL || "wss://mainnet.base.org");
-console.log(
-	`Using WebSocket transport: ${
-		env.BASE_RPC_URL ? "From BASE_RPC_URL" : "Default Base Mainnet"
-	}`,
+// Provides an untested fallback if the env var is not set (taken from https://chainlist.org/chain/8453).
+const wsTransport = webSocket(
+	env.BASE_RPC_URL || "wss://base-rpc.publicnode.com",
 );
+if (!env.BASE_RPC_URL) {
+	console.log(
+		"Note: Using an untested Base WebSocket endpoint taken from https://chainlist.org/chain/8453.",
+	);
+	console.log(
+		"For better reliability, consider setting BASE_RPC_URL in your environment variables (Alchemy, Infura, etc.)! It must start with 'wss://'.",
+	);
+}
 
 // Create the viem public client instance.
 // This client interacts with the Base blockchain via the WebSocket transport.
@@ -70,7 +69,7 @@ interface LaunchedEventLog extends Log {
 	args: {
 		token: `0x${string}`; // Address of the newly launched ERC20 token (indexed).
 		pair: `0x${string}`; // Address of the associated liquidity pair contract (indexed).
-		amount: bigint; // Amount associated with the launch (e.g., initial liquidity amount of the token?).
+		tokenInfos_length: bigint; // Not useful for anything.
 	};
 }
 
@@ -88,13 +87,13 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 	);
 
 	// Destructure arguments from the corrected log structure.
-	const { token, pair, amount } = log.args;
+	const { token, pair } = log.args;
 	const { blockNumber, transactionHash } = log;
 
 	// Basic validation for event arguments.
-	if (!token || !pair || amount === undefined) {
+	if (!token || !pair) {
 		console.warn(
-			`[${transactionHash}] Skipping incomplete ${log.eventName} event log: Missing required arguments (token, pair, or amount).`,
+			`[${transactionHash}] Skipping incomplete ${log.eventName} event log: Missing required arguments (token and pair).`,
 			log.args,
 		);
 		return; // Skip processing if data is incomplete.
@@ -108,15 +107,13 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		return; // Skip processing if essential metadata is missing.
 	}
 
-	console.log(
-		`[${token}] Extracted event args: token=${token}, pair=${pair}, amount=${amount.toString()}`,
-	);
+	// console.log(`[${token}] Extracted event args: token=${token}, pair=${pair}}`);
 
 	try {
 		// Fetch additional details concurrently: token info, block timestamp, and transaction sender (creator)
-		console.log(
-			`[${token}] Fetching token details, block info (for timestamp), and transaction info (for creator)...`,
-		);
+		// console.log(
+		// 	`[${token}] Fetching token details, block info (for timestamp), and transaction info (for creator)...`,
+		// );
 		const [
 			tokenDetails, // Array: [tokenName, tokenSymbol, tokenDecimals]
 			block, // Block data including timestamp
@@ -147,25 +144,15 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const launchedAtDate = new Date(Number(timestamp * 1000n));
 
 		// --- Construct Comprehensive Description ---
-		// Format the 'amount'. Assuming it represents the newly launched token's amount.
-		// The meaning of 'amount' might need verification based on contract logic.
-		const amountFormatted = formatUnits(amount, tokenDecimals);
-		console.log(
-			`[${token}] Formatted amount: ${amountFormatted} ${tokenSymbol}`,
-		);
-
 		// Create a multi-line description string containing key details about the launch.
 		const description = `
-Token: ${tokenSymbol}
-Token Address: https://basescan.org/token/${getAddress(token)}#balances
-Liquidity Contract: https://basescan.org/address/${getAddress(pair)}#asset-tokens
+Launched at: ${launchedAtDate.toUTCString()}
+Launched in transaction: https://basescan.org/tx/${transactionHash}
+Token symbol: ${tokenSymbol}
+Token address: https://basescan.org/token/${getAddress(token)}#balances
+Liquidity contract: https://basescan.org/address/${getAddress(pair)}#asset-tokens
 Creator address: https://basescan.org/address/${getAddress(creator)}
-Creator Virtuals profile: https://app.virtuals.io/profile/${getAddress(creator)}
-Launched At: ${launchedAtDate.toUTCString()}
-Amount (${tokenSymbol}): ${amountFormatted}  ${
-			" " /* Placeholder: Add $VIRTUAL amount if available elsewhere */
-		}
-Transaction: https://basescan.org/tx/${transactionHash}
+Creator profile: https://app.virtuals.io/profile/${getAddress(creator)}
             `.trim();
 
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
@@ -270,8 +257,9 @@ export function startVirtualsBaseListener() {
  */
 async function debugFetchHistoricalEvents() {
 	// Define the block range to query. Use BigInt literals (e.g., 12345n).
-	const fromBlock = 28057270n; // Example start block
-	const toBlock = 28057274n; // Example end block
+	const fromBlock = 23639253n; // Example start block
+	const toBlock = 23639253n; // Example end block
+	// another example: 28057272 for KIDDO
 	console.log(
 		`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${fromBlock} to ${toBlock} ---`,
 	);
