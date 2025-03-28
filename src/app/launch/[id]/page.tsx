@@ -1,14 +1,30 @@
+import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { BackButton } from "~/components/BackButton";
 import { getLaunchById } from "~/server/queries";
-import { notFound } from "next/navigation";
 
-export default async function LaunchDetailPage({
-	params,
-}: {
+type Props = {
 	params: { id: string };
-}) {
+};
+
+// Add metadata generation
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+	const resolvedParams = await Promise.resolve(params);
+	const launchId = Number.parseInt(resolvedParams.id, 10);
+	if (Number.isNaN(launchId)) {
+		return { title: "Invalid Launch | Scanner" };
+	}
+
+	const launch = await getLaunchById(launchId);
+	return {
+		title: launch ? `${launch.title} | Scanner` : "Launch Not Found | Scanner",
+	};
+}
+
+export default async function LaunchDetailPage({ params }: Props) {
 	// Validate ID - ensure it's a number
-	const launchId = Number.parseInt(params.id, 10);
+	const resolvedParams = await Promise.resolve(params);
+	const launchId = Number.parseInt(resolvedParams.id, 10);
 	if (Number.isNaN(launchId)) {
 		notFound(); // Or handle invalid ID format appropriately
 	}
@@ -78,15 +94,4 @@ export default async function LaunchDetailPage({
 //   // return launches.map((launch) => ({
 //   //   id: launch.id.toString(),
 //   // }));
-// }
-
-// Optional: Add metadata
-// export async function generateMetadata({ params }: { params: { id: string } }) {
-//   const launchId = parseInt(params.id, 10);
-//   if (isNaN(launchId)) return { title: "Invalid Launch" };
-//
-//   const launch = await getLaunchById(launchId);
-//   return {
-//     title: launch ? `${launch.title} | Scanner` : "Launch Not Found | Scanner",
-//   };
 // }
