@@ -62,7 +62,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 					{launch.description && launch.description !== "-" && (
 						<div>
 							<h2 className="font-semibold text-lg">Description</h2>
-							<p className="mt-1">{launch.description}</p>
+							<p className="mt-1 whitespace-pre-wrap">{launch.description}</p>
 						</div>
 					)}
 					{launch.summary && launch.summary !== "-" && (
@@ -74,7 +74,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 					{launch.analysis && launch.analysis !== "-" && (
 						<div>
 							<h2 className="font-semibold text-lg">Analysis</h2>
-							<p className="mt-1">{launch.analysis}</p>
+							<p className="mt-1 whitespace-pre-wrap">{launch.analysis}</p>
 						</div>
 					)}
 					{launch.rating !== undefined && launch.rating !== -1 && (
