@@ -4,6 +4,12 @@ import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
 
+// --- Configuration ---
+// Set to true to overwrite existing launches with the same title and launchpad,
+// false to skip adding duplicates.
+const OVERWRITE_EXISTING_LAUNCHES = true;
+// --- End Configuration ---
+
 // Define the type for data needed to create a new launch record.
 // It uses TypeScript's Omit utility type to take the 'launches' table insert type
 // (inferred by Drizzle as `typeof launches.$inferInsert`) and exclude properties
@@ -11,7 +17,7 @@ import { launches } from "./db/schema";
 // This ensures that functions adding launches only accept the required fields.
 type NewLaunchData = Omit<
 	typeof launches.$inferInsert,
-	"id" | "createdAt" | "updatedAt"
+	"id" | "createdAt" // Keep updatedAt potentially for update logic
 >;
 
 /**
@@ -61,15 +67,18 @@ export async function getDistinctLaunchpads() {
 }
 
 /**
- * Inserts a new launch record into the database if it doesn't already exist (based on title and launchpad).
- * After successful insertion, it triggers a revalidation of the Next.js cache
+ * Inserts a new launch record into the database or updates it if it already exists
+ * (based on title and launchpad) and OVERWRITE_EXISTING_LAUNCHES is true.
+ * After successful insertion or update, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
  * @param launchData An object conforming to the NewLaunchData type.
  */
 export async function addLaunch(launchData: NewLaunchData) {
 	console.log(
-		`Attempting to add/check launch in DB: ${launchData.title} from ${launchData.launchpad}`,
+		`Attempting to add/update launch in DB: ${launchData.title} from ${launchData.launchpad}`,
 	);
+	let actionTaken: "inserted" | "updated" | "skipped" | "error" = "error"; // Track outcome
+
 	try {
 		// Check if a launch with the same title and launchpad already exists
 		const existingLaunch = await db.query.launches.findFirst({
@@ -79,52 +88,83 @@ export async function addLaunch(launchData: NewLaunchData) {
 				eq(launches.launchpad, launchData.launchpad || "added manually"),
 			),
 			columns: {
-				// Only need to select one column to check for existence
+				// Need the ID to perform an update
 				id: true,
 			},
 		});
 
 		if (existingLaunch) {
-			// If launch exists, log it and do nothing further
+			// Launch exists, check if we should overwrite
+			if (OVERWRITE_EXISTING_LAUNCHES) {
+				console.log(
+					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Overwriting...`,
+				);
+				// Prepare data for update. Exclude fields that shouldn't be manually set on update if necessary.
+				// Assuming 'updatedAt' is handled by the database `onUpdateNow()`. If not, add `updatedAt: new Date()` here.
+				const updateData: Partial<typeof launches.$inferInsert> = {
+					...launchData,
+					// Explicitly set updatedAt if schema doesn't handle it automatically
+					// updatedAt: new Date(),
+				};
+				await db
+					.update(launches)
+					.set(updateData)
+					.where(eq(launches.id, existingLaunch.id));
+				console.log(
+					`Successfully updated launch: ${launchData.title} from ${launchData.launchpad}`,
+				);
+				actionTaken = "updated";
+			} else {
+				// If overwrite is disabled, log and skip
+				console.log(
+					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Skipping insertion as overwrite is disabled.`,
+				);
+				actionTaken = "skipped";
+				// No 'return' here, proceed to revalidation if needed (though skipping means no change)
+			}
+		} else {
+			// If launch does not exist, proceed with insertion
 			console.log(
-				`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Skipping insertion.`,
+				`"${launchData.title}" not found. Proceeding with insertion...`,
 			);
-			return; // Exit the function early
+			await db.insert(launches).values(launchData);
+			console.log(
+				`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
+			);
+			actionTaken = "inserted";
 		}
 
-		// If launch does not exist, proceed with insertion
-		console.log(
-			`"${launchData.title}" not found. Proceeding with insertion...`,
-		);
-		await db.insert(launches).values(launchData);
-		console.log(
-			`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
-		);
-
-		// Revalidate the cache for the specified path.
-		// Wrapped in try-catch to handle "static generation store missing" error during direct script execution
-		try {
-			console.log("Attempting to revalidate Next.js cache for path: /");
-			revalidatePath("/");
-			console.log("Cache revalidation triggered for /.");
-		} catch (revalidateError) {
-			console.log(
-				"Cache revalidation skipped: not in a Next.js rendering context.",
-			);
-			// This is expected when running outside of Next.js rendering context (like in direct script execution)
+		// Only revalidate if data was actually changed (inserted or updated)
+		if (actionTaken === "inserted" || actionTaken === "updated") {
+			// Revalidate the cache for the specified path.
+			// Wrapped in try-catch to handle "static generation store missing" error during direct script execution
+			try {
+				console.log("Attempting to revalidate Next.js cache for path: /");
+				revalidatePath("/");
+				console.log("Cache revalidation triggered for /.");
+			} catch (revalidateError) {
+				console.warn(
+					// Use warn for expected scenarios
+					"Cache revalidation skipped: not in a Next.js rendering context.",
+					revalidateError instanceof Error
+						? revalidateError.message
+						: revalidateError,
+				);
+				// This is expected when running outside of Next.js rendering context (like in direct script execution)
+			}
 		}
 	} catch (error) {
-		// Log any errors that occur during the database check or insertion process.
+		actionTaken = "error";
+		// Log any errors that occur during the database check, insertion or update process.
 		console.error(
 			`Error processing launch "${launchData.title}" in database:`, // Updated error message context
 			error,
 		);
-		// Depending on application requirements, you might:
-		// - Throw the error to be handled by a higher-level error handler.
-		// - Implement specific error handling (e.g., for unique constraint violations).
-		// - Send the error to an external monitoring service.
-		// throw error; // Uncomment to propagate the error
+		// Consider re-throwing the error if needed by the caller
+		// throw error;
 	}
+	// Optionally return the action taken
+	// return actionTaken;
 }
 
 export async function getLaunchById(id: number) {
