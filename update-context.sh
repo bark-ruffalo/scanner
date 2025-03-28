@@ -46,4 +46,5 @@ echo "code2prompt is available. Proceeding with context generation..."
 rm -f context-codebase.md
 
 # Generate new context file
-code2prompt -p . -o context-codebase.md --exclude "**.log,**.tmp,node_modules/**,.next/**,dist/**,build/**,.vercel/**,context**"
+code2prompt -p src -p instrumentation.ts -p package.json -p biome.jsonc -p drizzle.config.ts -p next.config.js -p postcss.config.js -p tsconfig.json -p .env -p .env.example -o context-codebase.md
+code context-codebase.md

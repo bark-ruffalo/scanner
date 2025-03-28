@@ -27,12 +27,6 @@ Always use the following command after a new chat has started in order to unders
 
 `tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc'`
 
-## Full Context
-
-To get the full context of the project, use the following command, then read the generated `context-codebase.md` file:
-
-`code2prompt -p . -o context-codebase.md --exclude "**.log,**.tmp,node_modules/**,.next/**,dist/**,build/**,.vercel/**,context**"`
-
 ## Data Models
 
 - **Launch**: Represents a launch event from a launchpad
