@@ -1,5 +1,5 @@
 import "server-only";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
@@ -61,31 +61,53 @@ export async function getDistinctLaunchpads() {
 }
 
 /**
- * Inserts a new launch record into the database.
+ * Inserts a new launch record into the database if it doesn't already exist (based on title and launchpad).
  * After successful insertion, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
  * @param launchData An object conforming to the NewLaunchData type.
  */
 export async function addLaunch(launchData: NewLaunchData) {
-	console.log(`Attempting to add new launch to DB: ${launchData.title}`);
+	console.log(
+		`Attempting to add/check launch in DB: ${launchData.title} from ${launchData.launchpad}`,
+	);
 	try {
-		// Uses Drizzle's `insert` method to add a new row to the 'launches' table.
-		// `.values(launchData)` provides the data for the new row.
+		// Check if a launch with the same title and launchpad already exists
+		const existingLaunch = await db.query.launches.findFirst({
+			where: and(
+				eq(launches.title, launchData.title),
+				eq(launches.launchpad, launchData.launchpad),
+			),
+			columns: {
+				// Only need to select one column to check for existence
+				id: true,
+			},
+		});
+
+		if (existingLaunch) {
+			// If launch exists, log it and do nothing further
+			console.log(
+				`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Skipping insertion.`,
+			);
+			return; // Exit the function early
+		}
+
+		// If launch does not exist, proceed with insertion
+		console.log(
+			`"${launchData.title}" not found. Proceeding with insertion...`,
+		);
 		await db.insert(launches).values(launchData);
 		console.log(
 			`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
 		);
 
-		// Revalidate the cache for the specified path. This tells Next.js to
-		// fetch fresh data for this path on the next request, ensuring the homepage
-		// list is updated without requiring a manual refresh or redeploy.
+		// Revalidate the cache for the specified path.
 		console.log("Revalidating Next.js cache for path: /");
 		revalidatePath("/");
 		console.log("Cache revalidation triggered for /.");
 	} catch (error) {
-		// Log any errors that occur during the database insertion process.
+		// Log any errors that occur during the database check or insertion process.
 		console.error(
-			`Error adding launch "${launchData.title}" to database:`,
+			`Error processing launch "${launchData.title}" in database:`, // Updated error message context
 			error,
 		);
 		// Depending on application requirements, you might:
