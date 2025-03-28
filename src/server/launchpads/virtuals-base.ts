@@ -3,7 +3,9 @@ import {
 	createPublicClient,
 	getAddress,
 	parseAbiItem,
+	parseAbi,
 	webSocket,
+	formatUnits,
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
@@ -25,13 +27,16 @@ const launchedEventAbi = parseAbiItem(
 	"event Launched(address indexed token, address indexed pair, uint256 n)",
 );
 
-// Define ABI fragments for standard ERC20 token functions (name, symbol, decimals).
-// These are used to fetch details about the newly launched token.
-const erc20Abi = [
-	parseAbiItem("function name() view returns (string)"),
-	parseAbiItem("function symbol() view returns (string)"),
-	parseAbiItem("function decimals() view returns (uint8)"),
-] as const; // Use 'as const' for stricter type inference with viem
+// Define the ABI for the tokenInfo function on the factory contract
+// Using parseAbi for complex structure - Corrected: Removed outer wrapping tuple ()
+const factoryAbi = parseAbi([
+	"function tokenInfo(address tokenAddress) view returns (address creator, address token, address pair, address agentToken, (address token, string name, string _name, string ticker, uint256 supply, uint256 price, uint256 marketCap, uint256 liquidity, uint256 volume, uint256 volume24H, uint256 prevPrice, uint256 lastUpdated) data, string description, string image, string twitter, string telegram, string youtube, string website, bool trading, bool tradingOnUniswap)",
+]);
+
+// Define ABI for standard ERC20 balanceOf function
+const balanceOfAbi = parseAbiItem(
+	"function balanceOf(address account) view returns (uint256)",
+);
 
 // --- Client Setup ---
 
@@ -69,16 +74,47 @@ interface LaunchedEventLog extends Log {
 	args: {
 		token: `0x${string}`; // Address of the newly launched ERC20 token (indexed).
 		pair: `0x${string}`; // Address of the associated liquidity pair contract (indexed).
-		tokenInfos_length: bigint; // Not useful for anything.
+		n: bigint; // Not useful for anything. It represents tokenInfos.length.
 	};
 }
+
+// Define a type for the structure returned by the tokenInfo function
+// Corrected: It returns a tuple (array) of values, not a single object
+type TokenInfoResult = readonly [
+	creator: `0x${string}`,
+	token: `0x${string}`,
+	pair: `0x${string}`,
+	agentToken: `0x${string}`,
+	data: {
+		token: `0x${string}`;
+		name: string;
+		_name: string;
+		ticker: string;
+		supply: bigint;
+		price: bigint;
+		marketCap: bigint;
+		liquidity: bigint;
+		volume: bigint;
+		volume24H: bigint;
+		prevPrice: bigint;
+		lastUpdated: bigint;
+	},
+	description: string,
+	image: string,
+	twitter: string,
+	telegram: string,
+	youtube: string,
+	website: string,
+	trading: boolean,
+	tradingOnUniswap: boolean,
+];
 
 // --- Listener Logic ---
 
 /**
  * Processes a single 'Launched' event log.
- * Fetches token details, block timestamp, transaction sender (creator),
- * formats a description, and adds the launch to the database.
+ * Fetches token details using tokenInfo, block timestamp, creator balance,
+ * calculates creator allocation, formats a description, and adds the launch to the database.
  * @param log The decoded event log matching the LaunchedEventLog interface.
  */
 async function processLaunchedEvent(log: LaunchedEventLog) {
@@ -93,7 +129,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 	// Basic validation for event arguments.
 	if (!token || !pair) {
 		console.warn(
-			`[${transactionHash}] Skipping incomplete ${log.eventName} event log: Missing required arguments (token and pair).`,
+			`[${transactionHash}] Skipping incomplete ${log.eventName} event log: Missing required arguments (token or pair).`,
 			log.args,
 		);
 		return; // Skip processing if data is incomplete.
@@ -107,77 +143,131 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		return; // Skip processing if essential metadata is missing.
 	}
 
-	// console.log(`[${token}] Extracted event args: token=${token}, pair=${pair}}`);
-
 	try {
-		// Fetch additional details concurrently: token info, block timestamp, and transaction sender (creator)
-		// console.log(
-		// 	`[${token}] Fetching token details, block info (for timestamp), and transaction info (for creator)...`,
-		// );
+		// Fetch token info from factory and block info (for timestamp) concurrently
+		console.log(`[${token}] Fetching tokenInfo and block info...`); // Updated log message
 		const [
-			tokenDetails, // Array: [tokenName, tokenSymbol, tokenDecimals]
+			tokenInfoResult, // Result from tokenInfo call (now a tuple)
 			block, // Block data including timestamp
-			transaction, // Transaction data including sender ('from' address)
 		] = await Promise.all([
-			publicClient.multicall({
-				contracts: [
-					{ address: token, abi: erc20Abi, functionName: "name" },
-					{ address: token, abi: erc20Abi, functionName: "symbol" },
-					{ address: token, abi: erc20Abi, functionName: "decimals" },
-				],
-				allowFailure: false,
-			}),
+			publicClient.readContract({
+				address: VIRTUALS_FACTORY_ADDRESS,
+				abi: factoryAbi,
+				functionName: "tokenInfo",
+				args: [token], // Pass the token address from the event
+			}) as Promise<TokenInfoResult>, // Cast result to our defined tuple type
 			publicClient.getBlock({ blockNumber: blockNumber }),
-			publicClient.getTransaction({ hash: transactionHash }),
-		]);
+		]).catch((error) => {
+			// Handle errors during Promise.all (e.g., tokenInfo call fails)
+			console.error(
+				`[${token}] Error during initial data fetching (tokenInfo, block):`,
+				error,
+			);
+			throw error; // Re-throw to stop further processing in this event
+		});
 
-		const [tokenName, tokenSymbol, tokenDecimals] = tokenDetails;
-		const timestamp = block.timestamp; // Get timestamp from block data
-		const creator = transaction.from; // Get sender ('from') address from transaction data
+		// Now access elements from the tokenInfoResult tuple and fetch creator balance
+		const creator = tokenInfoResult[0];
+		const dataTuple = tokenInfoResult[4];
+		const platformDescription = tokenInfoResult[5];
+		const image = tokenInfoResult[6];
+		const twitter = tokenInfoResult[7];
+		const telegram = tokenInfoResult[8];
+		const youtube = tokenInfoResult[9];
+		const website = tokenInfoResult[10];
+
+		const tokenName = dataTuple.name;
+		const tokenSymbol = dataTuple.ticker; // Use ticker as symbol
+		const totalSupply = dataTuple.supply;
+
+		console.log(`[${token}] Fetching creator's initial balance...`); // Added log
+		const creatorInitialBalance = await publicClient
+			.readContract({
+				address: token, // The launched token address
+				abi: [balanceOfAbi], // Use the balanceOf ABI
+				functionName: "balanceOf",
+				args: [creator], // The creator's address from tokenInfo
+				blockNumber: blockNumber, // Fetch balance at the specific block of the launch
+			})
+			.catch((error) => {
+				console.error(
+					`[${token}] Error fetching creator's initial balance:`,
+					error,
+				);
+				return 0n; // Default to 0 if balance check fails
+			});
+
+		const timestamp = block.timestamp;
 
 		console.log(
-			`[${token}] Fetched details: Name=${tokenName}, Symbol=${tokenSymbol}, Decimals=${tokenDecimals}, Creator=${creator}, Timestamp=${timestamp}`,
+			`[${token}] Fetched details via tokenInfo: Name=${tokenName}, Symbol=${tokenSymbol}, Creator=${creator}, Supply=${totalSupply}, Timestamp=${timestamp}`,
 		);
 
+		// Calculate creator allocation percentage
+		let creatorAllocationPercent = 0;
+		let formattedAllocation = "N/A";
+		if (totalSupply > 0n) {
+			try {
+				// Use BigInt math for precision before converting to number
+				const percentageBasisPoints =
+					(creatorInitialBalance * 10000n) / totalSupply; // Calculate in basis points (scaled by 10000)
+				creatorAllocationPercent = Number(percentageBasisPoints) / 100; // Convert back to percentage
+				formattedAllocation = `${creatorAllocationPercent.toFixed(2)}%`;
+			} catch (calcError) {
+				console.error(
+					`[${token}] Error calculating creator allocation:`,
+					calcError,
+				);
+				formattedAllocation = "Error calculating";
+			}
+		} else {
+			formattedAllocation = "0.00% (Total supply is 0)";
+		}
+
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
-		// This represents the actual time the launch happened (block timestamp).
 		const launchedAtDate = new Date(Number(timestamp * 1000n));
 
 		// --- Construct Comprehensive Description ---
-		// Create a multi-line description string containing key details about the launch.
+		// Access tuple elements by index for description
 		const description = `
 Launched at: ${launchedAtDate.toUTCString()}
 Launched in transaction: https://basescan.org/tx/${transactionHash}
-Token symbol: ${tokenSymbol}
-Token address: https://basescan.org/token/${getAddress(token)}#balances
-Liquidity contract: https://basescan.org/address/${getAddress(pair)}#asset-tokens
-Creator address: https://basescan.org/address/${getAddress(creator)}
-Creator profile: https://app.virtuals.io/profile/${getAddress(creator)}
+
+Token Name: ${tokenName} (${tokenSymbol})
+Token Address: https://basescan.org/token/${getAddress(token)}#balances
+Liquidity Contract: https://basescan.org/address/${getAddress(pair)}#code
+Total Supply: ${totalSupply.toString()} ${tokenSymbol}
+Image: ${image || "N/A"}
+
+Creator: https://basescan.org/address/${getAddress(creator)}
+Creator Virtuals Profile: https://app.virtuals.io/profile/${getAddress(creator)}
+Creator Initial Allocation: ${formattedAllocation}
+
+Description from Platform:
+${platformDescription || "N/A"}
+
+These fields aren't used anymore when creating a prototype on Virtuals Protocol, therefore they're likely to be empty:
+Website: ${website || "N/A"}
+Twitter: ${twitter || "N/A"}
+Telegram: ${telegram || "N/A"}
+YouTube: ${youtube || "N/A"}
             `.trim();
 
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
-			title: `${tokenName} (${tokenSymbol}) Launch`,
-			url: `https://app.virtuals.io/prototypes/${token}`, // Link to the token contract on the block explorer. Use pair address?
-			description: description,
-			launchedAt: launchedAtDate, // Pass the actual launch timestamp from the block
-			// summary: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
-			// analysis: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
+			title: `${tokenName} (${tokenSymbol}) Launch`, // Use name and ticker
+			url: `https://app.virtuals.io/prototypes/${token}`, // Keep Virtuals specific link
+			description: description, // Use the comprehensive description
+			launchedAt: launchedAtDate,
+			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(`[${token}] Prepared launch data for DB insertion.`);
-		console.log(
-			`[${token}] Prepared launch data for DB insertion:`,
-			launchData,
-		); // Added log for launchData
+		// console.log(`[${token}] Prepared launch data for DB insertion:`, launchData); // Optional detailed log
 
 		// Call the database function to add the new launch record.
 		await addLaunch(launchData);
-		// The log message below might be slightly inaccurate if the launch was skipped due to duplication,
-		// but the addLaunch function logs the skipping action itself.
-		console.log(
-			`[${token}] Called addLaunch for token: ${tokenSymbol}`, // Adjusted log message slightly
-		);
+		console.log(`[${token}] Called addLaunch for token: ${tokenSymbol}`);
 	} catch (error) {
 		// Catch and log any errors during fetching details or database insertion.
 		console.error(
