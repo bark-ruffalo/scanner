@@ -166,6 +166,9 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			throw error; // Re-throw to stop further processing in this event
 		});
 
+		// Build token URL
+		const tokenUrl = `https://app.virtuals.io/prototypes/${token}`;
+
 		// Now access elements from the tokenInfoResult tuple and fetch creator balance
 		const creator = tokenInfoResult[0];
 		const dataTuple = tokenInfoResult[4];
@@ -233,23 +236,30 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// --- Construct Comprehensive Description ---
 		// Access tuple elements by index for description
 		const description = `
+# ${tokenName}
 Launched at: ${launchedAtDate.toUTCString()}
+Launched through the launchpad: ${LAUNCHPAD_NAME}
+URL on launchpad: ${tokenUrl}
+
+## Token details and tokenomics
+Token symbol: $${tokenSymbol}
+Token address: ${getAddress(token)}
+Top holders: https://basescan.org/token/${getAddress(token)}#balances
+Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Launched in transaction: https://basescan.org/tx/${transactionHash}
+Token supply: 1 billion
+Creator initial allocation: ${formattedAllocation}
 
-Token: ${tokenName} (${tokenSymbol})
-Token address: https://basescan.org/token/${getAddress(token)}#balances
-Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code
-Total supply: 1 billion
-
+## Creator info
 Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
 Creator on virtuals.io: https://app.virtuals.io/profile/${getAddress(creator)}
 Creator on zerion.io: https://app.zerion.io/${getAddress(creator)}/overview
 Creator on debank.com: https://debank.com/profile/${getAddress(creator)}
-Creator initial allocation: ${formattedAllocation}
 
-Description at launch:
+## Description at launch
 ${platformDescription}
 
+## Additional links
 These fields aren't used anymore when launching on Virtuals Protocol, therefore they're likely to be empty:
 Website: ${website || "N/A"}
 Twitter: ${twitter || "N/A"}
@@ -261,7 +271,7 @@ YouTube: ${youtube || "N/A"}
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
 			title: `${tokenName} ($${tokenSymbol})`, // Use name and ticker
-			url: `https://app.virtuals.io/prototypes/${token}`, // Keep Virtuals specific link
+			url: tokenUrl, // Keep Virtuals specific link
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL

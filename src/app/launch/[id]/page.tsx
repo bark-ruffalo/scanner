@@ -57,25 +57,8 @@ export default async function LaunchDetailPage({ params }: Props) {
 					)}
 				</div>
 				<div className="flex flex-col gap-4 overflow-hidden rounded-xl border border-white/20 bg-gray-800 p-6">
-					<p>
-						<strong>Launchpad:</strong> {launch.launchpad}
-					</p>
-					{launch.url && (
-						<p className="break-words">
-							<strong>URL:</strong>{" "}
-							<a
-								href={launch.url}
-								target="_blank"
-								rel="noopener noreferrer"
-								className="break-all text-blue-500 hover:underline"
-							>
-								{launch.url}
-							</a>
-						</p>
-					)}
 					{launch.description && launch.description !== "-" && (
 						<div className="break-words">
-							<h2 className="font-semibold text-lg">Description</h2>
 							<div className="mt-1 whitespace-pre-wrap break-words">
 								{linkify(launch.description).map((part, index) => {
 									if (typeof part === "string") {
