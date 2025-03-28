@@ -11,10 +11,11 @@ Live on: https://scanner.trulyadog.com
 - [x] Add a first filter on the navbar
 - [ ] Add Launchpad base class
 - [ ] Add Admin page to add/remove/edit launches using Launchpad base class
+- [x] Add a launch page, where the launch details are shown
 - [ ] Add unit and integration tests
-- [ ] Research what launchpads to support initially
-- [ ] Summarize, analyze, and rate launches with a LLM
-- [ ] Add a crypto launchpad, where the launches are events detected on an EVM contract
+- [x] Research what launchpads to support initially
+- [x] Summarize, analyze, and rate launches with a LLM
+- [x] Add a crypto launchpad, where the launches are events detected on an EVM contract - added "VIRTUALS Protocol (Base)"
 - [ ] Add another crypto launchpad, but for Solana (SVM)
 - [ ] Add a traditional VC investing launchpad, where the listener of the class extracts information by crawling the launchpad website
 
