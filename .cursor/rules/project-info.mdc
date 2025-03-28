@@ -39,7 +39,8 @@ To get the full context of the project, use the following command, then read the
   - Properties: id, launchpad, title, URL, description, summary, analysis, rating, timestamps
 
 ## Important Notes (also regarding tool usage)
-
+- `npm run dev` has been run, and it should be live on localhost:3000; remind me to start it myself if it's not and you need it; never run the command yourself, and if you want it restarted, ask for it.
+- We do not plan to add authentication for users of this web app.
 - After modifying the UI, you may use the Playwright MCP to confirm that the changes are as expected.
 - When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
