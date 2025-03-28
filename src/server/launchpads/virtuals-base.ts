@@ -21,7 +21,7 @@ const VIRTUALS_FACTORY_ADDRESS: `0x${string}` =
 	"0xF66DeA7b3e897cD44A5a231c61B6B4423d613259"; // Address from python script
 
 // A constant string identifying the launchpad for database storage and display purposes.
-const LAUNCHPAD_NAME = "Virtuals Protocol (Base)";
+const LAUNCHPAD_NAME = "VIRTUALS Protocol (Base)";
 
 // Define the Application Binary Interface (ABI) fragment for the 'Launched' event.
 // Updated based on Basescan log 0x714aa39317ad9a7a7a99db52b44490da5d068a0b2710fffb1a1282ad3cadae1f
@@ -173,18 +173,17 @@ Transaction: https://basescan.org/tx/${transactionHash}
 			title: `${tokenName} (${tokenSymbol}) Launch`,
 			url: `https://basescan.org/address/${token}`, // Link to the token contract on the block explorer. Use pair address?
 			description: description,
-			summary: `New ${tokenSymbol} token launched by ${getAddress(
-				creator,
-			).substring(0, 6)}...${getAddress(creator).substring(
-				getAddress(creator).length - 4,
-			)}. Pair: ${getAddress(pair).substring(0, 6)}... Amount: ${amountFormatted}.`, // Adjusted summary
+			// summary: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
+			// analysis: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
 		};
 		console.log(`[${token}] Prepared launch data for DB insertion.`);
 
 		// Call the database function to add the new launch record.
 		await addLaunch(launchData);
+		// The log message below might be slightly inaccurate if the launch was skipped due to duplication,
+		// but the addLaunch function logs the skipping action itself.
 		console.log(
-			`[${token}] Successfully processed and added launch for token: ${tokenSymbol}`,
+			`[${token}] Called addLaunch for token: ${tokenSymbol}`, // Adjusted log message slightly
 		);
 	} catch (error) {
 		// Catch and log any errors during fetching details or database insertion.
@@ -330,7 +329,7 @@ async function debugFetchHistoricalEvents() {
 // --- How to run the debug function ---
 // 1. Uncomment the line below to run it when this module is loaded.
 //    Remember to comment it out again after debugging is complete.
-debugFetchHistoricalEvents();
+// debugFetchHistoricalEvents(); // <-- Remains commented out
 
 // --- Conceptual Base Class (Future Refactoring Idea) ---
 // The commented-out code below outlines a potential structure for an abstract base class.
