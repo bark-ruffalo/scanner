@@ -176,7 +176,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const youtube = tokenInfoResult[9];
 		const website = tokenInfoResult[10];
 
-		const tokenName = dataTuple.name;
+		const tokenName = dataTuple._name;
 		const tokenSymbol = dataTuple.ticker; // Use ticker as symbol
 		const totalSupply = dataTuple.supply;
 
@@ -233,18 +233,20 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 Launched at: ${launchedAtDate.toUTCString()}
 Launched in transaction: https://basescan.org/tx/${transactionHash}
 
-Token name: ${tokenName} (${tokenSymbol})
+Token: ${tokenName} (${tokenSymbol})
 Token address: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code
-Total supply: ${totalSupply.toString()} ${tokenSymbol}
+Total supply: 1 billion
 Image: ${image || "N/A"}
 
-Creator: https://basescan.org/address/${getAddress(creator)}
-Creator virtuals.io profile: https://app.virtuals.io/profile/${getAddress(creator)}
+Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
+Creator on virtuals.io: https://app.virtuals.io/profile/${getAddress(creator)}
+Creator on zerion.io: https://app.zerion.io/${getAddress(creator)}/overview
+Creator on debank.com: https://debank.com/profile/${getAddress(creator)}
 Creator initial allocation: ${formattedAllocation}
 
 Description at launch:
-${platformDescription || "N/A"}
+${platformDescription}
 
 These fields aren't used anymore when launching on Virtuals Protocol, therefore they're likely to be empty:
 Website: ${website || "N/A"}
@@ -256,14 +258,16 @@ YouTube: ${youtube || "N/A"}
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
-			title: `${tokenName} (${tokenSymbol}) Launch`, // Use name and ticker
+			title: `${tokenName} ($${tokenSymbol})`, // Use name and ticker
 			url: `https://app.virtuals.io/prototypes/${token}`, // Keep Virtuals specific link
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			// summary/analysis are left for potential future LLM processing
 		};
-		console.log(`[${token}] Prepared launch data for DB insertion.`);
-		// console.log(`[${token}] Prepared launch data for DB insertion:`, launchData); // Optional detailed log
+		console.log(
+			`[${token}] Prepared launch data for DB insertion:`,
+			launchData,
+		);
 
 		// Call the database function to add the new launch record.
 		await addLaunch(launchData);
@@ -346,9 +350,11 @@ export function startVirtualsBaseListener() {
  */
 export async function debugFetchHistoricalEvents() {
 	// Define the block range to query. Use BigInt literals (e.g., 12345n).
-	const fromBlock = 23639253n; // Example start block
-	const toBlock = 23639253n; // Example end block
+	const fromBlock = 25684212n; // Example start block
+	const toBlock = 25684212n; // Example end block
 	// another example: 28057272 for KIDDO
+	// $MAR: 25684212 https://basescan.org/tx/0x3b5e48b9748ac83ff98949b0d579298314ff20e71abadf5b743f9661a5d2ef64
+	// $DFY: 23639253 https://basescan.org/address/0xf66dea7b3e897cd44a5a231c61b6b4423d613259#readProxyContract
 	console.log(
 		`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${fromBlock} to ${toBlock} ---`,
 	);
