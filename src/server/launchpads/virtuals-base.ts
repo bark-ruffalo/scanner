@@ -249,13 +249,12 @@ export function startVirtualsBaseListener() {
 	}
 }
 
-// --- Debugging Function ---
-
 /**
  * Fetches and processes historical 'Launched' events within a specific block range.
  * Useful for testing the event processing logic or backfilling missed events.
+ * This function is intended for debugging and should be run conditionally, e.g., via instrumentation.ts.
  */
-async function debugFetchHistoricalEvents() {
+export async function debugFetchHistoricalEvents() {
 	// Define the block range to query. Use BigInt literals (e.g., 12345n).
 	const fromBlock = 23639253n; // Example start block
 	const toBlock = 23639253n; // Example end block
@@ -321,6 +320,7 @@ async function debugFetchHistoricalEvents() {
 }
 
 // --- How to run the debug function ---
-// 1. Uncomment the line below to run it when this module is loaded.
-//    Remember to comment it out again after debugging is complete.
-debugFetchHistoricalEvents(); // <-- Do not uncomment this line!
+// 1. Set the DEBUG_VIRTUALS_HISTORICAL environment variable to "true".
+// 2. The instrumentation.ts file will conditionally call debugFetchHistoricalEvents.
+// (another option would be to uncomment the line below)
+// debugFetchHistoricalEvents();
