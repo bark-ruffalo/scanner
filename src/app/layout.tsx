@@ -27,7 +27,7 @@ async function Navbar() {
 				<div className="flex items-center gap-6">
 					<Link
 						href="/"
-						className="text-gray-300 hover:text-purple-400"
+						className="text-gray-300 hover:text-[#733B73]"
 						aria-label="Home"
 					>
 						<svg
@@ -52,7 +52,7 @@ async function Navbar() {
 						href="https://github.com/bark-ruffalo/scanner"
 						target="_blank"
 						rel="noopener noreferrer"
-						className="text-gray-300 hover:text-purple-400"
+						className="text-gray-300 hover:text-[#733B73]"
 						aria-label="View source code on GitHub"
 					>
 						<svg

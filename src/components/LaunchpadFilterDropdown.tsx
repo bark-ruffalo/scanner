@@ -82,7 +82,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 							onClick={() => handleSelect("All")}
 							className={`block w-full px-4 py-2 text-left text-sm ${
 								currentFilter === "All"
-									? "bg-purple-700 text-white"
+									? "bg-[#733B73] text-white"
 									: "text-gray-300 hover:bg-gray-700 hover:text-white"
 							}`}
 						>
@@ -95,7 +95,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 								onClick={() => handleSelect(launchpad)}
 								className={`block w-full px-4 py-2 text-left text-sm ${
 									currentFilter === launchpad
-										? "bg-purple-700 text-white"
+										? "bg-[#733B73] text-white"
 										: "text-gray-300 hover:bg-gray-700 hover:text-white"
 								}`}
 							>

@@ -25,7 +25,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
 	return (
 		// Removed items-center justify-center, added pt-8 for spacing below navbar
-		<main className="flex min-h-screen flex-col bg-gradient-to-b from-[#1a013d] to-[#15162c] pt-8 text-white">
+		<main className="flex min-h-screen flex-col bg-gradient-to-b from-[#DAB1DA] to-[#15162c] pt-8 text-white">
 			{/* Container to control max-width and padding */}
 			<div className="container mx-auto w-full max-w-6xl p-4">
 				{filteredLaunches.length === 0 ? (
@@ -45,7 +45,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 								{/* Link the title */}
 								<Link
 									href={`/launch/${launch.id}`}
-									className="mb-2 font-bold text-xl hover:text-purple-400"
+									className="mb-2 font-bold text-xl hover:text-[#DAB1DA]"
 								>
 									{launch.title}
 								</Link>
@@ -57,7 +57,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 								<div className="mt-auto flex items-center justify-between pt-2">
 									{" "}
 									{/* mt-auto pushes this div down */}
-									<span className="rounded bg-purple-900 px-2 py-1 text-xs">
+									<span className="my-1 rounded bg-[#733B73] px-3 py-2 text-white text-xs">
 										{launch.rating === -1
 											? "Not rated"
 											: `Rating: ${launch.rating}/10`}

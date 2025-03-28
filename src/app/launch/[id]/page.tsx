@@ -36,7 +36,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 	}
 
 	return (
-		<main className="min-h-screen bg-gradient-to-b from-[#2e026d] to-[#15162c] p-8 text-white">
+		<main className="min-h-screen bg-gradient-to-b from-[#DAB1DA] to-[#15162c] p-8 text-white">
 			<div className="container mx-auto p-4">
 				<div className="mb-4 flex items-center gap-4">
 					<BackButton />
