@@ -42,39 +42,43 @@ export default async function LaunchDetailPage({ params }: Props) {
 					<BackButton />
 					<h1 className="font-bold text-2xl">{launch.title}</h1>
 				</div>
-				<div className="flex flex-col gap-4 rounded-xl border border-white/20 bg-[#27272a] p-6">
+				<div className="flex flex-col gap-4 overflow-hidden rounded-xl border border-white/20 bg-[#27272a] p-6">
 					<p>
 						<strong>Launchpad:</strong> {launch.launchpad}
 					</p>
 					{launch.url && (
-						<p>
+						<p className="break-words">
 							<strong>URL:</strong>{" "}
 							<a
 								href={launch.url}
 								target="_blank"
 								rel="noopener noreferrer"
-								className="text-blue-500 hover:underline"
+								className="break-all text-blue-500 hover:underline"
 							>
 								{launch.url}
 							</a>
 						</p>
 					)}
 					{launch.description && launch.description !== "-" && (
-						<div>
+						<div className="break-words">
 							<h2 className="font-semibold text-lg">Description</h2>
-							<p className="mt-1 whitespace-pre-wrap">{launch.description}</p>
+							<p className="mt-1 whitespace-pre-wrap break-words">
+								{launch.description}
+							</p>
 						</div>
 					)}
 					{launch.summary && launch.summary !== "-" && (
-						<div>
+						<div className="break-words">
 							<h2 className="font-semibold text-lg">Summary</h2>
-							<p className="mt-1">{launch.summary}</p>
+							<p className="mt-1 break-words">{launch.summary}</p>
 						</div>
 					)}
 					{launch.analysis && launch.analysis !== "-" && (
-						<div>
+						<div className="break-words">
 							<h2 className="font-semibold text-lg">Analysis</h2>
-							<p className="mt-1 whitespace-pre-wrap">{launch.analysis}</p>
+							<p className="mt-1 whitespace-pre-wrap break-words">
+								{launch.analysis}
+							</p>
 						</div>
 					)}
 					{launch.rating !== undefined && launch.rating !== -1 && (
