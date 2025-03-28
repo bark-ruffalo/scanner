@@ -233,20 +233,20 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 Launched at: ${launchedAtDate.toUTCString()}
 Launched in transaction: https://basescan.org/tx/${transactionHash}
 
-Token Name: ${tokenName} (${tokenSymbol})
-Token Address: https://basescan.org/token/${getAddress(token)}#balances
-Liquidity Contract: https://basescan.org/address/${getAddress(pair)}#code
-Total Supply: ${totalSupply.toString()} ${tokenSymbol}
+Token name: ${tokenName} (${tokenSymbol})
+Token address: https://basescan.org/token/${getAddress(token)}#balances
+Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code
+Total supply: ${totalSupply.toString()} ${tokenSymbol}
 Image: ${image || "N/A"}
 
 Creator: https://basescan.org/address/${getAddress(creator)}
-Creator Virtuals Profile: https://app.virtuals.io/profile/${getAddress(creator)}
-Creator Initial Allocation: ${formattedAllocation}
+Creator virtuals.io profile: https://app.virtuals.io/profile/${getAddress(creator)}
+Creator initial allocation: ${formattedAllocation}
 
-Description from Platform:
+Description at launch:
 ${platformDescription || "N/A"}
 
-These fields aren't used anymore when creating a prototype on Virtuals Protocol, therefore they're likely to be empty:
+These fields aren't used anymore when launching on Virtuals Protocol, therefore they're likely to be empty:
 Website: ${website || "N/A"}
 Twitter: ${twitter || "N/A"}
 Telegram: ${telegram || "N/A"}
