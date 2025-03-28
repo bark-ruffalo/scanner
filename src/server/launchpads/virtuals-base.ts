@@ -156,12 +156,12 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Create a multi-line description string containing key details about the launch.
 		const description = `
-New Token Launch on ${LAUNCHPAD_NAME}!
-Token: ${tokenName} (${tokenSymbol})
-Token Address: ${getAddress(token)}
-Pair Address: ${getAddress(pair)}
-Creator: ${getAddress(creator)}
-Launched At: ${launchedAtDate.toISOString()}
+Token: ${tokenSymbol}
+Token Address: https://basescan.org/token/${getAddress(token)}#balances
+Liquidity Contract: https://basescan.org/address/${getAddress(pair)}#asset-tokens
+Creator address: https://basescan.org/address/${getAddress(creator)}
+Creator Virtuals profile: https://app.virtuals.io/profile/${getAddress(creator)}
+Launched At: ${launchedAtDate.toUTCString()}
 Amount (${tokenSymbol}): ${amountFormatted}  ${
 			" " /* Placeholder: Add $VIRTUAL amount if available elsewhere */
 		}
@@ -172,13 +172,17 @@ Transaction: https://basescan.org/tx/${transactionHash}
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
 			title: `${tokenName} (${tokenSymbol}) Launch`,
-			url: `https://basescan.org/address/${token}`, // Link to the token contract on the block explorer. Use pair address?
+			url: `https://app.virtuals.io/prototypes/${token}`, // Link to the token contract on the block explorer. Use pair address?
 			description: description,
 			launchedAt: launchedAtDate, // Pass the actual launch timestamp from the block
 			// summary: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
 			// analysis: Omitted - Will be populated later by LLM analysis (defaults to NULL in DB)
 		};
 		console.log(`[${token}] Prepared launch data for DB insertion.`);
+		console.log(
+			`[${token}] Prepared launch data for DB insertion:`,
+			launchData,
+		); // Added log for launchData
 
 		// Call the database function to add the new launch record.
 		await addLaunch(launchData);
