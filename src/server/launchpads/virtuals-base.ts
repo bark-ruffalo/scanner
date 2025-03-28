@@ -1,11 +1,11 @@
 import {
 	type Log,
 	createPublicClient,
-	getAddress,
-	parseAbiItem,
-	parseAbi,
-	webSocket,
 	formatUnits,
+	getAddress,
+	parseAbi,
+	parseAbiItem,
+	webSocket,
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
@@ -227,6 +227,9 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
 		const launchedAtDate = new Date(Number(timestamp * 1000n));
 
+		// Extract image URL
+		const imageUrl = image || null; // Use null if image string is empty
+
 		// --- Construct Comprehensive Description ---
 		// Access tuple elements by index for description
 		const description = `
@@ -237,7 +240,6 @@ Token: ${tokenName} (${tokenSymbol})
 Token address: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code
 Total supply: 1 billion
-Image: ${image || "N/A"}
 
 Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
 Creator on virtuals.io: https://app.virtuals.io/profile/${getAddress(creator)}
@@ -262,6 +264,7 @@ YouTube: ${youtube || "N/A"}
 			url: `https://app.virtuals.io/prototypes/${token}`, // Keep Virtuals specific link
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
+			imageUrl: imageUrl, // Add the image URL
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(
