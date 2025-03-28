@@ -126,3 +126,11 @@ export async function addLaunch(launchData: NewLaunchData) {
 		// throw error; // Uncomment to propagate the error
 	}
 }
+
+export async function getLaunchById(id: number) {
+	// Ensure db connection is established if not already
+	const launch = await db.query.launches.findFirst({
+		where: eq(launches.id, id),
+	});
+	return launch ?? null; // Return the launch or null if not found
+}
