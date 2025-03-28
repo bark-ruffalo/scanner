@@ -1,5 +1,7 @@
 import {
+	type Address,
 	type Log,
+	type PublicClient,
 	createPublicClient,
 	formatUnits,
 	getAddress,
@@ -9,6 +11,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
+import { getEvmErc20BalanceAtBlock } from "~/server/lib/evm-utils";
 import { addLaunch } from "~/server/queries";
 
 // --- Configuration ---
@@ -32,11 +35,6 @@ const launchedEventAbi = parseAbiItem(
 const factoryAbi = parseAbi([
 	"function tokenInfo(address tokenAddress) view returns (address creator, address token, address pair, address agentToken, (address token, string name, string _name, string ticker, uint256 supply, uint256 price, uint256 marketCap, uint256 liquidity, uint256 volume, uint256 volume24H, uint256 prevPrice, uint256 lastUpdated) data, string description, string image, string twitter, string telegram, string youtube, string website, bool trading, bool tradingOnUniswap)",
 ]);
-
-// Define ABI for standard ERC20 balanceOf function
-const balanceOfAbi = parseAbiItem(
-	"function balanceOf(address account) view returns (uint256)",
-);
 
 // --- Client Setup ---
 
@@ -184,21 +182,12 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const totalSupply = dataTuple.supply;
 
 		console.log(`[${token}] Fetching creator's initial balance...`); // Added log
-		const creatorInitialBalance = await publicClient
-			.readContract({
-				address: token, // The launched token address
-				abi: [balanceOfAbi], // Use the balanceOf ABI
-				functionName: "balanceOf",
-				args: [creator], // The creator's address from tokenInfo
-				blockNumber: blockNumber, // Fetch balance at the specific block of the launch
-			})
-			.catch((error) => {
-				console.error(
-					`[${token}] Error fetching creator's initial balance:`,
-					error,
-				);
-				return 0n; // Default to 0 if balance check fails
-			});
+		const creatorInitialBalance = await getEvmErc20BalanceAtBlock(
+			publicClient as PublicClient, // Type assertion to match the expected type
+			token, // The launched token address
+			creator, // The creator's address from tokenInfo
+			blockNumber, // The block number from the event log
+		);
 
 		const timestamp = block.timestamp;
 
