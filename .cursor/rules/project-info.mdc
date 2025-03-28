@@ -41,7 +41,7 @@ To get the full context of the project, use the following command, then read the
 ## Important Notes (also regarding tool usage)
 
 - After modifying the UI, you may use the Playwright MCP to confirm that the changes are as expected.
-- When running in agent mode, after you finish modifying the code, always run the command `biome check --write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
+- When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
 - Use pnpm instead of npm.
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
