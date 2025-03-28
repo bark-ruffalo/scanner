@@ -189,11 +189,38 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			blockNumber, // The block number from the event log
 		);
 
+		// Fetch creator's current balance
+		console.log(`[${token}] Fetching creator's current balance...`);
+		const creatorCurrentBalance = await getEvmErc20BalanceAtBlock(
+			publicClient as PublicClient,
+			token,
+			creator,
+			// No blockNumber parameter - defaults to latest block
+		);
+
 		const timestamp = block.timestamp;
 
 		console.log(
 			`[${token}] Fetched details via tokenInfo: Name=${tokenName}, Symbol=${tokenSymbol}, Creator=${creator}, Supply=${totalSupply}, Timestamp=${timestamp}`,
 		);
+
+		// Format token balances for display
+		const formattedInitialBalance = formatUnits(creatorInitialBalance, 18); // Assuming 18 decimals for ERC20
+		const formattedCurrentBalance = formatUnits(creatorCurrentBalance, 18); // Assuming 18 decimals for ERC20
+
+		// Convert to number and format with commas and 2 decimal places
+		const displayInitialBalance = Number(
+			formattedInitialBalance,
+		).toLocaleString("en-US", {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2,
+		});
+		const displayCurrentBalance = Number(
+			formattedCurrentBalance,
+		).toLocaleString("en-US", {
+			minimumFractionDigits: 2,
+			maximumFractionDigits: 2,
+		});
 
 		// Calculate creator allocation percentage
 		let creatorAllocationPercent = 0;
@@ -237,7 +264,8 @@ Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Launched in transaction: https://basescan.org/tx/${transactionHash}
 Token supply: 1 billion
-Creator initial allocation: ${formattedAllocation}
+Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})
+Creator current number of tokens: ${displayCurrentBalance} (check if they've been sold or locked!)
 
 ## Creator info
 Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
