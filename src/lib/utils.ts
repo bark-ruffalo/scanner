@@ -44,3 +44,30 @@ export function linkify(
 
 	return parts;
 }
+
+import { formatUnits } from "viem";
+
+/**
+ * Formats a token balance from a raw BigInt value to a human-readable string with commas.
+ * @param amount The raw token balance as a BigInt.
+ * @param decimals The number of decimal places the token uses (default is 18 for most ERC20 tokens).
+ * @returns A formatted string with commas as thousand separators and appropriate decimal places.
+ */
+export function formatTokenBalance(amount: bigint, decimals = 18): string {
+	// Convert the raw amount to a decimal string
+	const formattedAmount = formatUnits(amount, decimals);
+
+	// Convert to a number for formatting
+	const numberAmount = Number(formattedAmount);
+
+	// If the value is 0, return "0" without decimal places
+	if (numberAmount === 0) {
+		return "0";
+	}
+
+	// Format with commas and two decimal places
+	return numberAmount.toLocaleString("en-US", {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	});
+}

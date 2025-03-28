@@ -11,6 +11,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
+import { formatTokenBalance } from "~/lib/utils";
 import { getEvmErc20BalanceAtBlock } from "~/server/lib/evm-utils";
 import { addLaunch } from "~/server/queries";
 
@@ -204,23 +205,9 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			`[${token}] Fetched details via tokenInfo: Name=${tokenName}, Symbol=${tokenSymbol}, Creator=${creator}, Supply=${totalSupply}, Timestamp=${timestamp}`,
 		);
 
-		// Format token balances for display
-		const formattedInitialBalance = formatUnits(creatorInitialBalance, 18); // Assuming 18 decimals for ERC20
-		const formattedCurrentBalance = formatUnits(creatorCurrentBalance, 18); // Assuming 18 decimals for ERC20
-
-		// Convert to number and format with commas and 2 decimal places
-		const displayInitialBalance = Number(
-			formattedInitialBalance,
-		).toLocaleString("en-US", {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2,
-		});
-		const displayCurrentBalance = Number(
-			formattedCurrentBalance,
-		).toLocaleString("en-US", {
-			minimumFractionDigits: 2,
-			maximumFractionDigits: 2,
-		});
+		// Format token balances for display using the utility function
+		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
+		const displayCurrentBalance = formatTokenBalance(creatorCurrentBalance);
 
 		// Calculate creator allocation percentage
 		let creatorAllocationPercent = 0;
