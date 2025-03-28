@@ -10,12 +10,13 @@ export function BackButton() {
 	return (
 		<button
 			onClick={() => router.back()}
-			className="rounded p-2 hover:bg-gray-200"
+			className="rounded p-2 hover:bg-gray-200/80"
 			aria-label="Go back"
 			type="button"
 		>
 			{/* <ArrowLeftIcon className="h-6 w-6" /> */}
-			<ArrowLeft className="h-6 w-6" /> {/* Use ArrowLeft from lucide-react */}
+			<ArrowLeft className="h-6 w-6 text-gray-800" />{" "}
+			{/* Use ArrowLeft from lucide-react */}
 		</button>
 	);
 }
