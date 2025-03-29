@@ -85,36 +85,28 @@ export default async function LaunchDetailPage({ params }: Props) {
 				{/* Token Statistics Section */}
 				{(launch.creatorTokenHoldingPercentage || launch.creatorTokensHeld) && (
 					<div className="mb-8 rounded-lg bg-gray-50 p-6 dark:bg-gray-800">
-						<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
-							{launch.creatorTokenHoldingPercentage && (
-								<div>
-									<p className="font-bold text-2xl">
-										{launch.creatorTokenHoldingPercentage}%
-									</p>
-									<p className="text-gray-500 text-sm">
-										of initial token allocation held by creator
-										{launch.updatedAt && (
+						<div className="flex flex-col gap-1">
+							<p>
+								{launch.creatorTokenHoldingPercentage && (
+									<>
+										{Math.round(Number(launch.creatorTokenHoldingPercentage))}%
+										of the initial token allocation is still held by the creator
+										{launch.creatorTokensHeld && (
 											<>
-												<br />
-												<span className="italic">
-													(checked{" "}
-													{format(launch.updatedAt, "MMM d, yyyy HH:mm")})
-												</span>
+												{" "}
+												({Number(launch.creatorTokensHeld).toLocaleString()}{" "}
+												tokens)
 											</>
 										)}
-									</p>
-								</div>
-							)}
-							{launch.totalTokenSupply && launch.creatorTokensHeld && (
-								<div>
-									<p className="font-bold text-2xl">
-										{Number(launch.creatorTokensHeld).toLocaleString()} /{" "}
-										{Number(launch.totalTokenSupply).toLocaleString()}
-									</p>
-									<p className="text-gray-500 text-sm">
-										tokens held by creator out of total supply
-									</p>
-								</div>
+										.
+									</>
+								)}
+							</p>
+							{launch.updatedAt && (
+								<p className="text-gray-500 text-sm">
+									last checked{" "}
+									{format(new Date(launch.updatedAt), "MMM d, yyyy HH:mm")}
+								</p>
 							)}
 						</div>
 					</div>
