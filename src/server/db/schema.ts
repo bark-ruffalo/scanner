@@ -11,6 +11,8 @@ import {
 	text,
 	timestamp,
 	varchar,
+	numeric,
+	bigint,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -38,6 +40,12 @@ export const launches = createTable(
 		rating: integer("rating").default(-1).notNull(),
 		// Add optional imageUrl field
 		imageUrl: varchar("image_url", { length: 1024 }),
+		creatorTokenHoldingPercentage: numeric("creator_token_holding_percentage", {
+			precision: 6,
+			scale: 2,
+		}),
+		creatorTokensHeld: bigint("creator_tokens_held", { mode: "number" }),
+		totalTokenSupply: bigint("total_token_supply", { mode: "number" }),
 		launchedAt: timestamp("launched_at")
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),
