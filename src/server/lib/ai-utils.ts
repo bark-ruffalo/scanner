@@ -5,12 +5,13 @@ import { z } from "zod";
 import { env } from "~/env";
 
 // LLM models to try in order
+// Link for reference: https://lmarena.ai/?leaderboard
 const LLM_MODELS = [
 	"google/gemini-2.5-pro-exp-03-25:free",
-	// "google/gemini-2.0-pro-exp-02-05:free",
-	// "google/gemini-2.0-flash-lite-preview-02-05:free",
-	"deepseek/deepseek-chat-v3-0324",
-	"google/gemma-3-27b-it",
+	"google/gemini-2.0-pro-exp-02-05:free",
+	"google/gemini-2.0-flash-thinking-exp:free",
+	"google/gemini-2.0-flash-thinking-exp-1219:free",
+	"google/gemini-2.0-flash-exp:free",
 ];
 
 // Define the output schema for response validation
