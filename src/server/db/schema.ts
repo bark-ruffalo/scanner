@@ -3,16 +3,16 @@
 
 import { sql } from "drizzle-orm";
 import {
+	bigint,
 	check,
 	index,
 	integer,
+	numeric,
 	pgTableCreator,
 	serial,
 	text,
 	timestamp,
 	varchar,
-	numeric,
-	bigint,
 } from "drizzle-orm/pg-core";
 
 /**
@@ -44,8 +44,14 @@ export const launches = createTable(
 			precision: 6,
 			scale: 2,
 		}),
-		creatorTokensHeld: bigint("creator_tokens_held", { mode: "number" }),
-		totalTokenSupply: bigint("total_token_supply", { mode: "number" }),
+		creatorTokensHeld: numeric("creator_tokens_held", {
+			precision: 78, // Maximum precision for PostgreSQL numeric type
+			scale: 0, // No decimal places needed for token amounts
+		}),
+		totalTokenSupply: numeric("total_token_supply", {
+			precision: 78, // Maximum precision for PostgreSQL numeric type
+			scale: 0, // No decimal places needed for token amounts
+		}),
 		launchedAt: timestamp("launched_at")
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),

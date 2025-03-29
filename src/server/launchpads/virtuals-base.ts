@@ -13,9 +13,34 @@ import { base } from "viem/chains";
 import { env } from "~/env";
 import { formatTokenBalance } from "~/lib/utils";
 import { getEvmErc20BalanceAtBlock } from "~/server/lib/evm-utils";
-import { addLaunch } from "~/server/queries";
+import { type NewLaunchData, addLaunch } from "~/server/queries";
+
+// --- Types ---
+
+interface LaunchData {
+	launchpad: string;
+	title: string;
+	url: string;
+	description: string;
+	launchedAt: Date;
+	imageUrl: string | null;
+	totalTokenSupply: string;
+	creatorTokensHeld: string;
+	creatorTokenHoldingPercentage: string;
+}
 
 // --- Configuration ---
+
+/**
+ * Formats a number into a string suitable for PostgreSQL numeric type.
+ * Handles large numbers by converting through BigInt.
+ */
+function formatBigNumber(num: number | bigint): string {
+	// Convert to BigInt first to handle the full integer value
+	const bigNum = typeof num === "number" ? BigInt(Math.floor(num)) : num;
+	// Convert to string for the numeric type
+	return bigNum.toString();
+}
 
 // The on-chain address of the Virtuals Protocol factory contract on the Base network.
 // This contract emits the 'Launched' event we are interested in.
@@ -278,9 +303,9 @@ YouTube: ${youtube || "N/A"}
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
-			totalTokenSupply: Number(totalSupply), // Convert BigInt to number
-			creatorTokensHeld: Number(creatorInitialBalance), // Convert BigInt to number
-			creatorTokenHoldingPercentage: creatorAllocationPercent.toFixed(2), // Format to 2 decimal places as string for Drizzle's numeric type
+			totalTokenSupply: formatBigNumber(totalSupply), // Convert BigInt to string
+			creatorTokensHeld: formatBigNumber(creatorInitialBalance), // Convert BigInt to string
+			creatorTokenHoldingPercentage: creatorAllocationPercent.toFixed(2), // Format to 2 decimal places
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(

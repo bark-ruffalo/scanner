@@ -13,7 +13,7 @@ export async function register() {
 			console.log(
 				"DEBUG_VIRTUALS_BASE is true. Running debugFetchHistoricalEvents for launchpad VIRTUALS Protocol (Base)...",
 			);
-			await debugFetchHistoricalEvents(); // Use await since it's async
+			await debugFetchHistoricalEvents(27843805n, 27843805n); // Use await since it's async
 		} else {
 			// Start the regular listener if not debugging
 			startVirtualsBaseListener();
