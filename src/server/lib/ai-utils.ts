@@ -49,12 +49,17 @@ function renderTemplate(
  * Attempts to find the first '{' character and considers that the start of JSON
  */
 function sanitizeJsonResponse(text: string): string {
+	// Handle responses with markdown code blocks
+	const codeBlockMatch = text.match(/```(?:json)?\s*(\{[\s\S]*\})\s*```/);
+	if (codeBlockMatch?.[1]) {
+		return codeBlockMatch[1];
+	}
+
+	// Fallback to original logic for non-markdown responses
 	const firstBraceIndex = text.indexOf("{");
 	if (firstBraceIndex === -1) {
-		// No opening brace found, return original text
 		return text;
 	}
-	// Return text from the first '{' onward
 	return text.substring(firstBraceIndex);
 }
 
