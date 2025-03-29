@@ -2,18 +2,22 @@ import {
 	type Address,
 	type Log,
 	type PublicClient,
+	type Transport,
+	type Chain,
 	createPublicClient,
 	formatUnits,
 	getAddress,
 	parseAbi,
 	parseAbiItem,
 	webSocket,
+	http,
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
 import { formatTokenBalance } from "~/lib/utils";
 import { getEvmErc20BalanceAtBlock } from "~/server/lib/evm-utils";
 import { type NewLaunchData, addLaunch } from "~/server/queries";
+import { updateTokenStatistics } from "~/server/lib/token-utils";
 
 // --- Types ---
 
@@ -82,12 +86,10 @@ if (!env.BASE_RPC_URL) {
 	);
 }
 
-// Create the viem public client instance.
-// This client interacts with the Base blockchain via the WebSocket transport.
-// It's used for watching events and making read-only calls (like fetching token details).
-const publicClient = createPublicClient({
-	chain: base, // Specifies the Base network configuration.
-	transport: wsTransport, // Uses the WebSocket transport created above.
+// Create a public client for Base network with explicit typing
+const publicClient = createPublicClient<Transport, Chain>({
+	chain: base,
+	transport: wsTransport, // Use the WebSocket transport
 });
 console.log(`Public client created for ${LAUNCHPAD_NAME} on Base.`);
 
@@ -328,15 +330,15 @@ YouTube: ${youtube || "N/A"}
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
-			totalTokenSupply: Math.round(
-				Number(formatUnits(totalSupply, 18)),
-			).toString(), // Convert from WEI to ETH and round to nearest integer
-			creatorTokensHeld: Math.round(
-				Number(formatUnits(creatorCurrentBalance, 18)),
-			).toString(), // Convert from WEI to ETH and round to nearest integer
-			creatorTokenHoldingPercentage: creatorHoldingPercent.toFixed(2), // Store the percentage of initial tokens still held
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
-			tokenStatsUpdatedAt: new Date(), // Set token stats timestamp for initial token data
+			// Get initial token statistics
+			...(await updateTokenStatistics(
+				publicClient,
+				token,
+				creator,
+				Math.round(Number(formatUnits(totalSupply, 18))).toString(),
+				blockNumber,
+			)),
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(
