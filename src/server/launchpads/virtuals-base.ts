@@ -364,23 +364,38 @@ export function startVirtualsBaseListener() {
  * Fetches and processes historical 'Launched' events within a specific block range.
  * Useful for testing the event processing logic or backfilling missed events.
  * This function is intended for debugging and should be run conditionally, e.g., via instrumentation.ts.
+ * @param fromBlock - Optional starting block number (defaults to 27843805n if not provided)
+ * @param toBlock - Optional ending block number (defaults to latest block if not provided)
  */
-export async function debugFetchHistoricalEvents() {
+export async function debugFetchHistoricalEvents(
+	fromBlock?: bigint,
+	toBlock?: bigint,
+) {
 	// Define the block range to query. Use BigInt literals (e.g., 12345n).
-	const fromBlock = 25684212n; // Example start block
-	const toBlock = 25684212n; // Example end block
-	// another example: 28057272 for KIDDO
+	const startBlock = fromBlock || 27843805n; // Default start block if not provided; it starts from $ACP.
+	// other good examples for startBlock:
 	// $MAR: 25684212 https://basescan.org/tx/0x3b5e48b9748ac83ff98949b0d579298314ff20e71abadf5b743f9661a5d2ef64
 	// $DFY: 23639253 https://basescan.org/address/0xf66dea7b3e897cd44a5a231c61b6b4423d613259#readProxyContract
+
+	// Fetch the latest block if toBlock is not provided
+	let endBlock: bigint;
+	if (!toBlock) {
+		const latestBlock = await publicClient.getBlockNumber();
+		endBlock = latestBlock;
+		console.log(`Using latest block number: ${endBlock}`);
+	} else {
+		endBlock = toBlock;
+	}
+
 	console.log(
-		`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${fromBlock} to ${toBlock} ---`,
+		`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${startBlock} to ${endBlock} ---`,
 	);
 
 	const getLogsParams = {
 		address: VIRTUALS_FACTORY_ADDRESS,
 		event: launchedEventAbi, // Use the corrected ABI definition
-		fromBlock: fromBlock,
-		toBlock: toBlock,
+		fromBlock: startBlock,
+		toBlock: endBlock,
 	};
 	console.log(
 		`[${LAUNCHPAD_NAME} Debug] Querying logs with corrected ABI:`, // Updated log message
@@ -412,8 +427,8 @@ export async function debugFetchHistoricalEvents() {
 		// --- Secondary Debug Step: Fetch ALL logs (Now likely unnecessary) ---
 		// This section can probably be removed or kept commented out
 		/*
-        console.log(`[${LAUNCHPAD_NAME} Debug] --- Fetching ALL logs from contract ${VIRTUALS_FACTORY_ADDRESS} in range ${fromBlock}-${toBlock}... ---`);
-        const allLogsParams = { address: VIRTUALS_FACTORY_ADDRESS, fromBlock: fromBlock, toBlock: toBlock };
+        console.log(`[${LAUNCHPAD_NAME} Debug] --- Fetching ALL logs from contract ${VIRTUALS_FACTORY_ADDRESS} in range ${startBlock}-${endBlock}... ---`);
+        const allLogsParams = { address: VIRTUALS_FACTORY_ADDRESS, fromBlock: startBlock, toBlock: endBlock };
         const allLogs = await publicClient.getLogs(allLogsParams);
         console.log(`[${LAUNCHPAD_NAME} Debug] Found ${allLogs.length} total logs from the contract in the range (no event filter).`);
         // ... rest of secondary debug logging ...
