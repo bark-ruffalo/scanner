@@ -42,7 +42,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 		/Token address: (0x[a-fA-F0-9]{40})/,
 	);
 	const creatorMatch = launch.description.match(
-		/Creator on basescan\.org: https:\/\/basescan\.org\/address\/(0x[a-fA-F0-9]{40})/,
+		/Creator address: (0x[a-fA-F0-9]{40})/,
 	);
 	const initialTokensMatch = launch.description.match(
 		/Creator initial number of tokens: ([\d,]+)/,
