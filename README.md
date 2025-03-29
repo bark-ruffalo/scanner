@@ -25,4 +25,7 @@ Hopefully, the latter three items (classes) will serve as templates for others t
 ## TODO (long term)
 
 - [ ] Access relevant links when analyzing a launch (anything mentioned in the launch page: socials, website, documentation, etc.)
+- [ ] Add for users the possibility to add a custom link to a launch
+- [ ] Add a comment section for each launch
+- [ ] Add like/dislike buttons for each launch
 
