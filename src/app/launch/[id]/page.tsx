@@ -80,12 +80,6 @@ export default async function LaunchDetailPage({ params }: Props) {
 							/>
 						)}
 					</div>
-					{launch.basicInfoUpdatedAt && (
-						<p className="text-gray-500 text-sm">
-							Basic info last updated:{" "}
-							{format(new Date(launch.basicInfoUpdatedAt), "MMM d, yyyy HH:mm")}
-						</p>
-					)}
 				</div>
 
 				{/* Token Statistics Section */}
@@ -109,8 +103,8 @@ export default async function LaunchDetailPage({ params }: Props) {
 								)}
 							</p>
 							{launch.tokenStatsUpdatedAt && (
-								<p className="text-gray-500 text-sm">
-									Token stats last updated:{" "}
+								<p className="mt-2 text-gray-500 text-sm">
+									Creator token stats last updated:{" "}
 									{format(
 										new Date(launch.tokenStatsUpdatedAt),
 										"MMM d, yyyy HH:mm",
@@ -145,6 +139,15 @@ export default async function LaunchDetailPage({ params }: Props) {
 									);
 								})}
 							</div>
+							{launch.basicInfoUpdatedAt && (
+								<p className="mt-4 text-gray-500 text-sm">
+									Investment info section last updated:{" "}
+									{format(
+										new Date(launch.basicInfoUpdatedAt),
+										"MMM d, yyyy HH:mm",
+									)}
+								</p>
+							)}
 						</div>
 					)}
 				</div>
@@ -176,8 +179,8 @@ export default async function LaunchDetailPage({ params }: Props) {
 						</p>
 					)}
 					{launch.llmAnalysisUpdatedAt && (
-						<p className="text-gray-500 text-sm">
-							LLM analysis last updated:{" "}
+						<p className="mt-2 text-gray-500 text-sm">
+							LLM responses last updated:{" "}
 							{format(
 								new Date(launch.llmAnalysisUpdatedAt),
 								"MMM d, yyyy HH:mm",
