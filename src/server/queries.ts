@@ -212,8 +212,21 @@ export async function addLaunch(launchData: NewLaunchData) {
 			// Wrapped in try-catch to handle "static generation store missing" error during direct script execution
 			try {
 				console.log("Attempting to revalidate Next.js cache for path: /");
-				revalidatePath("/");
-				console.log("Cache revalidation triggered for /.");
+				// Check if we're in a Next.js rendering context before attempting to revalidate
+				// The headers() function from next/headers is only available in a Next.js rendering context
+				// If this is imported outside a rendering context, it will throw an error
+				if (
+					typeof globalThis.Headers !== "undefined" &&
+					typeof process !== "undefined" &&
+					process.env.NEXT_RUNTIME === "nodejs"
+				) {
+					revalidatePath("/");
+					console.log("Cache revalidation triggered for /.");
+				} else {
+					console.log(
+						"Cache revalidation skipped: not in a Next.js rendering context.",
+					);
+				}
 			} catch (revalidateError) {
 				console.warn(
 					// Use warn for expected scenarios
