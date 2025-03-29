@@ -40,21 +40,21 @@ export default async function LaunchDetailPage({ params }: Props) {
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
 			<div className="container mx-auto p-4">
-				<div className="mb-4 flex items-center justify-between gap-4">
-					<div className="flex items-center gap-4">
+				<div className="mb-4 flex flex-col items-center justify-center gap-4">
+					<div className="flex items-center justify-center gap-4">
 						<BackButton />
 						<h1 className="font-bold text-2xl text-gray-800">{launch.title}</h1>
+						{launch.imageUrl && (
+							<Image
+								src={launch.imageUrl}
+								alt={`${launch.title} image`}
+								width={72}
+								height={72}
+								className="rounded object-cover"
+								unoptimized
+							/>
+						)}
 					</div>
-					{launch.imageUrl && (
-						<Image
-							src={launch.imageUrl}
-							alt={`${launch.title} image`}
-							width={72}
-							height={72}
-							className="rounded object-cover"
-							unoptimized
-						/>
-					)}
 				</div>
 				<div className="flex flex-col gap-4 overflow-hidden rounded-xl border border-white/20 bg-gray-800 p-6">
 					{launch.description && launch.description !== "-" && (
