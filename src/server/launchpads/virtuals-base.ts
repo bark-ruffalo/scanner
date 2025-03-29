@@ -303,8 +303,12 @@ YouTube: ${youtube || "N/A"}
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
-			totalTokenSupply: formatBigNumber(totalSupply), // Convert BigInt to string
-			creatorTokensHeld: formatBigNumber(creatorInitialBalance), // Convert BigInt to string
+			totalTokenSupply: Math.round(
+				Number(formatUnits(totalSupply, 18)),
+			).toString(), // Convert from WEI to ETH and round to nearest integer
+			creatorTokensHeld: Math.round(
+				Number(formatUnits(creatorInitialBalance, 18)),
+			).toString(), // Convert from WEI to ETH and round to nearest integer
 			creatorTokenHoldingPercentage: creatorAllocationPercent.toFixed(2), // Format to 2 decimal places
 			// summary/analysis are left for potential future LLM processing
 		};
