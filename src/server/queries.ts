@@ -8,7 +8,7 @@ import { analyzeLaunch } from "./lib/ai-utils";
 // --- Configuration ---
 // Set to true to overwrite existing launches with the same title and launchpad,
 // false to skip adding duplicates.
-const OVERWRITE_EXISTING_LAUNCHES = true;
+const OVERWRITE_EXISTING_LAUNCHES = false;
 // --- End Configuration ---
 
 // Define the type for data needed to create a new launch record.
@@ -99,14 +99,13 @@ export async function addLaunch(launchData: NewLaunchData) {
 			},
 		});
 
-		// Enhanced data with AI analysis - only if missing or OVERWRITE_EXISTING_LAUNCHES is true
+		// Enhanced data with AI analysis - if missing in either new launch or existing launch
 		let enhancedData = { ...launchData };
 		const needsAnalysis =
 			!existingLaunch ||
-			(OVERWRITE_EXISTING_LAUNCHES &&
-				(existingLaunch.analysis === "-" ||
-					existingLaunch.summary === "-" ||
-					existingLaunch.rating === -1));
+			existingLaunch.analysis === "-" ||
+			existingLaunch.summary === "-" ||
+			existingLaunch.rating === -1;
 
 		if (needsAnalysis) {
 			try {
@@ -151,8 +150,27 @@ export async function addLaunch(launchData: NewLaunchData) {
 					`Successfully updated launch: ${launchData.title} from ${launchData.launchpad}`,
 				);
 				actionTaken = "updated";
+			} else if (needsAnalysis) {
+				// If overwrite is disabled but analysis was needed and performed, update only the AI fields
+				console.log(
+					`Existing launch detected: "${launchData.title}" from ${launchData.launchpad}. Updating only AI analysis fields...`,
+				);
+				// Only update the AI-generated fields
+				const updateData = {
+					analysis: enhancedData.analysis,
+					summary: enhancedData.summary,
+					rating: enhancedData.rating,
+				};
+				await db
+					.update(launches)
+					.set(updateData)
+					.where(eq(launches.id, existingLaunch.id));
+				console.log(
+					`Successfully updated AI analysis for: ${launchData.title} from ${launchData.launchpad}`,
+				);
+				actionTaken = "updated";
 			} else {
-				// If overwrite is disabled, log and skip
+				// If overwrite is disabled and no analysis needed, log and skip
 				console.log(
 					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Skipping insertion as overwrite is disabled.`,
 				);
