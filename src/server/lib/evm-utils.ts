@@ -31,7 +31,6 @@ interface ReadContractClient {
  * @param tokenAddress - The token contract address
  * @param creatorAddress - The creator's address
  * @param creatorInitialTokens - The creator's initial token allocation (as a string)
- * @param blockNumber - Optional block number to check balance at
  * @returns TokenUpdateResult containing the updated token statistics
  */
 export async function updateEvmTokenStatistics(
@@ -39,19 +38,16 @@ export async function updateEvmTokenStatistics(
 	tokenAddress: Address,
 	creatorAddress: Address,
 	creatorInitialTokens: string,
-	blockNumber?: bigint,
 ): Promise<TokenUpdateResult> {
 	console.log(`Updating EVM token statistics for token ${tokenAddress}:`);
 	console.log(`- Creator address: ${creatorAddress}`);
 	console.log(`- Initial tokens: ${creatorInitialTokens}`);
-	if (blockNumber) console.log(`- At block: ${blockNumber}`);
 
 	// Get current balance from blockchain
 	const currentBalanceWei = await getEvmErc20BalanceAtBlock(
 		client,
 		tokenAddress,
 		creatorAddress,
-		blockNumber,
 	);
 
 	console.log(
