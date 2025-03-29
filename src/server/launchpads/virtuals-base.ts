@@ -215,19 +215,27 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			blockNumber, // The block number from the event log
 		);
 
-		// Fetch creator's current balance
-		console.log(`[${token}] Fetching creator's current balance...`);
-		const creatorCurrentBalance = await getEvmErc20BalanceAtBlock(
-			publicClient as PublicClient,
-			token,
-			creator,
-			// No blockNumber parameter - defaults to latest block
-		);
+		// Determine if this is a historical event by checking if we're in debug mode
+		// We consider it historical if the block number is more than 100 blocks old
+		const latestBlock = await publicClient.getBlockNumber();
+		const isHistoricalEvent = latestBlock - blockNumber > 100n;
+
+		// Only fetch current balance if this is a historical event
+		const creatorCurrentBalance = isHistoricalEvent
+			? await getEvmErc20BalanceAtBlock(
+					publicClient as PublicClient,
+					token,
+					creator,
+					// No blockNumber parameter - defaults to latest block
+				)
+			: creatorInitialBalance; // For new launches, current = initial
 
 		const timestamp = block.timestamp;
 
 		console.log(
-			`[${token}] Fetched details via tokenInfo: Name=${tokenName}, Symbol=${tokenSymbol}, Creator=${creator}, Supply=${totalSupply}, Timestamp=${timestamp}`,
+			`[${token}] Fetched details via tokenInfo: Name=${tokenName}, Symbol=${tokenSymbol}, Creator=${creator}, Supply=${totalSupply}, Timestamp=${timestamp}${
+				isHistoricalEvent ? " (Historical Event)" : " (New Launch)"
+			}`,
 		);
 
 		// Format token balances for display using the utility function
