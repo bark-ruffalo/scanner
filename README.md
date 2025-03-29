@@ -18,9 +18,11 @@ Live on: https://scanner.trulyadog.com
 - [x] Add a crypto launchpad, where the launches are events detected on an EVM contract - added "VIRTUALS Protocol (Base)"
 - [ ] Add another crypto launchpad, but for Solana (SVM)
 - [ ] Add a traditional VC investing launchpad, where the listener of the class extracts information by crawling the launchpad website
+- [ ] Check if dev tokens have been sold or locked
 
 Hopefully, the latter three items (classes) will serve as templates for others to contribute to Scanner and add other launchpads.
 
 ## TODO (long term)
 
 - [ ] Access relevant links when analyzing a launch (anything mentioned in the launch page: socials, website, documentation, etc.)
+
