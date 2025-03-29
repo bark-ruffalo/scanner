@@ -9,6 +9,8 @@ import { analyzeLaunch } from "./lib/ai-utils";
 // Set to true to overwrite existing launches with the same title and launchpad,
 // false to skip adding duplicates.
 const OVERWRITE_EXISTING_LAUNCHES = false;
+// Set to true to re-analyze launches that already have analysis, summary, and rating
+const OVERWRITE_LLM_RESPONSES = false;
 // --- End Configuration ---
 
 // Define the type for data needed to create a new launch record.
@@ -105,7 +107,8 @@ export async function addLaunch(launchData: NewLaunchData) {
 			!existingLaunch ||
 			existingLaunch.analysis === "-" ||
 			existingLaunch.summary === "-" ||
-			existingLaunch.rating === -1;
+			existingLaunch.rating === -1 ||
+			OVERWRITE_LLM_RESPONSES;
 
 		if (needsAnalysis) {
 			try {
