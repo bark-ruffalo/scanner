@@ -1,10 +1,13 @@
+import { format } from "date-fns";
 import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import { Suspense } from "react";
 import { BackButton } from "~/components/BackButton";
 import { linkify } from "~/lib/utils";
 import { getLaunchById, getLaunchMetadata } from "~/server/queries";
+import { TokenHoldingsUpdater } from "./token-holdings-updater";
 
 type Props = {
 	params: { id: string };
@@ -20,6 +23,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 	return getLaunchMetadata(launchId);
 }
 
+// Make the main page component a server component again
 export default async function LaunchDetailPage({ params }: Props) {
 	const resolvedParams = await Promise.resolve(params);
 	const launchId = Number.parseInt(resolvedParams.id, 10);
@@ -44,19 +48,18 @@ export default async function LaunchDetailPage({ params }: Props) {
 	const tokenAddress = tokenAddressMatch?.[1];
 	const creatorAddress = creatorMatch?.[1];
 
-	// Trigger background update of token holdings if we have all required data
-	if (tokenAddress && creatorAddress && launch.totalTokenSupply) {
-		const { updateTokenHoldings } = await import("./actions");
-		updateTokenHoldings(
-			launch.id,
-			tokenAddress,
-			creatorAddress,
-			launch.totalTokenSupply,
-		).catch(console.error);
-	}
-
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
+			{tokenAddress && creatorAddress && launch.totalTokenSupply && (
+				<Suspense fallback={null}>
+					<TokenHoldingsUpdater
+						launchId={launch.id}
+						tokenAddress={tokenAddress}
+						creatorAddress={creatorAddress}
+						initialBalance={launch.totalTokenSupply}
+					/>
+				</Suspense>
+			)}
 			<div className="container mx-auto p-4">
 				<div className="mb-4 flex flex-col items-center justify-center gap-4">
 					<div className="flex items-center justify-center gap-4">
@@ -87,7 +90,18 @@ export default async function LaunchDetailPage({ params }: Props) {
 									<p className="font-bold text-2xl">
 										{launch.creatorTokenHoldingPercentage}%
 									</p>
-									<p className="text-gray-500 text-sm">of initial allocation</p>
+									<p className="text-gray-500 text-sm">
+										of initial token allocation
+										{launch.updatedAt && (
+											<>
+												<br />
+												<span className="italic">
+													(checked{" "}
+													{format(launch.updatedAt, "MMM d, yyyy HH:mm")})
+												</span>
+											</>
+										)}
+									</p>
 								</div>
 							)}
 							{launch.totalTokenSupply && launch.creatorTokensHeld && (

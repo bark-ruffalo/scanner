@@ -51,11 +51,12 @@ export async function updateTokenHoldings(
 			.set({
 				creatorTokensHeld: currentBalance.toString(),
 				creatorTokenHoldingPercentage: percentageOfInitial.toFixed(2),
+				updatedAt: new Date(),
 			})
 			.where(eq(launches.id, launchId));
 
 		// Revalidate the page to show updated data
-		revalidatePath(`/launch/${launchId}`);
+		revalidatePath(`/launch/${launchId}`, "page");
 	} catch (error) {
 		console.error("Error updating token holdings:", error);
 		// Don't throw - this is a background operation
