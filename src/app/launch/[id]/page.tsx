@@ -37,26 +37,30 @@ export default async function LaunchDetailPage({ params }: Props) {
 		notFound();
 	}
 
-	// Extract token address and creator address from the description if available
+	// Extract token address, creator address, and initial allocation from the description
 	const tokenAddressMatch = launch.description.match(
 		/Token address: (0x[a-fA-F0-9]{40})/,
 	);
 	const creatorMatch = launch.description.match(
 		/Creator on basescan\.org: https:\/\/basescan\.org\/address\/(0x[a-fA-F0-9]{40})/,
 	);
+	const initialTokensMatch = launch.description.match(
+		/Creator initial number of tokens: ([\d,]+)/,
+	);
 
 	const tokenAddress = tokenAddressMatch?.[1];
 	const creatorAddress = creatorMatch?.[1];
+	const creatorInitialTokens = initialTokensMatch?.[1]?.replace(/,/g, "");
 
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
-			{tokenAddress && creatorAddress && launch.totalTokenSupply && (
+			{tokenAddress && creatorAddress && creatorInitialTokens && (
 				<Suspense fallback={null}>
 					<TokenHoldingsUpdater
 						launchId={launch.id}
 						tokenAddress={tokenAddress}
 						creatorAddress={creatorAddress}
-						initialBalance={launch.totalTokenSupply}
+						creatorInitialTokens={creatorInitialTokens}
 					/>
 				</Suspense>
 			)}

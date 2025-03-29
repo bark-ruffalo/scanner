@@ -7,23 +7,23 @@ interface TokenHoldingsUpdaterProps {
 	launchId: number;
 	tokenAddress: string;
 	creatorAddress: string;
-	initialBalance: string;
+	creatorInitialTokens: string; // Initial token allocation at launch
 }
 
 export function TokenHoldingsUpdater({
 	launchId,
 	tokenAddress,
 	creatorAddress,
-	initialBalance,
+	creatorInitialTokens,
 }: TokenHoldingsUpdaterProps) {
 	useEffect(() => {
 		updateTokenHoldings(
 			launchId,
 			tokenAddress,
 			creatorAddress,
-			initialBalance,
+			creatorInitialTokens,
 		).catch(console.error);
-	}, [launchId, tokenAddress, creatorAddress, initialBalance]);
+	}, [launchId, tokenAddress, creatorAddress, creatorInitialTokens]);
 
 	return null;
 }

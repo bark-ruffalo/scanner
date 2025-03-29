@@ -2,7 +2,7 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { http, createPublicClient } from "viem";
+import { http, createPublicClient, formatUnits } from "viem";
 import { base } from "viem/chains";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
@@ -19,38 +19,66 @@ const publicClient = createPublicClient({
  * @param launchId The ID of the launch to update
  * @param tokenAddress The token contract address
  * @param creatorAddress The creator's address
- * @param initialBalance The initial balance as a string (from numeric DB type)
+ * @param creatorInitialTokens The creator's initial token allocation at launch (in ETH)
  */
 export async function updateTokenHoldings(
 	launchId: number,
 	tokenAddress: string,
 	creatorAddress: string,
-	initialBalance: string,
+	creatorInitialTokens: string,
 ) {
 	try {
-		// Get current balance
-		const currentBalance = await getEvmErc20BalanceAtBlock(
+		console.log(`Updating token holdings for launch ${launchId}:`);
+		console.log(`- Token address: ${tokenAddress}`);
+		console.log(`- Creator address: ${creatorAddress}`);
+		console.log(
+			`- Creator's initial token allocation: ${creatorInitialTokens}`,
+		);
+
+		// Get current balance from blockchain
+		const currentBalanceWei = await getEvmErc20BalanceAtBlock(
 			publicClient,
 			tokenAddress as `0x${string}`,
 			creatorAddress as `0x${string}`,
 		);
 
-		// Convert to number for comparison
-		const currentBalanceNumber = Number(currentBalance);
-		const initialBalanceNumber = Number(initialBalance);
+		console.log(
+			`- Current balance from blockchain (in wei): ${currentBalanceWei.toString()}`,
+		);
 
-		// Calculate percentage of initial allocation
-		const percentageOfInitial =
-			initialBalanceNumber > 0
-				? (currentBalanceNumber / initialBalanceNumber) * 100
-				: 0;
+		// Convert wei to eth for current balance
+		const currentTokensHeld = Number(formatUnits(currentBalanceWei, 18));
+		const initialTokensNum = Number(creatorInitialTokens);
 
-		// Update the database
+		console.log(`- Current tokens held by creator: ${currentTokensHeld}`);
+		console.log(`- Initial token allocation: ${initialTokensNum}`);
+
+		// Calculate what percentage of initial allocation is still held
+		const percentageOfInitialHeld =
+			initialTokensNum > 0 ? (currentTokensHeld / initialTokensNum) * 100 : 0;
+
+		console.log(
+			`- Percentage of initial allocation still held: ${percentageOfInitialHeld}%`,
+		);
+
+		// Round the current balance to match database format
+		const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
+
+		// Log the exact values we're trying to update in the database
+		console.log("Attempting to update database with:");
+		console.log(
+			`- creatorTokensHeld (current balance): ${roundedCurrentTokens}`,
+		);
+		console.log(
+			`- creatorTokenHoldingPercentage (% of initial still held): ${percentageOfInitialHeld.toFixed(2)}`,
+		);
+
+		// Update the database with current values
 		await db
 			.update(launches)
 			.set({
-				creatorTokensHeld: currentBalance.toString(),
-				creatorTokenHoldingPercentage: percentageOfInitial.toFixed(2),
+				creatorTokensHeld: roundedCurrentTokens,
+				creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
 				updatedAt: new Date(),
 			})
 			.where(eq(launches.id, launchId));
@@ -58,7 +86,13 @@ export async function updateTokenHoldings(
 		// Revalidate the page to show updated data
 		revalidatePath(`/launch/${launchId}`, "page");
 	} catch (error) {
-		console.error("Error updating token holdings:", error);
+		// Enhanced error logging
+		console.error("Error updating token holdings:");
+		console.error("Error details:", error);
+		if (error instanceof Error) {
+			console.error("Error message:", error.message);
+			console.error("Error stack:", error.stack);
+		}
 		// Don't throw - this is a background operation
 	}
 }
