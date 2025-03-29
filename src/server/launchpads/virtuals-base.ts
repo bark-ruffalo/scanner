@@ -207,7 +207,6 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const tokenSymbol = dataTuple.ticker; // Use ticker as symbol
 		const totalSupply = dataTuple.supply;
 
-		console.log(`[${token}] Fetching creator's initial balance...`); // Added log
 		const creatorInitialBalance = await getEvmErc20BalanceAtBlock(
 			publicClient as PublicClient, // Type assertion to match the expected type
 			token, // The launched token address
@@ -448,21 +447,13 @@ export async function debugFetchHistoricalEvents(
 
 	const getLogsParams = {
 		address: VIRTUALS_FACTORY_ADDRESS,
-		event: launchedEventAbi, // Use the corrected ABI definition
+		event: launchedEventAbi,
 		fromBlock: startBlock,
 		toBlock: endBlock,
 	};
-	console.log(
-		`[${LAUNCHPAD_NAME} Debug] Querying logs with corrected ABI:`, // Updated log message
-		JSON.stringify(
-			getLogsParams,
-			(key, value) => (typeof value === "bigint" ? value.toString() : value),
-			2,
-		),
-	);
 
 	try {
-		// Fetch logs using the corrected event filter.
+		// Fetch logs using an event filter.
 		const logs = await publicClient.getLogs(getLogsParams);
 
 		console.log(
@@ -478,18 +469,6 @@ export async function debugFetchHistoricalEvents(
 			);
 			await processLaunchedEvent(log as unknown as LaunchedEventLog);
 		}
-
-		// --- Secondary Debug Step: Fetch ALL logs (Now likely unnecessary) ---
-		// This section can probably be removed or kept commented out
-		/*
-        console.log(`[${LAUNCHPAD_NAME} Debug] --- Fetching ALL logs from contract ${VIRTUALS_FACTORY_ADDRESS} in range ${startBlock}-${endBlock}... ---`);
-        const allLogsParams = { address: VIRTUALS_FACTORY_ADDRESS, fromBlock: startBlock, toBlock: endBlock };
-        const allLogs = await publicClient.getLogs(allLogsParams);
-        console.log(`[${LAUNCHPAD_NAME} Debug] Found ${allLogs.length} total logs from the contract in the range (no event filter).`);
-        // ... rest of secondary debug logging ...
-        console.log(`[${LAUNCHPAD_NAME} Debug] --- Finished fetching ALL logs ---`);
-        */
-		// --- End Secondary Debug Step ---
 	} catch (error) {
 		console.error(
 			`[${LAUNCHPAD_NAME} Debug] Error fetching or processing historical events:`,

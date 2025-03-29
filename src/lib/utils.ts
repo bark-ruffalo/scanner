@@ -57,17 +57,17 @@ export function formatTokenBalance(amount: bigint, decimals = 18): string {
 	// Convert the raw amount to a decimal string
 	const formattedAmount = formatUnits(amount, decimals);
 
-	// Convert to a number for formatting
-	const numberAmount = Number(formattedAmount);
+	// Convert to a number and round it
+	const numberAmount = Math.round(Number(formattedAmount));
 
 	// If the value is 0, return "0" without decimal places
 	if (numberAmount === 0) {
 		return "0";
 	}
 
-	// Format with commas and two decimal places
+	// Format with commas and no decimal places
 	return numberAmount.toLocaleString("en-US", {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
+		minimumFractionDigits: 0,
+		maximumFractionDigits: 0,
 	});
 }

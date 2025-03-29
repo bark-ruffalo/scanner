@@ -18,6 +18,7 @@ interface ReadContractClient {
 		args: readonly unknown[];
 		blockNumber?: bigint;
 	}): Promise<unknown>;
+	getBlockNumber(): Promise<bigint>;
 }
 
 /**
@@ -34,6 +35,10 @@ export async function getEvmErc20BalanceAtBlock(
 	accountAddress: Address,
 	blockNumber?: bigint,
 ): Promise<bigint> {
+	const blockDescription = blockNumber
+		? `at block ${blockNumber}`
+		: `at latest block ${await client.getBlockNumber()}`;
+	console.log(`Fetching creator's balance ${blockDescription}...`);
 	try {
 		const contractArgs: {
 			address: Address;

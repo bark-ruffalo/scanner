@@ -10,9 +10,6 @@ export async function register() {
 
 		// Check if the debug flag is set
 		if (process.env.DEBUG_VIRTUALS_BASE === "true") {
-			console.log(
-				"DEBUG_VIRTUALS_BASE is true. Running debugFetchHistoricalEvents for launchpad VIRTUALS Protocol (Base)...",
-			);
 			await debugFetchHistoricalEvents(27843805n, 27843805n); // Use await since it's async
 		} else {
 			// Start the regular listener if not debugging
