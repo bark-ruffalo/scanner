@@ -253,3 +253,30 @@ export async function getLaunchMetadata(id: number) {
 		title: launch ? `${launch.title} | Scanner` : "Launch Not Found | Scanner",
 	};
 }
+
+export interface TokenUpdateResult {
+	creatorTokensHeld: string;
+	creatorTokenHoldingPercentage: string;
+	tokenStatsUpdatedAt: Date;
+}
+
+/**
+ * Updates token statistics in the database for a specific launch.
+ *
+ * @param launchId - The ID of the launch to update
+ * @param tokenStats - The token statistics to update
+ */
+export async function updateTokenStatisticsInDb(
+	launchId: number,
+	tokenStats: TokenUpdateResult,
+) {
+	await db
+		.update(launches)
+		.set({
+			creatorTokensHeld: tokenStats.creatorTokensHeld,
+			creatorTokenHoldingPercentage: tokenStats.creatorTokenHoldingPercentage,
+			tokenStatsUpdatedAt: tokenStats.tokenStatsUpdatedAt,
+			updatedAt: new Date(),
+		})
+		.where(eq(launches.id, launchId));
+}

@@ -1,13 +1,10 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { http, createPublicClient, type Transport, type Chain } from "viem";
+import { http, type Chain, type Transport, createPublicClient } from "viem";
 import { base } from "viem/chains";
-import {
-	updateTokenStatistics,
-	updateTokenStatisticsInDb,
-} from "~/server/lib/token-utils";
-
+import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
+import { updateTokenStatisticsInDb } from "~/server/queries";
 // Create a public client for Base network with explicit typing
 const publicClient = createPublicClient<Transport, Chain>({
 	chain: base,
@@ -28,34 +25,20 @@ export async function updateTokenHoldings(
 	creatorInitialTokens: string,
 ) {
 	try {
-		console.log(`Updating token holdings for launch ${launchId}:`);
-		console.log(`- Token address: ${tokenAddress}`);
-		console.log(`- Creator address: ${creatorAddress}`);
-		console.log(
-			`- Creator's initial token allocation: ${creatorInitialTokens}`,
-		);
-
-		// Get updated token statistics
-		const tokenStats = await updateTokenStatistics(
+		const tokenStats = await updateEvmTokenStatistics(
 			publicClient,
 			tokenAddress as `0x${string}`,
 			creatorAddress as `0x${string}`,
 			creatorInitialTokens,
 		);
 
-		// Update the database
 		await updateTokenStatisticsInDb(launchId, tokenStats);
-
-		// Revalidate the page to show updated data
 		revalidatePath(`/launch/${launchId}`, "page");
 	} catch (error) {
-		// Enhanced error logging
-		console.error("Error updating token holdings:");
-		console.error("Error details:", error);
+		console.error("Error updating token holdings:", error);
 		if (error instanceof Error) {
 			console.error("Error message:", error.message);
 			console.error("Error stack:", error.stack);
 		}
-		// Don't throw - this is a background operation
 	}
 }

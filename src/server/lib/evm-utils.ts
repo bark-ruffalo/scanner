@@ -1,8 +1,9 @@
 import "server-only";
 // Use type imports for types
-import type { AbiItem, Address } from "viem";
+import type { AbiItem, Address, PublicClient } from "viem";
 // Keep value imports separate
-import { parseAbiItem } from "viem";
+import { formatUnits, parseAbiItem } from "viem";
+import type { TokenUpdateResult } from "~/server/queries";
 
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
@@ -19,6 +20,67 @@ interface ReadContractClient {
 		blockNumber?: bigint;
 	}): Promise<unknown>;
 	getBlockNumber(): Promise<bigint>;
+}
+
+/**
+ * Updates token statistics for a given EVM token and creator address.
+ * This is the central function for updating token-related information,
+ * used both when adding new launches and when refreshing existing ones.
+ *
+ * @param client - The viem public client to use for blockchain queries
+ * @param tokenAddress - The token contract address
+ * @param creatorAddress - The creator's address
+ * @param creatorInitialTokens - The creator's initial token allocation (as a string)
+ * @param blockNumber - Optional block number to check balance at
+ * @returns TokenUpdateResult containing the updated token statistics
+ */
+export async function updateEvmTokenStatistics(
+	client: PublicClient,
+	tokenAddress: Address,
+	creatorAddress: Address,
+	creatorInitialTokens: string,
+	blockNumber?: bigint,
+): Promise<TokenUpdateResult> {
+	console.log(`Updating EVM token statistics for token ${tokenAddress}:`);
+	console.log(`- Creator address: ${creatorAddress}`);
+	console.log(`- Initial tokens: ${creatorInitialTokens}`);
+	if (blockNumber) console.log(`- At block: ${blockNumber}`);
+
+	// Get current balance from blockchain
+	const currentBalanceWei = await getEvmErc20BalanceAtBlock(
+		client,
+		tokenAddress,
+		creatorAddress,
+		blockNumber,
+	);
+
+	console.log(
+		`- Current balance from blockchain (in wei): ${currentBalanceWei.toString()}`,
+	);
+
+	// Convert wei to eth for current balance
+	const currentTokensHeld = Number(formatUnits(currentBalanceWei, 18));
+	const initialTokensNum = Number(creatorInitialTokens);
+
+	console.log(`- Current tokens held by creator: ${currentTokensHeld}`);
+	console.log(`- Initial token allocation: ${initialTokensNum}`);
+
+	// Calculate what percentage of initial allocation is still held
+	const percentageOfInitialHeld =
+		initialTokensNum > 0 ? (currentTokensHeld / initialTokensNum) * 100 : 0;
+
+	console.log(
+		`- Percentage of initial allocation still held: ${percentageOfInitialHeld}%`,
+	);
+
+	// Round the current balance to match database format
+	const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
+
+	return {
+		creatorTokensHeld: roundedCurrentTokens,
+		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
+		tokenStatsUpdatedAt: new Date(),
+	};
 }
 
 /**

@@ -1,23 +1,24 @@
 import {
 	type Address,
+	type Chain,
 	type Log,
 	type PublicClient,
 	type Transport,
-	type Chain,
 	createPublicClient,
 	formatUnits,
 	getAddress,
 	parseAbi,
 	parseAbiItem,
 	webSocket,
-	http,
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
 import { formatTokenBalance } from "~/lib/utils";
-import { getEvmErc20BalanceAtBlock } from "~/server/lib/evm-utils";
+import {
+	getEvmErc20BalanceAtBlock,
+	updateEvmTokenStatistics,
+} from "~/server/lib/evm-utils";
 import { type NewLaunchData, addLaunch } from "~/server/queries";
-import { updateTokenStatistics } from "~/server/lib/token-utils";
 
 // --- Types ---
 
@@ -332,7 +333,7 @@ YouTube: ${youtube || "N/A"}
 			imageUrl: imageUrl, // Add the image URL
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
 			// Get initial token statistics
-			...(await updateTokenStatistics(
+			...(await updateEvmTokenStatistics(
 				publicClient,
 				token,
 				creator,
