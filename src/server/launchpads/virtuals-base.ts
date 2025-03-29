@@ -234,7 +234,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
 		const displayCurrentBalance = formatTokenBalance(creatorCurrentBalance);
 
-		// Calculate creator allocation percentage
+		// Calculate inital creator allocation percentage out of the total supply
 		let creatorAllocationPercent = 0;
 		let formattedAllocation = "N/A";
 		if (totalSupply > 0n) {
@@ -253,6 +253,22 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			}
 		} else {
 			formattedAllocation = "0.00% (Total supply is 0)";
+		}
+
+		// Calculate what percentage of their initial balance the creator still holds
+		let creatorHoldingPercent = 0;
+		if (creatorInitialBalance > 0n) {
+			try {
+				// Use BigInt math for precision before converting to number
+				const holdingBasisPoints =
+					(creatorCurrentBalance * 10000n) / creatorInitialBalance; // Calculate in basis points (scaled by 10000)
+				creatorHoldingPercent = Number(holdingBasisPoints) / 100; // Convert back to percentage
+			} catch (calcError) {
+				console.error(
+					`[${token}] Error calculating creator holding percentage:`,
+					calcError,
+				);
+			}
 		}
 
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
@@ -307,9 +323,9 @@ YouTube: ${youtube || "N/A"}
 				Number(formatUnits(totalSupply, 18)),
 			).toString(), // Convert from WEI to ETH and round to nearest integer
 			creatorTokensHeld: Math.round(
-				Number(formatUnits(creatorInitialBalance, 18)),
+				Number(formatUnits(creatorCurrentBalance, 18)),
 			).toString(), // Convert from WEI to ETH and round to nearest integer
-			creatorTokenHoldingPercentage: creatorAllocationPercent.toFixed(2), // Format to 2 decimal places
+			creatorTokenHoldingPercentage: creatorHoldingPercent.toFixed(2), // Store the percentage of initial tokens still held
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(
