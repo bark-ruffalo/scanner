@@ -12,7 +12,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import { formatTokenBalance } from "~/lib/utils";
+import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
 import {
 	getEvmErc20BalanceAtBlock,
 	updateEvmTokenStatistics,
@@ -232,40 +232,32 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
 		const displayCurrentBalance = formatTokenBalance(creatorCurrentBalance);
 
-		// Calculate inital creator allocation percentage out of the total supply
+		// Calculate initial creator allocation percentage out of the total supply
 		let creatorAllocationPercent = 0;
 		let formattedAllocation = "N/A";
-		if (totalSupply > 0n) {
-			try {
-				// Use BigInt math for precision before converting to number
-				const percentageBasisPoints =
-					(creatorInitialBalance * 10000n) / totalSupply; // Calculate in basis points (scaled by 10000)
-				creatorAllocationPercent = Number(percentageBasisPoints) / 100; // Convert back to percentage
-				formattedAllocation = `${creatorAllocationPercent.toFixed(2)}%`;
-			} catch (calcError) {
-				console.error(
-					`[${token}] Error calculating creator allocation:`,
-					calcError,
-				);
-				formattedAllocation = "Error calculating";
-			}
-		} else {
+		const allocationResult = calculateBigIntPercentage(
+			creatorInitialBalance,
+			totalSupply,
+		);
+		if (allocationResult) {
+			creatorAllocationPercent = allocationResult.percent;
+			formattedAllocation = allocationResult.formatted;
+		} else if (totalSupply === 0n) {
 			formattedAllocation = "0.00% (Total supply is 0)";
+		} else {
+			formattedAllocation = "Error calculating";
 		}
 
 		// Calculate what percentage of their initial balance the creator still holds
+		// Only calculate for historical events where current balance differs from initial
 		let creatorHoldingPercent = 0;
-		if (creatorInitialBalance > 0n) {
-			try {
-				// Use BigInt math for precision before converting to number
-				const holdingBasisPoints =
-					(creatorCurrentBalance * 10000n) / creatorInitialBalance; // Calculate in basis points (scaled by 10000)
-				creatorHoldingPercent = Number(holdingBasisPoints) / 100; // Convert back to percentage
-			} catch (calcError) {
-				console.error(
-					`[${token}] Error calculating creator holding percentage:`,
-					calcError,
-				);
+		if (isHistoricalEvent && creatorCurrentBalance !== creatorInitialBalance) {
+			const holdingResult = calculateBigIntPercentage(
+				creatorCurrentBalance,
+				creatorInitialBalance,
+			);
+			if (holdingResult) {
+				creatorHoldingPercent = holdingResult.percent;
 			}
 		}
 
@@ -329,7 +321,6 @@ YouTube: ${youtube || "N/A"}
 				token,
 				creator,
 				Math.round(Number(formatUnits(creatorInitialBalance, 18))).toString(),
-				blockNumber,
 			)),
 			// summary/analysis are left for potential future LLM processing
 		};

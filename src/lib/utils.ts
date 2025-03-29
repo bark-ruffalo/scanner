@@ -71,3 +71,34 @@ export function formatTokenBalance(amount: bigint, decimals = 18): string {
 		maximumFractionDigits: 0,
 	});
 }
+
+/**
+ * Calculates a percentage using BigInt values and returns it as a number with 2 decimal places.
+ * @param numerator The top number in the fraction (BigInt)
+ * @param denominator The bottom number in the fraction (BigInt)
+ * @returns An object containing the percentage as a number and a formatted string, or null if calculation fails
+ */
+export function calculateBigIntPercentage(
+	numerator: bigint,
+	denominator: bigint,
+): {
+	percent: number;
+	formatted: string;
+} | null {
+	if (denominator <= 0n) {
+		return null;
+	}
+
+	try {
+		// Calculate in basis points (scaled by 10000) for precision
+		const percentageBasisPoints = (numerator * 10000n) / denominator;
+		const percent = Number(percentageBasisPoints) / 100;
+		return {
+			percent,
+			formatted: `${percent.toFixed(2)}%`,
+		};
+	} catch (error) {
+		console.error("Error calculating percentage:", error);
+		return null;
+	}
+}
