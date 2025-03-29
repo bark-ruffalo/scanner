@@ -160,10 +160,11 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 	try {
 		// Fetch token info from factory and block info (for timestamp) concurrently
-		console.log(`[${token}] Fetching tokenInfo and block info...`); // Updated log message
+		console.log(`[${token}] Fetching tokenInfo and block info...`);
 		const [
 			tokenInfoResult, // Result from tokenInfo call (now a tuple)
 			block, // Block data including timestamp
+			latestBlock, // Get latest block number for historical check
 		] = await Promise.all([
 			publicClient.readContract({
 				address: VIRTUALS_FACTORY_ADDRESS,
@@ -172,10 +173,11 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 				args: [token], // Pass the token address from the event
 			}) as Promise<TokenInfoResult>, // Cast result to our defined tuple type
 			publicClient.getBlock({ blockNumber: blockNumber }),
+			publicClient.getBlockNumber(),
 		]).catch((error) => {
 			// Handle errors during Promise.all (e.g., tokenInfo call fails)
 			console.error(
-				`[${token}] Error during initial data fetching (tokenInfo, block):`,
+				`[${token}] Error during initial data fetching (tokenInfo, block, latestBlock):`,
 				error,
 			);
 			throw error; // Re-throw to stop further processing in this event
@@ -184,7 +186,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Build launchpad URL for the launch
 		const tokenUrl = `https://app.virtuals.io/prototypes/${token}`;
 
-		// Now access elements from the tokenInfoResult tuple and fetch initial creator allocation (token balance at launch)
+		// Now access elements from the tokenInfoResult tuple
 		const creator = tokenInfoResult[0];
 		const dataTuple = tokenInfoResult[4];
 		const platformDescription = tokenInfoResult[5];
@@ -198,27 +200,33 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const tokenSymbol = dataTuple.ticker; // Use ticker as symbol
 		const totalSupply = dataTuple.supply;
 
-		const creatorInitialBalance = await getEvmErc20BalanceAtBlock(
-			publicClient as PublicClient, // Type assertion to match the expected type
-			token, // The launched token address
-			creator, // The creator's address from tokenInfo
-			blockNumber, // The block number from the event log
-		);
-
 		// Determine if this is a historical event by checking if we're in debug mode
 		// We consider it historical if the block number is more than 100 blocks old
-		const latestBlock = await publicClient.getBlockNumber();
 		const isHistoricalEvent = latestBlock - blockNumber > 100n;
 
-		// Only fetch current balance if this is a historical event
-		const creatorCurrentBalance = isHistoricalEvent
-			? await getEvmErc20BalanceAtBlock(
-					publicClient as PublicClient,
-					token,
-					creator,
-					// No blockNumber parameter - defaults to latest block
-				)
-			: creatorInitialBalance; // For new launches, current = initial
+		// Fetch initial and current creator balances in a single block to avoid redundancy
+		const [creatorInitialBalance, creatorCurrentBalance] = await Promise.all([
+			getEvmErc20BalanceAtBlock(
+				publicClient as PublicClient,
+				token,
+				creator,
+				blockNumber, // The block number from the event log
+			),
+			// Only fetch current balance if this is a historical event, otherwise use initial
+			isHistoricalEvent
+				? getEvmErc20BalanceAtBlock(
+						publicClient as PublicClient,
+						token,
+						creator,
+						// No blockNumber parameter - defaults to latest block
+					)
+				: null, // We'll set this to initial balance below if not historical
+		]);
+
+		// For new launches, current = initial
+		const finalCurrentBalance = isHistoricalEvent
+			? creatorCurrentBalance || creatorInitialBalance
+			: creatorInitialBalance;
 
 		const timestamp = block.timestamp;
 
@@ -230,7 +238,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Format token balances for display using the utility function
 		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
-		const displayCurrentBalance = formatTokenBalance(creatorCurrentBalance);
+		const displayCurrentBalance = formatTokenBalance(finalCurrentBalance);
 
 		// Calculate initial creator allocation percentage out of the total supply
 		let creatorAllocationPercent = 0;
@@ -251,9 +259,9 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Calculate what percentage of their initial balance the creator still holds
 		// Only calculate for historical events where current balance differs from initial
 		let creatorHoldingPercent = 0;
-		if (isHistoricalEvent && creatorCurrentBalance !== creatorInitialBalance) {
+		if (isHistoricalEvent && finalCurrentBalance !== creatorInitialBalance) {
 			const holdingResult = calculateBigIntPercentage(
-				creatorCurrentBalance,
+				finalCurrentBalance,
 				creatorInitialBalance,
 			);
 			if (holdingResult) {
@@ -283,7 +291,7 @@ Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})${
-			creatorCurrentBalance !== creatorInitialBalance
+			finalCurrentBalance !== creatorInitialBalance
 				? `\nNumber of tokens still held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)`
 				: ""
 		}
@@ -306,6 +314,11 @@ Telegram: ${telegram || "N/A"}
 YouTube: ${youtube || "N/A"}
             `.trim();
 
+		// Calculate the formatted initial balance for token statistics
+		const formattedInitialBalance = Math.round(
+			Number(formatUnits(creatorInitialBalance, 18)),
+		).toString();
+
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
@@ -315,12 +328,13 @@ YouTube: ${youtube || "N/A"}
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
-			// Get initial token statistics
+			// Use the balances we already have instead of fetching again
 			...(await updateEvmTokenStatistics(
 				publicClient,
 				token,
 				creator,
-				Math.round(Number(formatUnits(creatorInitialBalance, 18))).toString(),
+				formattedInitialBalance,
+				finalCurrentBalance, // Pass the current balance we already fetched
 			)),
 			// summary/analysis are left for potential future LLM processing
 		};
@@ -374,19 +388,13 @@ export function startVirtualsBaseListener() {
 				console.error(
 					`[${LAUNCHPAD_NAME}] Error in WebSocket event watcher:`,
 					error.message,
-					// Optionally log the full error object for more details
-					// error
 				);
-				// Potential enhancements:
-				// - Implement retry logic with backoff for temporary connection issues.
-				// - Check error type/message to decide if reconnection is feasible.
-				// - Use a more robust monitoring/alerting system for persistent errors.
-				// const shouldReconnect = checkIfReconnectableError(error);
-				// if (shouldReconnect) {
+				// Potential implementation for reconnection logic:
+				// setTimeout(() => {
 				//   console.log(`[${LAUNCHPAD_NAME}] Attempting to reconnect listener...`);
 				//   unwatch(); // Stop the current watcher
-				//   setTimeout(startVirtualsBaseListener, 5000); // Retry after delay
-				// }
+				//   startVirtualsBaseListener(); // Restart listener
+				// }, 5000);
 			},
 			// strict: true // Consider adding strict: true for stricter ABI parsing/matching
 		});
@@ -414,34 +422,38 @@ export async function debugFetchHistoricalEvents(
 	fromBlock?: bigint,
 	toBlock?: bigint,
 ) {
-	// Define the block range to query. Use BigInt literals (e.g., 12345n).
-	const startBlock = fromBlock || 27843805n; // Default start block if not provided; it starts from $ACP.
-	// other good examples for startBlock:
-	// $MAR: 25684212 https://basescan.org/tx/0x3b5e48b9748ac83ff98949b0d579298314ff20e71abadf5b743f9661a5d2ef64
-	// $DFY: 23639253 https://basescan.org/address/0xf66dea7b3e897cd44a5a231c61b6b4423d613259#readProxyContract
+	console.log(`Attempting to debug ${LAUNCHPAD_NAME} historical events...`);
 
-	// Fetch the latest block if toBlock is not provided
-	let endBlock: bigint;
-	if (!toBlock) {
-		const latestBlock = await publicClient.getBlockNumber();
-		endBlock = latestBlock;
-		console.log(`Using latest block number: ${endBlock}`);
-	} else {
-		endBlock = toBlock;
+	// Check if the WebSocket transport was successfully created.
+	if (!wsTransport) {
+		console.error(
+			`[${LAUNCHPAD_NAME}] Failed to create WebSocket transport. Debug cannot start. Ensure BASE_RPC_URL (wss://) is set or check network configuration.`,
+		);
+		return; // Stop execution if transport is not available.
 	}
 
-	console.log(
-		`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${startBlock} to ${endBlock} ---`,
-	);
-
-	const getLogsParams = {
-		address: VIRTUALS_FACTORY_ADDRESS,
-		event: launchedEventAbi,
-		fromBlock: startBlock,
-		toBlock: endBlock,
-	};
-
 	try {
+		// Define the block range to query. Use BigInt literals (e.g., 12345n).
+		const startBlock = fromBlock || 27843805n; // Default start block if not provided; it starts from $ACP.
+		// other good examples for startBlock:
+		// $MAR: 25684212 https://basescan.org/tx/0x3b5e48b9748ac83ff98949b0d579298314ff20e71abadf5b743f9661a5d2ef64
+		// $DFY: 23639253 https://basescan.org/address/0xf66dea7b3e897cd44a5a231c61b6b4423d613259#readProxyContract
+
+		// Fetch the latest block if toBlock is not provided
+		const endBlock = toBlock || (await publicClient.getBlockNumber());
+		console.log(`Using block range: ${startBlock} to ${endBlock}`);
+
+		console.log(
+			`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${startBlock} to ${endBlock} ---`,
+		);
+
+		const getLogsParams = {
+			address: VIRTUALS_FACTORY_ADDRESS,
+			event: launchedEventAbi,
+			fromBlock: startBlock,
+			toBlock: endBlock,
+		};
+
 		// Fetch logs using an event filter.
 		const logs = await publicClient.getLogs(getLogsParams);
 
@@ -458,14 +470,17 @@ export async function debugFetchHistoricalEvents(
 			);
 			await processLaunchedEvent(log as unknown as LaunchedEventLog);
 		}
+
+		console.log(
+			`--- Debugging [${LAUNCHPAD_NAME}]: Finished fetching historical events ---`,
+		);
 	} catch (error) {
 		console.error(
 			`[${LAUNCHPAD_NAME} Debug] Error fetching or processing historical events:`,
 			error,
 		);
-	} finally {
 		console.log(
-			`--- Debugging [${LAUNCHPAD_NAME}]: Finished fetching historical events ---`,
+			`--- Debugging [${LAUNCHPAD_NAME}]: Failed to fetch historical events ---`,
 		);
 	}
 }

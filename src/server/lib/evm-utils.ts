@@ -31,6 +31,7 @@ interface ReadContractClient {
  * @param tokenAddress - The token contract address
  * @param creatorAddress - The creator's address
  * @param creatorInitialTokens - The creator's initial token allocation (as a string)
+ * @param currentBalanceBigInt - Optional pre-fetched current balance (as bigint)
  * @returns TokenUpdateResult containing the updated token statistics
  */
 export async function updateEvmTokenStatistics(
@@ -38,17 +39,17 @@ export async function updateEvmTokenStatistics(
 	tokenAddress: Address,
 	creatorAddress: Address,
 	creatorInitialTokens: string,
+	currentBalanceBigInt?: bigint,
 ): Promise<TokenUpdateResult> {
 	console.log(`Updating EVM token statistics for token ${tokenAddress}:`);
 	console.log(`- Creator address: ${creatorAddress}`);
 	console.log(`- Initial tokens: ${creatorInitialTokens}`);
 
-	// Get current balance from blockchain
-	const currentBalanceWei = await getEvmErc20BalanceAtBlock(
-		client,
-		tokenAddress,
-		creatorAddress,
-	);
+	// Get current balance from blockchain if not provided
+	const currentBalanceWei =
+		currentBalanceBigInt !== undefined
+			? currentBalanceBigInt
+			: await getEvmErc20BalanceAtBlock(client, tokenAddress, creatorAddress);
 
 	console.log(
 		`- Current balance from blockchain (in wei): ${currentBalanceWei.toString()}`,
