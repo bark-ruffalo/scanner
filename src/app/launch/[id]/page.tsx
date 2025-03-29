@@ -84,14 +84,11 @@ export default async function LaunchDetailPage({ params }: Props) {
 						<div className="grid grid-cols-1 gap-6 md:grid-cols-2">
 							{launch.creatorTokenHoldingPercentage && (
 								<div>
-									<p className="text-gray-600 dark:text-gray-400">
-										Creator holds
-									</p>
 									<p className="font-bold text-2xl">
 										{launch.creatorTokenHoldingPercentage}%
 									</p>
 									<p className="text-gray-500 text-sm">
-										of initial token allocation
+										of initial token allocation held by creator
 										{launch.updatedAt && (
 											<>
 												<br />
@@ -106,15 +103,12 @@ export default async function LaunchDetailPage({ params }: Props) {
 							)}
 							{launch.totalTokenSupply && launch.creatorTokensHeld && (
 								<div>
-									<p className="text-gray-600 dark:text-gray-400">
-										Total Supply
-									</p>
 									<p className="font-bold text-2xl">
 										{Number(launch.creatorTokensHeld).toLocaleString()} /{" "}
 										{Number(launch.totalTokenSupply).toLocaleString()}
 									</p>
 									<p className="text-gray-500 text-sm">
-										tokens held by creator
+										tokens held by creator out of total supply
 									</p>
 								</div>
 							)}
