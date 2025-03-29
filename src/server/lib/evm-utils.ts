@@ -61,21 +61,20 @@ export async function updateEvmTokenStatistics(
 	// Convert wei to eth for current balance
 	const currentTokensHeld = Number(formatUnits(currentBalanceWei, 18));
 	const initialTokensNum = Number(creatorInitialTokens);
+	const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
 
-	console.log(`- Current tokens held by creator: ${currentTokensHeld}`);
-	console.log(`- Initial token allocation: ${initialTokensNum}`);
+	console.log(`- Current tokens held by creator: ${roundedCurrentTokens}`);
+	console.log(`- Initial token allocation: ${Math.round(initialTokensNum)}`);
 
 	// Calculate what percentage of initial allocation is still held
 	const percentageOfInitialHeld =
 		initialTokensNum > 0 ? (currentTokensHeld / initialTokensNum) * 100 : 0;
 
 	console.log(
-		`- Percentage of initial allocation still held: ${percentageOfInitialHeld}%`,
+		`- Percentage of initial allocation still held: ${percentageOfInitialHeld.toFixed(2)}%`,
 	);
 
-	// Round the current balance to match database format
-	const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
-
+	// Return the values in database format
 	return {
 		creatorTokensHeld: roundedCurrentTokens,
 		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
