@@ -19,6 +19,7 @@ Live on: https://scanner.trulyadog.com
 - [ ] Add another crypto launchpad, but for Solana (SVM)
 - [ ] Add a traditional VC investing launchpad, where the listener of the class extracts information by crawling the launchpad website
 - [ ] Check if dev tokens have been sold or locked
+- [ ] Modify db schema to also store for each launch if the creator still holds tokens
 
 Hopefully, the latter three items (classes) will serve as templates for others to contribute to Scanner and add other launchpads.
 
