@@ -1,5 +1,4 @@
 import {
-	type Address,
 	type Chain,
 	type Log,
 	type PublicClient,
@@ -18,7 +17,7 @@ import {
 	getEvmErc20BalanceAtBlock,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
-import { type NewLaunchData, addLaunch } from "~/server/queries";
+import { addLaunch } from "~/server/queries";
 
 // --- Types ---
 
@@ -38,17 +37,6 @@ interface LaunchData {
 
 // --- Configuration ---
 
-/**
- * Formats a number into a string suitable for PostgreSQL numeric type.
- * Handles large numbers by converting through BigInt.
- */
-function formatBigNumber(num: number | bigint): string {
-	// Convert to BigInt first to handle the full integer value
-	const bigNum = typeof num === "number" ? BigInt(Math.floor(num)) : num;
-	// Convert to string for the numeric type
-	return bigNum.toString();
-}
-
 // The on-chain address of the Virtuals Protocol factory contract on the Base network.
 // This contract emits the 'Launched' event we are interested in.
 const VIRTUALS_FACTORY_ADDRESS: `0x${string}` =
@@ -64,7 +52,7 @@ const launchedEventAbi = parseAbiItem(
 );
 
 // Define the ABI for the tokenInfo function on the factory contract
-// Using parseAbi for complex structure - Corrected: Removed outer wrapping tuple ()
+// Using parseAbi for complex structure
 const factoryAbi = parseAbi([
 	"function tokenInfo(address tokenAddress) view returns (address creator, address token, address pair, address agentToken, (address token, string name, string _name, string ticker, uint256 supply, uint256 price, uint256 marketCap, uint256 liquidity, uint256 volume, uint256 volume24H, uint256 prevPrice, uint256 lastUpdated) data, string description, string image, string twitter, string telegram, string youtube, string website, bool trading, bool tradingOnUniswap)",
 ]);
@@ -97,7 +85,6 @@ console.log(`Public client created for ${LAUNCHPAD_NAME} on Base.`);
 // --- Types ---
 
 // Define a TypeScript interface extending viem's Log type.
-// Updated to match the corrected 'Launched' event ABI.
 interface LaunchedEventLog extends Log {
 	eventName: "Launched"; // Explicitly set event name
 	args: {
@@ -108,7 +95,6 @@ interface LaunchedEventLog extends Log {
 }
 
 // Define a type for the structure returned by the tokenInfo function
-// Corrected: It returns a tuple (array) of values, not a single object
 type TokenInfoResult = readonly [
 	creator: `0x${string}`,
 	token: `0x${string}`,
@@ -195,10 +181,10 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			throw error; // Re-throw to stop further processing in this event
 		});
 
-		// Build token URL
+		// Build launchpad URL for the launch
 		const tokenUrl = `https://app.virtuals.io/prototypes/${token}`;
 
-		// Now access elements from the tokenInfoResult tuple and fetch creator balance
+		// Now access elements from the tokenInfoResult tuple and fetch initial creator allocation (token balance at launch)
 		const creator = tokenInfoResult[0];
 		const dataTuple = tokenInfoResult[4];
 		const platformDescription = tokenInfoResult[5];
@@ -342,7 +328,7 @@ YouTube: ${youtube || "N/A"}
 				publicClient,
 				token,
 				creator,
-				Math.round(Number(formatUnits(totalSupply, 18))).toString(),
+				Math.round(Number(formatUnits(creatorInitialBalance, 18))).toString(),
 				blockNumber,
 			)),
 			// summary/analysis are left for potential future LLM processing
