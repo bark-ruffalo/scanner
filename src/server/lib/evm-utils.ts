@@ -1,14 +1,75 @@
 import "server-only";
 // Use type imports for types
-import type { AbiItem, Address, PublicClient } from "viem";
+import type {
+	Abi,
+	AbiItem,
+	Address,
+	GetLogsReturnType,
+	Log,
+	PublicClient,
+} from "viem";
 // Keep value imports separate
-import { formatUnits, parseAbiItem } from "viem";
+import {
+	http,
+	createPublicClient,
+	decodeEventLog,
+	formatUnits,
+	parseAbi,
+	parseAbiItem,
+} from "viem";
+import { base } from "viem/chains";
+import { env } from "~/env";
 import type { TokenUpdateResult } from "~/server/queries";
 
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
 	"function balanceOf(address account) view returns (uint256)",
 ) as AbiItem; // Cast remains as parseAbiItem returns a complex type
+
+// Define ABI for standard ERC20 Transfer event
+export const transferEventAbi = parseAbiItem(
+	"event Transfer(address indexed from, address indexed to, uint256 value)",
+) as AbiItem;
+
+// Define ERC20 ABI with Transfer event in the format viem expects
+export const erc20Abi = [
+	{
+		type: "event",
+		name: "Transfer",
+		inputs: [
+			{
+				indexed: true,
+				name: "from",
+				type: "address",
+			},
+			{
+				indexed: true,
+				name: "to",
+				type: "address",
+			},
+			{
+				indexed: false,
+				name: "value",
+				type: "uint256",
+			},
+		],
+	},
+] as const;
+
+// Define common token lock contract addresses
+const KNOWN_LOCK_ADDRESSES: Record<string, string> = {
+	"0x100cc9618a91f242ea6f374bea9ef4e979b6a78a": "Team.Finance",
+	"0x663a5c229c09b049e36dcc11a9dd1d8062d7595f": "UniCrypt",
+	"0xf4c8e32eadec4bfe97e0f595add0f4450a863a11": "DxLock",
+	// Add more as needed
+};
+
+// Define a type for Transfer event args
+interface TransferEventArgs {
+	from: Address;
+	to: Address;
+	value: bigint;
+}
 
 // Define a minimal client interface
 interface ReadContractClient {
@@ -71,12 +132,186 @@ export async function updateEvmTokenStatistics(
 		`- Percentage of initial allocation still held: ${percentageOfInitialHeld.toFixed(2)}%`,
 	);
 
-	// Return the values in database format
-	return {
+	// Default result without token movement details
+	const result: TokenUpdateResult = {
 		creatorTokensHeld: roundedCurrentTokens,
 		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
 		tokenStatsUpdatedAt: new Date(),
 	};
+
+	// Only analyze token movement if creator has at least 1% less than initial allocation
+	if (percentageOfInitialHeld < 99 && initialTokensNum > 0) {
+		try {
+			console.log(
+				"Creator has reduced their token holdings. Analyzing movements...",
+			);
+
+			// Create a dedicated client with the Alchemy HTTP endpoint
+			// This ensures we don't use the default fallback endpoint
+			const httpUrl = env.BASE_RPC_URL
+				? env.BASE_RPC_URL.replace("wss://", "https://")
+				: undefined;
+
+			console.log(`Using HTTP RPC URL: ${httpUrl || "(default)"}`);
+
+			// Create a specific client for log analysis to ensure proper RPC URL
+			const analysisClient = httpUrl
+				? createPublicClient({
+						chain: base,
+						transport: http(httpUrl),
+					})
+				: client; // Fall back to provided client if no URL
+
+			// Get the creator's transfer history (outgoing transfers)
+			const transferLogs = await analysisClient
+				.getLogs({
+					address: tokenAddress,
+					event: transferEventAbi as unknown as AbiItem & { type: "event" },
+					args: {
+						from: creatorAddress,
+					},
+					// Limit the block range to avoid timeouts on public endpoints
+					fromBlock: 0n, // From genesis or earliest available
+					toBlock: "latest",
+				})
+				.catch(async (error) => {
+					console.error(
+						`Error fetching logs, trying with recent blocks only: ${error.message}`,
+					);
+
+					// Get the latest block number for fallback range
+					let recentBlocksStart = 0n;
+					try {
+						const latestBlock = await analysisClient.getBlockNumber();
+						// Use last ~2 weeks of blocks (approx 100k blocks)
+						recentBlocksStart = latestBlock - 100000n;
+						if (recentBlocksStart < 0n) recentBlocksStart = 0n;
+					} catch (blockError) {
+						console.error(`Failed to get latest block number: ${blockError}`);
+					}
+
+					// Fallback to recent blocks only if first attempt fails
+					return analysisClient
+						.getLogs({
+							address: tokenAddress,
+							event: transferEventAbi as unknown as AbiItem & { type: "event" },
+							args: {
+								from: creatorAddress,
+							},
+							// Only check recent blocks as fallback
+							fromBlock: recentBlocksStart,
+							toBlock: "latest",
+						})
+						.catch((secondError) => {
+							console.error(
+								`Second attempt also failed: ${secondError.message}`,
+							);
+							return []; // Return empty array if both attempts fail
+						});
+				});
+
+			if (transferLogs.length === 0) {
+				result.creatorTokenMovementDetails =
+					"No outgoing transfers found despite balance reduction. Possible contract interaction.";
+				return result;
+			}
+
+			// Process logs to extract transfer data
+			const transfers = transferLogs
+				.map((log) => {
+					try {
+						const decoded = decodeEventLog({
+							abi: erc20Abi,
+							data: log.data,
+							topics: log.topics,
+						});
+
+						// Explicitly type the args to avoid property access errors
+						const args = decoded.args as TransferEventArgs;
+
+						return {
+							to: args.to,
+							value: args.value,
+							blockNumber: log.blockNumber,
+							transactionHash: log.transactionHash,
+						};
+					} catch (error) {
+						console.error("Error decoding transfer log:", error);
+						return null;
+					}
+				})
+				.filter((t): t is NonNullable<typeof t> => t !== null);
+
+			// Sort by value (descending) and take up to 3 most significant transfers
+			const significantTransfers = transfers
+				.sort((a, b) => ((b?.value || 0n) > (a?.value || 0n) ? 1 : -1))
+				.slice(0, 3);
+
+			const movementDetails: string[] = [];
+
+			for (const transfer of significantTransfers) {
+				if (!transfer) continue;
+
+				const { to, value, transactionHash } = transfer;
+				const formattedValue = Number(formatUnits(value, 18)).toFixed(2);
+
+				// Check if destination is a known lock contract
+				const isKnownLock = Object.entries(KNOWN_LOCK_ADDRESSES).find(
+					([address]) => address.toLowerCase() === to.toLowerCase(),
+				);
+
+				if (isKnownLock) {
+					movementDetails.push(
+						`Locked ${formattedValue} tokens in ${isKnownLock[1]} (${to})`,
+					);
+				} else {
+					// Check if destination is a DEX router or LP contract
+					const isContract = await isDestinationContract(client, to);
+					if (isContract) {
+						movementDetails.push(
+							`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity)`,
+						);
+					} else {
+						movementDetails.push(
+							`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet)`,
+						);
+					}
+				}
+			}
+
+			result.creatorTokenMovementDetails = movementDetails.join("; ");
+			console.log(
+				`- Token movement details: ${result.creatorTokenMovementDetails}`,
+			);
+		} catch (error) {
+			console.error("Error analyzing token movements:", error);
+			result.creatorTokenMovementDetails = "Error analyzing token movements";
+		}
+	}
+
+	return result;
+}
+
+/**
+ * Checks if a destination address is a contract
+ * @param client The viem client
+ * @param address The address to check
+ * @returns True if the address is a contract, false otherwise
+ */
+async function isDestinationContract(
+	client: PublicClient,
+	address: Address,
+): Promise<boolean> {
+	try {
+		const code = await client.getBytecode({
+			address,
+		});
+		// If there is bytecode, it's a contract
+		return code !== undefined && code !== "0x";
+	} catch (error) {
+		console.error(`Error checking if ${address} is a contract:`, error);
+		return false; // Assume it's not a contract if we can't determine
+	}
 }
 
 /**

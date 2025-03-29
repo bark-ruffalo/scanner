@@ -48,6 +48,9 @@ export const launches = createTable(
 			precision: 78, // Maximum precision for PostgreSQL numeric type
 			scale: 0, // No decimal places needed for token amounts
 		}),
+		creatorTokenMovementDetails: varchar("creator_token_movement_details", {
+			length: 1024,
+		}),
 		totalTokenSupply: numeric("total_token_supply", {
 			precision: 78, // Maximum precision for PostgreSQL numeric type
 			scale: 0, // No decimal places needed for token amounts

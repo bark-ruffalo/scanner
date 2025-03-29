@@ -271,6 +271,7 @@ export interface TokenUpdateResult {
 	creatorTokensHeld: string;
 	creatorTokenHoldingPercentage: string;
 	tokenStatsUpdatedAt: Date;
+	creatorTokenMovementDetails?: string;
 }
 
 /**
@@ -288,6 +289,7 @@ export async function updateTokenStatisticsInDb(
 		.set({
 			creatorTokensHeld: tokenStats.creatorTokensHeld,
 			creatorTokenHoldingPercentage: tokenStats.creatorTokenHoldingPercentage,
+			creatorTokenMovementDetails: tokenStats.creatorTokenMovementDetails,
 			tokenStatsUpdatedAt: tokenStats.tokenStatsUpdatedAt,
 			updatedAt: new Date(),
 		})

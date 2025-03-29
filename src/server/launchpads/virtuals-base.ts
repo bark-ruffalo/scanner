@@ -1,4 +1,5 @@
 import {
+	http,
 	type Chain,
 	type Log,
 	type PublicClient,
@@ -66,6 +67,15 @@ const factoryAbi = parseAbi([
 const wsTransport = webSocket(
 	env.BASE_RPC_URL || "wss://base-rpc.publicnode.com",
 );
+
+// Create an HTTP transport from the WebSocket URL
+// This is used for historical queries like getLogs
+const httpTransport = http(
+	env.BASE_RPC_URL
+		? env.BASE_RPC_URL.replace("wss://", "https://")
+		: "https://base-mainnet.g.alchemy.com", // Provide a safe fallback
+);
+
 if (!env.BASE_RPC_URL) {
 	console.log(
 		"Note: Using an untested Base WebSocket endpoint taken from https://chainlist.org/chain/8453.",
@@ -78,8 +88,15 @@ if (!env.BASE_RPC_URL) {
 // Create a public client for Base network with explicit typing
 const publicClient = createPublicClient<Transport, Chain>({
 	chain: base,
-	transport: wsTransport, // Use the WebSocket transport
+	transport: httpTransport, // Use HTTP transport for general queries like getLogs
 });
+
+// Create a real-time client for event watching
+const watchClient = createPublicClient<Transport, Chain>({
+	chain: base,
+	transport: wsTransport, // Use WebSocket transport for real-time event watching
+});
+
 console.log(`Public client created for ${LAUNCHPAD_NAME} on Base.`);
 
 // --- Types ---
@@ -370,8 +387,8 @@ export function startVirtualsBaseListener() {
 	}
 
 	try {
-		// Use the viem client to watch for specific contract events.
-		const unwatch = publicClient.watchContractEvent({
+		// Use the watchClient with WebSocket transport to watch for events
+		const unwatch = watchClient.watchContractEvent({
 			address: VIRTUALS_FACTORY_ADDRESS,
 			abi: [launchedEventAbi], // Use the corrected ABI definition
 			eventName: "Launched", // Match the event name in the corrected ABI
@@ -424,10 +441,10 @@ export async function debugFetchHistoricalEvents(
 ) {
 	console.log(`Attempting to debug ${LAUNCHPAD_NAME} historical events...`);
 
-	// Check if the WebSocket transport was successfully created.
-	if (!wsTransport) {
+	// Check if the HTTP transport was successfully created.
+	if (!httpTransport) {
 		console.error(
-			`[${LAUNCHPAD_NAME}] Failed to create WebSocket transport. Debug cannot start. Ensure BASE_RPC_URL (wss://) is set or check network configuration.`,
+			`[${LAUNCHPAD_NAME}] Failed to create HTTP transport. Debug cannot start. Ensure BASE_RPC_URL is set or check network configuration.`,
 		);
 		return; // Stop execution if transport is not available.
 	}
