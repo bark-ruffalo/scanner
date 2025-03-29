@@ -293,20 +293,21 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Access tuple elements by index for description
 		const description = `
 # ${tokenName}
+URL on launchpad: ${tokenUrl}
 Launched at: ${launchedAtDate.toUTCString()}
 Launched through the launchpad: ${LAUNCHPAD_NAME}
-URL on launchpad: ${tokenUrl}
+Launched in transaction: https://basescan.org/tx/${transactionHash}
 
 ## Token details and tokenomics
-Token symbol: $${tokenSymbol}
 Token address: ${getAddress(token)}
+Token symbol: $${tokenSymbol}
+Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
-Launched in transaction: https://basescan.org/tx/${transactionHash}
-Token supply: 1 billion
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})
 
 ## Creator info
+Creator address: ${getAddress(creator)}
 Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
 Creator on virtuals.io: https://app.virtuals.io/profile/${getAddress(creator)}
 Creator on zerion.io: https://app.zerion.io/${getAddress(creator)}/overview
