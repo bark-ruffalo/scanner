@@ -80,6 +80,12 @@ export default async function LaunchDetailPage({ params }: Props) {
 							/>
 						)}
 					</div>
+					{launch.basicInfoUpdatedAt && (
+						<p className="text-gray-500 text-sm">
+							Basic info last updated:{" "}
+							{format(new Date(launch.basicInfoUpdatedAt), "MMM d, yyyy HH:mm")}
+						</p>
+					)}
 				</div>
 
 				{/* Token Statistics Section */}
@@ -102,10 +108,13 @@ export default async function LaunchDetailPage({ params }: Props) {
 									</>
 								)}
 							</p>
-							{launch.updatedAt && (
+							{launch.tokenStatsUpdatedAt && (
 								<p className="text-gray-500 text-sm">
-									last checked{" "}
-									{format(new Date(launch.updatedAt), "MMM d, yyyy HH:mm")}
+									Token stats last updated:{" "}
+									{format(
+										new Date(launch.tokenStatsUpdatedAt),
+										"MMM d, yyyy HH:mm",
+									)}
 								</p>
 							)}
 						</div>
@@ -164,6 +173,15 @@ export default async function LaunchDetailPage({ params }: Props) {
 					{launch.rating !== undefined && launch.rating !== -1 && (
 						<p>
 							<strong>Rating:</strong> {launch.rating}
+						</p>
+					)}
+					{launch.llmAnalysisUpdatedAt && (
+						<p className="text-gray-500 text-sm">
+							LLM analysis last updated:{" "}
+							{format(
+								new Date(launch.llmAnalysisUpdatedAt),
+								"MMM d, yyyy HH:mm",
+							)}
 						</p>
 					)}
 				</div>

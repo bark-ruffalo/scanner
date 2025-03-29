@@ -128,6 +128,7 @@ export async function addLaunch(launchData: NewLaunchData) {
 					analysis: analysisResult.analysis,
 					summary: analysisResult.summary,
 					rating: analysisResult.rating,
+					llmAnalysisUpdatedAt: new Date(), // Set LLM analysis timestamp
 				};
 			} catch (analysisError) {
 				console.error("Error during AI analysis:", analysisError);
@@ -155,6 +156,7 @@ export async function addLaunch(launchData: NewLaunchData) {
 						enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
 					totalTokenSupply:
 						enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
+					basicInfoUpdatedAt: new Date(), // Update basic info timestamp
 				};
 				await db
 					.update(launches)
@@ -174,6 +176,7 @@ export async function addLaunch(launchData: NewLaunchData) {
 					analysis: enhancedData.analysis,
 					summary: enhancedData.summary,
 					rating: enhancedData.rating,
+					llmAnalysisUpdatedAt: new Date(), // Update LLM analysis timestamp
 				};
 				await db
 					.update(launches)

@@ -55,6 +55,24 @@ export const launches = createTable(
 		launchedAt: timestamp("launched_at")
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),
+		// Track when the basic info section was last updated (title, description, etc.)
+		basicInfoUpdatedAt: timestamp("basic_info_updated_at", {
+			withTimezone: true,
+		})
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
+		// Track when the token statistics section was last updated
+		tokenStatsUpdatedAt: timestamp("token_stats_updated_at", {
+			withTimezone: true,
+		})
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
+		// Track when the LLM analysis section was last updated
+		llmAnalysisUpdatedAt: timestamp("llm_analysis_updated_at", {
+			withTimezone: true,
+		})
+			.default(sql`CURRENT_TIMESTAMP`)
+			.notNull(),
 		createdAt: timestamp("created_at", { withTimezone: true })
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),

@@ -27,6 +27,8 @@ interface LaunchData {
 	totalTokenSupply: string;
 	creatorTokensHeld: string;
 	creatorTokenHoldingPercentage: string;
+	basicInfoUpdatedAt: Date;
+	tokenStatsUpdatedAt: Date;
 }
 
 // --- Configuration ---
@@ -333,6 +335,8 @@ YouTube: ${youtube || "N/A"}
 				Number(formatUnits(creatorCurrentBalance, 18)),
 			).toString(), // Convert from WEI to ETH and round to nearest integer
 			creatorTokenHoldingPercentage: creatorHoldingPercent.toFixed(2), // Store the percentage of initial tokens still held
+			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
+			tokenStatsUpdatedAt: new Date(), // Set token stats timestamp for initial token data
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(

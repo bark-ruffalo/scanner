@@ -79,6 +79,7 @@ export async function updateTokenHoldings(
 			.set({
 				creatorTokensHeld: roundedCurrentTokens,
 				creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
+				tokenStatsUpdatedAt: new Date(),
 				updatedAt: new Date(),
 			})
 			.where(eq(launches.id, launchId));
