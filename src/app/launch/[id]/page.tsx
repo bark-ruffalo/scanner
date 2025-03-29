@@ -141,7 +141,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 							</div>
 							{launch.basicInfoUpdatedAt && (
 								<p className="mt-4 text-gray-500 text-sm">
-									Investment info section last updated:{" "}
+									Investment info last updated:{" "}
 									{format(
 										new Date(launch.basicInfoUpdatedAt),
 										"MMM d, yyyy HH:mm",
