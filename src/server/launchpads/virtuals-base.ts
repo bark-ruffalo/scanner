@@ -252,7 +252,6 @@ Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the t
 Launched in transaction: https://basescan.org/tx/${transactionHash}
 Token supply: 1 billion
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})
-Creator current number of tokens: ${displayCurrentBalance} (check if they've been sold or locked!)
 
 ## Creator info
 Creator on basescan.org: https://basescan.org/address/${getAddress(creator)}
@@ -279,6 +278,9 @@ YouTube: ${youtube || "N/A"}
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
+			totalTokenSupply: Number(totalSupply), // Convert BigInt to number
+			creatorTokensHeld: Number(creatorInitialBalance), // Convert BigInt to number
+			creatorTokenHoldingPercentage: creatorAllocationPercent.toFixed(2), // Format to 2 decimal places as string for Drizzle's numeric type
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(

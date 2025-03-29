@@ -75,7 +75,9 @@ export async function getDistinctLaunchpads() {
  * Before insertion, it uses LLM to analyze, rate and summarize the launch.
  * After successful insertion or update, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
- * @param launchData An object conforming to the NewLaunchData type.
+ * @param launchData An object conforming to the NewLaunchData type, which includes:
+ *   - Required fields: launchpad, title, url, description
+ *   - Optional fields: imageUrl, creatorTokenHoldingPercentage, creatorTokensHeld, totalTokenSupply
  */
 export async function addLaunch(launchData: NewLaunchData) {
 	console.log(
@@ -98,6 +100,10 @@ export async function addLaunch(launchData: NewLaunchData) {
 				analysis: true,
 				summary: true,
 				rating: true,
+				// Get existing token data to preserve it if not provided in update
+				creatorTokenHoldingPercentage: true,
+				creatorTokensHeld: true,
+				totalTokenSupply: true,
 			},
 		});
 
@@ -138,12 +144,17 @@ export async function addLaunch(launchData: NewLaunchData) {
 				console.log(
 					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Overwriting...`,
 				);
-				// Prepare data for update. Exclude fields that shouldn't be manually set on update if necessary.
-				// Assuming 'updatedAt' is handled by the database `onUpdateNow()`. If not, add `updatedAt: new Date()` here.
+				// Prepare data for update, preserving existing token data if not provided in update
 				const updateData: Partial<typeof launches.$inferInsert> = {
 					...enhancedData,
-					// Explicitly set updatedAt if schema doesn't handle it automatically
-					// updatedAt: new Date(),
+					// Preserve existing token data if not provided in update
+					creatorTokenHoldingPercentage:
+						enhancedData.creatorTokenHoldingPercentage ??
+						existingLaunch.creatorTokenHoldingPercentage,
+					creatorTokensHeld:
+						enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
+					totalTokenSupply:
+						enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
 				};
 				await db
 					.update(launches)
