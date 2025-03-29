@@ -5,6 +5,7 @@
 <rules>
 # Rules for analysis
 Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check.
+Use proper punctuation, casing and grammar.
 Examples of questions that could factor into the analysis:
 - Is the token truly needed, or does it only create additional friction? Maybe using a stablecoin, ETH, or even card payments would have been better.
 - Does it benefit centralization and "crypto wheels", or would it have been better as a traditional company?
