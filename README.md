@@ -17,19 +17,26 @@ Live on: https://scanner.trulyadog.com
 - [x] Modify db schema to also store for each launch if the creator still holds tokens
 - [x] Separate databases for production and development
 - [x] Add .md files for each launchpad with relevant information; they should be used in LLM calls
+- [x] Do processing (LLM calls, token movement updates) in the background when loading a launch
 - [ ] Add another crypto launchpad, but for Solana (SVM)
 - [ ] Add a traditional VC investing launchpad, where the listener of the class extracts information by crawling the launchpad website
 - [ ] Add Launchpad base class
-- [ ] Add a password-protected Admin page that allows adding launches using Launchpad base class, or edit/remove existing ones
+- [.] Add a password-protected Admin page that allows adding launches using Launchpad base class, or edit/remove existing ones
+  - not using the base class yet, not tested much
+- [x] Add functionality in the Admin page to trigger token movement check or LLM analysis with various filters (by date, by launchpad, etc.)
 
 Hopefully, the latter three items (classes) will serve as templates for others to contribute to Scanner and add other launchpads.
 
 ## TODO (long term)
 
-- [ ] Add functionality in the Admin page to trigger token movement check or LLM analysis with various filters (by date, by launchpad, etc.)
 - [ ] Access relevant links when analyzing a launch (anything mentioned in the launch page: socials, website, documentation, etc.)
 - [ ] Add for users the possibility to add a custom link to a launch, which will then be analyzed and potentially added in the database
 - [ ] Add a comment section for each launch; a random username will be generated based on the user's IP address (the algorithm should always generate the same username for the same IP address)
 - [ ] Add like/dislike buttons for each launch
 - [ ] Add unit and integration tests
 
+## TODO (tiny tasks that I put here so that I don't forget them)
+
+- [x] Make sure new launches are actually detected (I changed hosting to non-Vercel so that it supports WebSockets)
+- [x] Show unrated launches when selecting 0 in the Rating filter
+- [ ] Creator initial number of tokens: 874,027,651 (87.40% of token supply) - use common function to show percentages
