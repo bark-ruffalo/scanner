@@ -8,7 +8,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 function FilterContent() {
 	const router = useRouter();
 	const pathname = usePathname();
-	const searchParams = useSearchParams();
+	const searchParams = useSearchParams() || new URLSearchParams();
 	const currentFilter = searchParams.get("minRating") ?? "2";
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
