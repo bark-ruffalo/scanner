@@ -39,6 +39,7 @@ Always use the following command after a new chat has started in order to unders
 - When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
 - Use pnpm instead of npm.
+- Never write code for database migration because I'll just do `pnpm db:push` instead
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
 - Add many comments that ELI5 the parts of the code that are more difficult to understand. Additionally, often add comments valuable for technical people and coding AI agents.
 - The fewer lines of code, the better.
