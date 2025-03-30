@@ -90,7 +90,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 								{launch.creatorTokenHoldingPercentage && (
 									<>
 										{Math.round(Number(launch.creatorTokenHoldingPercentage))}%
-										of the initial token allocation is still held by the creator
+										of the initial token allocation is held by the creator
 										{launch.creatorTokensHeld && (
 											<>
 												{" "}
