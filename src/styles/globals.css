@@ -7,3 +7,16 @@
 	--color-scanner-purple-dark: #733b73;
 	--color-scanner-purple-light: #dab1da;
 }
+
+@keyframes indeterminate-loading {
+	0% {
+		transform: translateX(-100%);
+	}
+	100% {
+		transform: translateX(400%);
+	}
+}
+
+.animate-indeterminate-loading {
+	animation: indeterminate-loading 1.5s infinite linear;
+}

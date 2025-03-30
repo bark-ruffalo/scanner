@@ -12,8 +12,7 @@ import {
 	getLaunchMetadata,
 	updateLaunchAnalysis,
 } from "~/server/queries";
-import { LlmAnalysisUpdater } from "./llm-analysis-updater";
-import { TokenHoldingsUpdater } from "./token-holdings-updater";
+import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
 
 type Props = {
 	params: { id: string };
@@ -51,19 +50,6 @@ export default async function LaunchDetailPage({ params }: Props) {
 		launch.summary === "-" ||
 		launch.rating === -1;
 
-	// Only trigger analysis on the server side for initial page load
-	// Client-side component will handle loading UI
-	if (needsAnalysis) {
-		try {
-			console.log(
-				`Launch ${launchId} missing LLM responses. Queuing analysis...`,
-			);
-			// We'll move the actual analysis to a background process shown by LlmAnalysisUpdater
-		} catch (error) {
-			console.error("Error during launch analysis:", error);
-		}
-	}
-
 	// Extract token address, creator address, and initial allocation from the description
 	const tokenAddressMatch = launch.description.match(
 		/Token address: (0x[a-fA-F0-9]{40})/,
@@ -79,31 +65,25 @@ export default async function LaunchDetailPage({ params }: Props) {
 	const creatorAddress = creatorMatch?.[1];
 	const creatorInitialTokens = initialTokensMatch?.[1]?.replace(/,/g, "");
 
-	// Process ID for background tasks
-	const processId = `${launchId}-${Date.now()}`;
+	// Should we check for token holdings?
+	const needsTokenUpdate = !!(
+		tokenAddress &&
+		creatorAddress &&
+		creatorInitialTokens
+	);
 
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
-			{/* Background Processing Indicators */}
-			<div className="container mx-auto mb-4">
-				<Suspense fallback={null}>
-					<LlmAnalysisUpdater
-						launchId={launch.id}
-						needsAnalysis={needsAnalysis}
-					/>
-				</Suspense>
-			</div>
+			{/* Centralized process loader */}
+			<LaunchProcessLoader
+				launchId={launch.id}
+				needsAnalysis={needsAnalysis}
+				needsTokenUpdate={needsTokenUpdate}
+				tokenAddress={tokenAddress}
+				creatorAddress={creatorAddress}
+				creatorInitialTokens={creatorInitialTokens}
+			/>
 
-			{tokenAddress && creatorAddress && creatorInitialTokens && (
-				<Suspense fallback={null}>
-					<TokenHoldingsUpdater
-						launchId={launch.id}
-						tokenAddress={tokenAddress}
-						creatorAddress={creatorAddress}
-						creatorInitialTokens={creatorInitialTokens}
-					/>
-				</Suspense>
-			)}
 			<div className="container mx-auto p-4">
 				<div className="mb-4 flex flex-col items-center justify-center gap-4">
 					<div className="flex items-center justify-center gap-4">

@@ -22,42 +22,23 @@ export function BackgroundProcessIndicator({
 	onComplete,
 	className,
 }: BackgroundProcessIndicatorProps) {
-	const [progress, setProgress] = useState(0);
 	const [isComplete, setIsComplete] = useState(false);
 
 	useEffect(() => {
 		if (!isActive) {
-			setProgress(0);
 			setIsComplete(false);
 			return;
 		}
 
-		const duration = processType === "tokenStats" ? 5000 : 15000; // Token stats faster than LLM
-		const interval = 100;
-		const steps = duration / interval;
-		const increment = 100 / steps;
+		// Simulate completion for demonstration purposes
+		// In real production, this would be triggered by the actual task completion
+		const duration = processType === "tokenStats" ? 5000 : 15000;
+		const timer = setTimeout(() => {
+			setIsComplete(true);
+			onComplete?.();
+		}, duration);
 
-		let currentProgress = 0;
-		const timer = setInterval(() => {
-			currentProgress += increment;
-
-			// Slow down progress as it approaches completion for natural feeling
-			const easedProgress =
-				currentProgress < 70
-					? currentProgress
-					: 70 + ((currentProgress - 70) / 30) ** 2 * 30;
-
-			setProgress(Math.min(easedProgress, 99.5));
-
-			if (currentProgress >= 100) {
-				clearInterval(timer);
-				setProgress(100);
-				setIsComplete(true);
-				onComplete?.();
-			}
-		}, interval);
-
-		return () => clearInterval(timer);
+		return () => clearTimeout(timer);
 	}, [isActive, processType, onComplete]);
 
 	const labels = {
@@ -80,17 +61,17 @@ export function BackgroundProcessIndicator({
 						? `${labels[processType].replace("...", "")} complete`
 						: labels[processType]}
 				</span>
-				<span className="text-gray-300 text-xs">{Math.round(progress)}%</span>
 			</div>
-			<div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-600">
-				<div
-					className={cn(
-						"h-full transition-all duration-300 ease-in-out",
-						isComplete ? "bg-green-500" : "bg-blue-500",
-					)}
-					style={{ width: `${progress}%` }}
-				/>
-			</div>
+			{!isComplete && (
+				<div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-600">
+					<div className="h-full w-1/3 animate-indeterminate-loading rounded-full bg-blue-500" />
+				</div>
+			)}
+			{isComplete && (
+				<div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-gray-600">
+					<div className="h-full w-full bg-green-500" />
+				</div>
+			)}
 		</div>
 	);
 }
