@@ -296,3 +296,21 @@ export async function updateTokenStatisticsInDb(
 		})
 		.where(eq(launches.id, launchId));
 }
+
+/**
+ * Updates a launch's description and analysis data
+ * @param launchId The ID of the launch to update
+ * @param data The updated launch data
+ */
+export async function updateLaunchAnalysis(
+	launchId: number,
+	data: {
+		description: string;
+		analysis: string;
+		summary: string;
+		rating: number;
+		llmAnalysisUpdatedAt: Date;
+	},
+) {
+	await db.update(launches).set(data).where(eq(launches.id, launchId));
+}

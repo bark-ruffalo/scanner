@@ -3,11 +3,17 @@
 import { revalidatePath } from "next/cache";
 import { http, type Chain, type Transport, createPublicClient } from "viem";
 import { base } from "viem/chains";
+import { analyzeLaunch } from "~/server/lib/ai-utils";
 import {
 	addKnownEvmSellingAddress,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
-import { getLaunchById, updateTokenStatisticsInDb } from "~/server/queries";
+import {
+	getLaunchById,
+	updateLaunchAnalysis,
+	updateTokenStatisticsInDb,
+} from "~/server/queries";
+
 // Create a public client for Base network with explicit typing
 const publicClient = createPublicClient<Transport, Chain>({
 	chain: base,
@@ -64,6 +70,56 @@ export async function updateTokenHoldings(
 		);
 
 		await updateTokenStatisticsInDb(launchId, tokenStats);
+
+		// Check if there's been a significant change in token holdings
+		const newPercentage = Number(tokenStats.creatorTokenHoldingPercentage);
+		const percentageDiff = Math.abs(newPercentage - currentPercentage);
+
+		// If there's a significant change (more than 5% difference)
+		if (percentageDiff > 5) {
+			console.log(
+				`Significant token holding change detected (${percentageDiff}% difference). Triggering reanalysis...`,
+			);
+
+			// Update the description with recent developments
+			const updatedDescription = launch.description.includes(
+				"### Recent developments",
+			)
+				? launch.description.replace(
+						/### Recent developments[\s\S]*?(?=\n\n|$)/,
+						`### Recent developments\nAs of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${tokenStats.creatorTokensHeld} tokens held (${newPercentage}% of initial allocation)${
+							tokenStats.creatorTokenMovementDetails
+								? `\n${tokenStats.creatorTokenMovementDetails}`
+								: ""
+						}`,
+					)
+				: `${launch.description}\n\n### Recent developments\nAs of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${tokenStats.creatorTokensHeld} tokens held (${newPercentage}% of initial allocation)${
+						tokenStats.creatorTokenMovementDetails
+							? `\n${tokenStats.creatorTokenMovementDetails}`
+							: ""
+					}`;
+
+			// Trigger reanalysis with updated description
+			try {
+				const analysisResult = await analyzeLaunch(updatedDescription);
+
+				// Update the database with new analysis using the DAL function
+				await updateLaunchAnalysis(launchId, {
+					description: updatedDescription,
+					analysis: analysisResult.analysis,
+					summary: analysisResult.summary,
+					rating: analysisResult.rating,
+					llmAnalysisUpdatedAt: new Date(),
+				});
+
+				console.log(
+					`Analysis updated for launch ${launchId} with new rating: ${analysisResult.rating}/10`,
+				);
+			} catch (analysisError) {
+				console.error("Error during reanalysis:", analysisError);
+			}
+		}
+
 		revalidatePath(`/launch/${launchId}`, "page");
 	} catch (error) {
 		console.error("Error updating token holdings:", error);
