@@ -45,3 +45,7 @@ yarn-error.log*
 
 # idea files
 .idea
+
+# Render specific
+.render-buildpacks/
+.render-build.log

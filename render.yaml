@@ -1,0 +1,67 @@
+services:
+  - type: web
+    name: scanner-app
+    env: node
+    plan: starter # Adjust as needed: starter, standard, pro, etc.
+    buildCommand: pnpm install && pnpm build
+    startCommand: pnpm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    numInstances: 1 # Can scale up as needed
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Use existing Supabase database connection details
+      - key: POSTGRES_URL
+        sync: false # Set this value manually in the Render dashboard
+      - key: POSTGRES_PRISMA_URL
+        sync: false
+      - key: POSTGRES_URL_NON_POOLING
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DATABASE
+        sync: false
+      - key: POSTGRES_HOST
+        sync: false
+      # Supabase specific variables
+      - key: SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      # WebSocket connection for monitoring blockchain events
+      - key: BASE_RPC_URL
+        sync: false
+      # OpenRouter API for AI analysis
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_API_HOST
+        sync: false
+      # Admin access
+      - key: ADMIN_PASSWORD
+        sync: false
+      # URLs
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://scanner.trulyadog.com
+    domains:
+      - scanner.trulyadog.com
+
+# Add this to ensure WebSocket connections work properly
+headers:
+  - path: /*
+    name: Connection
+    value: upgrade
+  - path: /*
+    name: Upgrade
+    value: websocket
+  - path: /*
+    name: Upgrade-Insecure-Requests
+    value: "1"
