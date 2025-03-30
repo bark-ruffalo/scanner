@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { Suspense } from "react";
+import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
 import { BackButton } from "~/components/BackButton";
 import { linkify } from "~/lib/utils";
 import { analyzeLaunch } from "~/server/lib/ai-utils";
@@ -12,7 +13,6 @@ import {
 	getLaunchMetadata,
 	updateLaunchAnalysis,
 } from "~/server/queries";
-import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
 
 type Props = {
 	params: { id: string };
