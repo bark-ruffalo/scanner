@@ -17,6 +17,13 @@ interface EditLaunchFormProps {
 	launch: Launch;
 }
 
+type FormErrors = {
+	title?: string;
+	launchpad?: string;
+	url?: string;
+	description?: string;
+};
+
 export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 	const router = useRouter();
 	const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,19 +34,82 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 		description: launch.description,
 		imageUrl: launch.imageUrl || "",
 	});
+	const [errors, setErrors] = useState<FormErrors>({});
+	const [actionMessage, setActionMessage] = useState<{
+		text: string;
+		type: "success" | "error";
+	} | null>(null);
+
+	const validateForm = (): boolean => {
+		const newErrors: FormErrors = {};
+
+		// Validate title
+		if (!formData.title.trim()) {
+			newErrors.title = "Title is required";
+		} else if (formData.title.length > 256) {
+			newErrors.title = "Title must be less than 256 characters";
+		}
+
+		// Validate launchpad
+		if (!formData.launchpad.trim()) {
+			newErrors.launchpad = "Launchpad is required";
+		} else if (formData.launchpad.length > 256) {
+			newErrors.launchpad = "Launchpad must be less than 256 characters";
+		}
+
+		// Validate URL
+		if (!formData.url.trim()) {
+			newErrors.url = "URL is required";
+		} else {
+			try {
+				// Check if it's a valid URL
+				new URL(formData.url);
+			} catch (e) {
+				newErrors.url = "Please enter a valid URL";
+			}
+		}
+
+		// Validate description
+		if (!formData.description.trim()) {
+			newErrors.description = "Description is required";
+		}
+
+		// If there are validation errors
+		setErrors(newErrors);
+		return Object.keys(newErrors).length === 0;
+	};
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault();
+
+		// Validate form before submission
+		if (!validateForm()) {
+			setActionMessage({
+				text: "Please fix the errors in the form",
+				type: "error",
+			});
+			return;
+		}
+
 		setIsSubmitting(true);
+		setActionMessage(null);
 
 		try {
 			await updateLaunch(launch.id, formData);
-			router.push("/admin");
-			router.refresh();
+			setActionMessage({
+				text: "Launch updated successfully",
+				type: "success",
+			});
+			setTimeout(() => {
+				router.push("/admin");
+				router.refresh();
+			}, 1000);
 		} catch (error) {
 			console.error("Error updating launch:", error);
-			alert("Error updating launch");
-		} finally {
+			setActionMessage({
+				text: `Error updating launch: ${error instanceof Error ? error.message : "Unknown error"}`,
+				type: "error",
+			});
 			setIsSubmitting(false);
 		}
 	};
@@ -49,10 +119,26 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 	) => {
 		const { name, value } = e.target;
 		setFormData((prev) => ({ ...prev, [name]: value }));
+		// Clear error for this field when user starts typing
+		if (errors[name as keyof FormErrors]) {
+			setErrors((prev) => ({ ...prev, [name]: undefined }));
+		}
 	};
 
 	return (
 		<form onSubmit={handleSubmit} className="space-y-6">
+			{actionMessage && (
+				<div
+					className={`mb-4 rounded-lg p-4 ${
+						actionMessage.type === "success"
+							? "bg-green-800 text-white"
+							: "bg-red-800 text-white"
+					}`}
+				>
+					{actionMessage.text}
+				</div>
+			)}
+
 			<div>
 				<label htmlFor="title" className="mb-2 block font-medium text-gray-200">
 					Title
@@ -63,9 +149,13 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 					name="title"
 					value={formData.title}
 					onChange={handleChange}
-					required
-					className="w-full rounded-lg bg-gray-700 p-2 text-white"
+					className={`w-full rounded-lg bg-gray-700 p-2 text-white ${
+						errors.title ? "border border-red-500" : ""
+					}`}
 				/>
+				{errors.title && (
+					<p className="mt-1 text-red-500 text-sm">{errors.title}</p>
+				)}
 			</div>
 
 			<div>
@@ -81,9 +171,13 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 					name="launchpad"
 					value={formData.launchpad}
 					onChange={handleChange}
-					required
-					className="w-full rounded-lg bg-gray-700 p-2 text-white"
+					className={`w-full rounded-lg bg-gray-700 p-2 text-white ${
+						errors.launchpad ? "border border-red-500" : ""
+					}`}
 				/>
+				{errors.launchpad && (
+					<p className="mt-1 text-red-500 text-sm">{errors.launchpad}</p>
+				)}
 			</div>
 
 			<div>
@@ -96,9 +190,13 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 					name="url"
 					value={formData.url}
 					onChange={handleChange}
-					required
-					className="w-full rounded-lg bg-gray-700 p-2 text-white"
+					className={`w-full rounded-lg bg-gray-700 p-2 text-white ${
+						errors.url ? "border border-red-500" : ""
+					}`}
 				/>
+				{errors.url && (
+					<p className="mt-1 text-red-500 text-sm">{errors.url}</p>
+				)}
 			</div>
 
 			<div>
@@ -130,10 +228,14 @@ export function EditLaunchForm({ launch }: EditLaunchFormProps) {
 					name="description"
 					value={formData.description}
 					onChange={handleChange}
-					required
 					rows={10}
-					className="w-full rounded-lg bg-gray-700 p-2 text-white"
+					className={`w-full rounded-lg bg-gray-700 p-2 text-white ${
+						errors.description ? "border border-red-500" : ""
+					}`}
 				/>
+				{errors.description && (
+					<p className="mt-1 text-red-500 text-sm">{errors.description}</p>
+				)}
 			</div>
 
 			<div className="flex gap-4">

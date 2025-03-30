@@ -3,8 +3,7 @@ import "~/styles/globals.css";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
-import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
-import { RatingFilterDropdown } from "~/components/RatingFilterDropdown";
+import { FilterDropdown } from "~/components/common/FilterDropdown";
 import { getDistinctLaunchpads } from "~/server/queries";
 
 export const metadata: Metadata = {
@@ -21,6 +20,18 @@ const geist = Geist({
 
 async function Navbar() {
 	const launchpadNames = await getDistinctLaunchpads();
+
+	// Prepare rating options for the dropdown
+	const ratingOptions = Array.from({ length: 11 }, (_, i) => ({
+		value: i.toString(),
+		label: i.toString(),
+	}));
+
+	// Prepare launchpad options for the dropdown
+	const launchpadOptions = [
+		{ value: "All", label: "All Launchpads" },
+		...launchpadNames.map((name) => ({ value: name, label: name })),
+	];
 
 	return (
 		<nav className="sticky top-0 z-20 bg-gray-900 p-4 text-white shadow-md">
@@ -94,8 +105,18 @@ async function Navbar() {
 				</div>
 				<div className="flex items-center gap-2">
 					<span className="mr-1 text-gray-400 text-sm">Filters:</span>
-					<RatingFilterDropdown />
-					<LaunchpadFilterDropdown launchpads={launchpadNames} />
+					<FilterDropdown
+						options={ratingOptions}
+						paramName="minRating"
+						defaultValue="2"
+						label="Min Rating"
+					/>
+					<FilterDropdown
+						options={launchpadOptions}
+						paramName="filter"
+						defaultValue="All"
+						width="w-56"
+					/>
 				</div>
 			</div>
 		</nav>

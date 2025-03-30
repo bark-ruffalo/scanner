@@ -1,24 +1,17 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { http, type Chain, type Transport, createPublicClient } from "viem";
-import { base } from "viem/chains";
 import { analyzeLaunch } from "~/server/lib/ai-utils";
 import {
 	addKnownEvmSellingAddress,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
+import { publicClient } from "~/server/lib/web3-client";
 import {
 	getLaunchById,
 	updateLaunchAnalysis,
 	updateTokenStatisticsInDb,
 } from "~/server/queries";
-
-// Create a public client for Base network with explicit typing
-const publicClient = createPublicClient<Transport, Chain>({
-	chain: base,
-	transport: http(),
-});
 
 /**
  * Updates the token holdings for a launch in the background

@@ -1,7 +1,7 @@
 "use client";
 
-import { ChevronDown } from "lucide-react"; // Using lucide-react for icon
-import { useRouter, useSearchParams } from "next/navigation";
+import { ChevronDown, Loader2 } from "lucide-react"; // Add Loader2 icon
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react"; // Import useRef
 
 interface LaunchpadFilterDropdownProps {
@@ -11,12 +11,32 @@ interface LaunchpadFilterDropdownProps {
 // Create a client component that uses useSearchParams
 function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 	const router = useRouter();
+	const pathname = usePathname();
 	const searchParams = useSearchParams();
 	const currentFilter = searchParams.get("filter") ?? "All";
 	const [isOpen, setIsOpen] = useState(false);
+	const [isLoading, setIsLoading] = useState(false);
+	const loadingRef = useRef(false);
 	const dropdownRef = useRef<HTMLDivElement>(null); // Create a ref for the dropdown container
 
+	// Track navigation changes without dependencies
+	const navigationRef = useRef({ pathname, searchParams });
+
+	useEffect(() => {
+		// Update ref when navigation changes
+		navigationRef.current = { pathname, searchParams };
+
+		// Reset loading state if navigation changed while loading
+		if (loadingRef.current) {
+			setIsLoading(false);
+			loadingRef.current = false;
+		}
+	}, [pathname, searchParams]);
+
 	const handleSelect = (filter: string) => {
+		// Set loading state while router navigation is happening
+		setIsLoading(true);
+		loadingRef.current = true;
 		const params = new URLSearchParams(searchParams.toString());
 		if (filter === "All") {
 			params.delete("filter");
@@ -24,7 +44,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 			params.set("filter", filter);
 		}
 		// Use router.push to navigate, preserving other potential query params
-		router.push(`/?${params.toString()}`);
+		router.push(`${pathname}?${params.toString()}`);
 		setIsOpen(false); // Close dropdown after selection
 	};
 
@@ -59,15 +79,25 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 			<div>
 				<button
 					type="button"
+					disabled={isLoading}
 					// Removed data-dropdown-button as ref is used now
-					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600"
+					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600 disabled:opacity-70"
 					onClick={() => setIsOpen(!isOpen)}
 				>
-					{currentFilter === "All" ? "All Launchpads" : currentFilter}
-					<ChevronDown
-						className="-mr-1 h-5 w-5 text-gray-400"
-						aria-hidden="true"
-					/>
+					{isLoading ? (
+						<>
+							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+							Loading...
+						</>
+					) : (
+						<>
+							{currentFilter === "All" ? "All Launchpads" : currentFilter}
+							<ChevronDown
+								className="-mr-1 h-5 w-5 text-gray-400"
+								aria-hidden="true"
+							/>
+						</>
+					)}
 				</button>
 			</div>
 
@@ -114,7 +144,10 @@ export function LaunchpadFilterDropdown(props: LaunchpadFilterDropdownProps) {
 	return (
 		<Suspense
 			fallback={
-				<div className="h-10 w-48 animate-pulse rounded-md bg-gray-700" />
+				<div className="inline-flex h-10 w-48 items-center justify-center rounded-md bg-gray-700 px-3 py-2">
+					<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+					Loading...
+				</div>
 			}
 		>
 			<FilterContent {...props} />

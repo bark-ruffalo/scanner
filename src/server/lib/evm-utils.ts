@@ -81,6 +81,12 @@ const KNOWN_DEX_ADDRESSES: Record<string, string> = {
 	"0x7a250d5630b4cf539739df2c5dacb4c659f2488d": "Uniswap V2 Router",
 	"0xe592427a0aece92de3edee1f18e0157c05861564": "Uniswap V3 Router",
 	"0xdef1c0ded9bec7f1a1670819833240f027b25eff": "0x Exchange Proxy",
+
+	// DEX Factory Addresses
+	"0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f": "Uniswap V2 Factory",
+	"0x1f98431c8ad98523631ae4a59f267346ea31f984": "Uniswap V3 Factory",
+	"0xb4371da53140417cbab448b48df3e8f6c0360ff8": "SushiSwap Factory (Base)",
+	"0xf66dea7b3e897cd44a5a231c61b6b4423d613259": "Virtuals Protocol Factory",
 };
 
 // Define a type for Transfer event args
@@ -88,6 +94,15 @@ interface TransferEventArgs {
 	from: Address;
 	to: Address;
 	value: bigint;
+}
+
+// Define a type for processed transfers
+interface ProcessedTransfer {
+	to: Address;
+	value: bigint;
+	blockNumber: bigint;
+	transactionHash: `0x${string}`;
+	destinationType?: string;
 }
 
 // Define a minimal client interface
@@ -265,7 +280,7 @@ export async function updateEvmTokenStatistics(
 							value: args.value,
 							blockNumber: log.blockNumber,
 							transactionHash: log.transactionHash,
-						};
+						} as ProcessedTransfer;
 					} catch (error) {
 						console.error("Error decoding transfer log:", error);
 						return null;
@@ -273,77 +288,237 @@ export async function updateEvmTokenStatistics(
 				})
 				.filter((t): t is NonNullable<typeof t> => t !== null);
 
-			// Sort by value (descending) and take up to 3 most significant transfers
-			const significantTransfers = transfers
-				.sort((a, b) => ((b?.value || 0n) > (a?.value || 0n) ? 1 : -1))
-				.slice(0, 3);
+			// Sort by value (descending)
+			const sortedTransfers = transfers.sort((a, b) =>
+				(b?.value || 0n) > (a?.value || 0n) ? 1 : -1,
+			);
 
-			const movementDetails: string[] = [];
+			// Take the most significant transfers (up to 5 for more comprehensive analysis)
+			const significantTransfers = sortedTransfers.slice(0, 5);
 
-			// Track if any tokens were sent to the zero address (burn)
-			let sentToZeroAddress = false; // TODO: find the new token address, update the launch, etc.
+			// Group transfers by destination type for better analysis
+			const transferGroups: {
+				burned: typeof transfers;
+				locked: typeof transfers;
+				sold: typeof transfers;
+				unknown: typeof transfers;
+			} = {
+				burned: [],
+				locked: [],
+				sold: [],
+				unknown: [],
+			};
 
+			// Total transferred amount for percentage calculations
+			let totalTransferredAmount = 0n;
+
+			// Analyze each transfer and categorize it
 			for (const transfer of significantTransfers) {
 				if (!transfer) continue;
 
-				const { to, value, transactionHash } = transfer;
-				const formattedValue = formatTokenBalance(value);
+				const { to, value } = transfer;
+				totalTransferredAmount += value;
 
-				// Handle zero address (token burn)
+				// Check transfer type and add to appropriate group
+
+				// 1. Burns (zero address transfers)
 				if (to.toLowerCase() === "0x0000000000000000000000000000000000000000") {
-					movementDetails.push(
-						`Burned ${formattedValue} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX with a new token address. The creator might still hold the new token; investors should check!`,
-					);
-					sentToZeroAddress = true; // Set the flag when burn detected
+					transferGroups.burned.push(transfer);
 					continue;
 				}
 
-				// Check if destination is a known lock contract
+				// 2. Known lock contracts
 				const isKnownLock = Object.entries(KNOWN_LOCK_ADDRESSES).find(
 					([address]) => address.toLowerCase() === to.toLowerCase(),
 				);
 
 				if (isKnownLock) {
-					movementDetails.push(
-						`Locked ${formattedValue} tokens in ${isKnownLock[1]} (${to}).`,
-					);
-				} else {
-					// Check if destination is a known DEX router
-					const isKnownDex = Object.entries(KNOWN_DEX_ADDRESSES).find(
-						([address]) => address.toLowerCase() === to.toLowerCase(),
-					);
-
-					// Also check if it matches the launch-specific pair address
-					const isLaunchPair =
-						launchPairAddress &&
-						to.toLowerCase() === launchPairAddress.toLowerCase();
-
-					if (isKnownDex || isLaunchPair) {
-						const dexName = isKnownDex
-							? isKnownDex[1]
-							: "Launch-specific Selling Address";
-						movementDetails.push(
-							`Sold ${formattedValue} tokens through ${dexName} (${to}).`,
-						);
-					} else {
-						// Check if destination is any contract
-						const isContract = await isDestinationContract(client, to);
-						if (isContract) {
-							movementDetails.push(
-								`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity).`,
-							);
-						} else {
-							movementDetails.push(
-								`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet).`,
-							);
-						}
-					}
+					transferGroups.locked.push({
+						...transfer,
+						destinationType: isKnownLock[1],
+					});
+					continue;
 				}
+
+				// 3. Known DEX routers/addresses
+				const isKnownDex = Object.entries(KNOWN_DEX_ADDRESSES).find(
+					([address]) => address.toLowerCase() === to.toLowerCase(),
+				);
+
+				// Also check if it matches the launch-specific pair address
+				const isLaunchPair =
+					launchPairAddress &&
+					to.toLowerCase() === launchPairAddress.toLowerCase();
+
+				if (isKnownDex || isLaunchPair) {
+					const dexName = isKnownDex
+						? isKnownDex[1]
+						: "Launch-specific Selling Address";
+
+					transferGroups.sold.push({
+						...transfer,
+						destinationType: dexName,
+					});
+					continue;
+				}
+
+				// 4. Check if destination is any contract
+				try {
+					const code = await client.getBytecode({
+						address: to,
+					});
+
+					// If there is bytecode, it's a contract
+					if (code !== undefined && code !== "0x") {
+						// Check if it's a known DEX contract (could be a router or factory)
+						const knownDexMatch = Object.entries(KNOWN_DEX_ADDRESSES).find(
+							([address]) => address.toLowerCase() === to.toLowerCase(),
+						);
+
+						if (knownDexMatch) {
+							transferGroups.sold.push({
+								...transfer,
+								destinationType: `${knownDexMatch[1]}${knownDexMatch[1].includes("Factory") ? " (possible LP token creation)" : ""}`,
+							});
+						} else {
+							// Unknown contract
+							transferGroups.unknown.push({
+								...transfer,
+								destinationType: "unidentified contract",
+							});
+						}
+					} else {
+						// EOA (externally owned account)
+						transferGroups.unknown.push({
+							...transfer,
+							destinationType: "external wallet",
+						});
+					}
+				} catch (error) {
+					console.error(`Error checking if ${to} is a contract:`, error);
+					transferGroups.unknown.push({
+						...transfer,
+						destinationType: "unknown (error checking)",
+					});
+				}
+			}
+
+			// Build detailed movement report
+			const movementDetails: string[] = [];
+
+			// Formatter helper function
+			const formatTransferDetail = (
+				transfer: ProcessedTransfer,
+				action: string,
+			) => {
+				if (!transfer) return "";
+				const { value, transactionHash, destinationType } = transfer;
+				const formattedValue = formatTokenBalance(value);
+				const destinationInfo = destinationType
+					? ` via ${destinationType}`
+					: "";
+				const txShort = transactionHash.substring(0, 8);
+				return `${action} ${formattedValue} tokens${destinationInfo} (tx: ${txShort}...)`;
+			};
+
+			// Burned tokens have highest priority in reporting
+			if (transferGroups.burned.length > 0) {
+				const burnedTokens = transferGroups.burned.reduce(
+					(total, t) => total + (t?.value || 0n),
+					0n,
+				);
+				const formattedBurned = formatTokenBalance(burnedTokens);
+
+				movementDetails.push(
+					`Burned ${formattedBurned} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX with a new token address. The creator might still hold the new token; investors should check!`,
+				);
+
+				// Set the flag when burn detected
+				result.sentToZeroAddress = true;
+			}
+
+			// Add locked tokens next
+			if (transferGroups.locked.length > 0) {
+				const lockedTokens = transferGroups.locked.reduce(
+					(total, t) => total + (t?.value || 0n),
+					0n,
+				);
+				const formattedLocked = formatTokenBalance(lockedTokens);
+
+				// Group by lock platform
+				const lockPlatforms = transferGroups.locked.reduce<
+					Record<string, bigint>
+				>((acc, transfer) => {
+					const platform = transfer.destinationType || "unknown lock";
+					acc[platform] = (acc[platform] || 0n) + transfer.value;
+					return acc;
+				}, {});
+
+				// Format the lock details
+				const lockDetails = Object.entries(lockPlatforms)
+					.map(
+						([platform, amount]) =>
+							`${formatTokenBalance(amount)} in ${platform}`,
+					)
+					.join(", ");
+
+				movementDetails.push(
+					`Locked ${formattedLocked} tokens in ${lockDetails}.`,
+				);
+			}
+
+			// Add sold tokens next
+			if (transferGroups.sold.length > 0) {
+				const soldTokens = transferGroups.sold.reduce(
+					(total, t) => total + (t?.value || 0n),
+					0n,
+				);
+				const formattedSold = formatTokenBalance(soldTokens);
+
+				// Calculate percentage of initial allocation that was sold
+				const percentageSold =
+					initialTokensNum > 0
+						? (Number(formatUnits(soldTokens, 18)) / initialTokensNum) * 100
+						: 0;
+
+				// Group by DEX/selling platform
+				const sellingPlatforms = transferGroups.sold.reduce<
+					Record<string, bigint>
+				>((acc, transfer) => {
+					const platform = transfer.destinationType || "unknown exchange";
+					acc[platform] = (acc[platform] || 0n) + transfer.value;
+					return acc;
+				}, {});
+
+				// Format the selling details
+				const sellingDetails = Object.entries(sellingPlatforms)
+					.map(
+						([platform, amount]) =>
+							`Sold ${formatTokenBalance(amount)} tokens through ${platform}.`,
+					)
+					.join(" ");
+
+				movementDetails.push(sellingDetails);
+			}
+
+			// Add unknown transfers last
+			if (transferGroups.unknown.length > 0) {
+				const unknownTransferDetails = transferGroups.unknown
+					.map((transfer) => {
+						const formattedValue = formatTokenBalance(transfer.value);
+						const destinationType =
+							transfer.destinationType || "unknown destination";
+
+						return `Transferred ${formattedValue} tokens to ${destinationType}.`;
+					})
+					.join(" ");
+
+				movementDetails.push(unknownTransferDetails);
 			}
 
 			result.creatorTokenMovementDetails = movementDetails.join(" ");
 			// Add the flag to the result if tokens were sent to zero address
-			if (sentToZeroAddress) {
+			if (transferGroups.burned.length > 0) {
 				result.sentToZeroAddress = true;
 			}
 			console.log(

@@ -2,35 +2,38 @@
 
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { http, type Chain, type Transport, createPublicClient } from "viem";
-import { base } from "viem/chains";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
 import { analyzeLaunch } from "~/server/lib/ai-utils";
 import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
+import { publicClient } from "~/server/lib/web3-client";
 import {
 	getLaunchById,
 	updateLaunchAnalysis,
 	updateTokenStatisticsInDb,
 } from "~/server/queries";
 
-// Create a public client for Base network with explicit typing
-const publicClient = createPublicClient<Transport, Chain>({
-	chain: base,
-	transport: http(),
-});
-
 /**
  * Deletes a launch from the database
+ * @throws {Error} If deletion fails
  */
 export async function deleteLaunch(id: number) {
-	await db.delete(launches).where(eq(launches.id, id));
-	revalidatePath("/admin");
-	revalidatePath("/");
+	try {
+		await db.delete(launches).where(eq(launches.id, id));
+		revalidatePath("/admin");
+		revalidatePath("/");
+		return { success: true };
+	} catch (error) {
+		console.error(`Error deleting launch ${id}:`, error);
+		throw new Error(
+			`Failed to delete launch: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
 }
 
 /**
  * Updates token statistics for a launch
+ * @throws {Error} If update fails or launch not found
  */
 export async function updateLaunchTokenStats(
 	launchId: number,
@@ -38,32 +41,42 @@ export async function updateLaunchTokenStats(
 	creatorAddress: string,
 	creatorInitialTokens: string,
 ) {
-	const launch = await getLaunchById(launchId);
-	if (!launch) {
-		throw new Error(`Launch with ID ${launchId} not found`);
+	try {
+		const launch = await getLaunchById(launchId);
+		if (!launch) {
+			throw new Error(`Launch with ID ${launchId} not found`);
+		}
+
+		// Register the main selling address if it exists
+		const tokenStats = await updateEvmTokenStatistics(
+			publicClient,
+			tokenAddress as `0x${string}`,
+			creatorAddress as `0x${string}`,
+			creatorInitialTokens,
+			undefined,
+			launch.mainSellingAddress as `0x${string}` | undefined,
+		);
+
+		await updateTokenStatisticsInDb(launchId, tokenStats);
+		revalidatePath(`/launch/${launchId}`);
+		revalidatePath("/admin");
+		revalidatePath("/");
+		return { success: true };
+	} catch (error) {
+		console.error(`Error updating token stats for launch ${launchId}:`, error);
+		throw new Error(
+			`Failed to update token statistics: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
-
-	// Register the main selling address if it exists
-	const tokenStats = await updateEvmTokenStatistics(
-		publicClient,
-		tokenAddress as `0x${string}`,
-		creatorAddress as `0x${string}`,
-		creatorInitialTokens,
-		undefined,
-		launch.mainSellingAddress as `0x${string}` | undefined,
-	);
-
-	await updateTokenStatisticsInDb(launchId, tokenStats);
-	revalidatePath(`/launch/${launchId}`);
-	revalidatePath("/admin");
-	revalidatePath("/");
 }
 
 /**
  * Updates token statistics for all launches
+ * @returns Object with success count and error count
  */
 export async function updateAllTokenStats() {
 	const allLaunches = await db.query.launches.findMany();
+	const results = { success: 0, failed: 0, total: allLaunches.length };
 
 	for (const launch of allLaunches) {
 		try {
@@ -86,6 +99,7 @@ export async function updateAllTokenStats() {
 				console.log(
 					`Skipping launch ${launch.id}: Could not extract token info from description`,
 				);
+				results.failed++;
 				continue;
 			}
 
@@ -95,53 +109,76 @@ export async function updateAllTokenStats() {
 				creatorMatch[1],
 				initialTokensMatch[1].replace(/,/g, ""),
 			);
+			results.success++;
 		} catch (error) {
 			console.error(
 				`Error updating token stats for launch ${launch.id}:`,
 				error,
 			);
+			results.failed++;
 		}
 	}
+
+	revalidatePath("/admin");
+	revalidatePath("/");
+	return results;
 }
 
 /**
  * Reanalyzes a launch with LLM
+ * @throws {Error} If reanalysis fails or launch not found
  */
 export async function reanalyzeLaunch(id: number) {
-	const launch = await getLaunchById(id);
-	if (!launch) {
-		throw new Error(`Launch with ID ${id} not found`);
+	try {
+		const launch = await getLaunchById(id);
+		if (!launch) {
+			throw new Error(`Launch with ID ${id} not found`);
+		}
+
+		const analysisResult = await analyzeLaunch(
+			launch.description,
+			launch.launchpad,
+		);
+
+		await updateLaunchAnalysis(id, {
+			description: launch.description,
+			analysis: analysisResult.analysis,
+			summary: analysisResult.summary,
+			rating: analysisResult.rating,
+			llmAnalysisUpdatedAt: new Date(),
+		});
+
+		revalidatePath(`/launch/${id}`);
+		revalidatePath("/admin");
+		revalidatePath("/");
+		return { success: true, rating: analysisResult.rating };
+	} catch (error) {
+		console.error(`Error reanalyzing launch ${id}:`, error);
+		throw new Error(
+			`Failed to reanalyze launch: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
-
-	const analysisResult = await analyzeLaunch(
-		launch.description,
-		launch.launchpad,
-	);
-
-	await updateLaunchAnalysis(id, {
-		description: launch.description,
-		analysis: analysisResult.analysis,
-		summary: analysisResult.summary,
-		rating: analysisResult.rating,
-		llmAnalysisUpdatedAt: new Date(),
-	});
-
-	revalidatePath(`/launch/${id}`);
-	revalidatePath("/admin");
-	revalidatePath("/");
 }
 
 /**
  * Reanalyzes all launches with LLM
+ * @returns Object with success count and error count
  */
 export async function reanalyzeAllLaunches() {
 	const allLaunches = await db.query.launches.findMany();
+	const results = { success: 0, failed: 0, total: allLaunches.length };
 
 	for (const launch of allLaunches) {
 		try {
 			await reanalyzeLaunch(launch.id);
+			results.success++;
 		} catch (error) {
 			console.error(`Error reanalyzing launch ${launch.id}:`, error);
+			results.failed++;
 		}
 	}
+
+	revalidatePath("/admin");
+	revalidatePath("/");
+	return results;
 }

@@ -4,6 +4,7 @@ import { format } from "date-fns";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import type { NewLaunchData } from "~/server/queries";
 import {
 	deleteLaunch,
 	reanalyzeAllLaunches,
@@ -12,6 +13,7 @@ import {
 	updateLaunchTokenStats,
 } from "../actions";
 
+// Define the Launch interface based on the types used in the queries module
 interface Launch {
 	id: number;
 	title: string;
@@ -28,6 +30,10 @@ interface AdminDashboardProps {
 export function AdminDashboard({ launches }: AdminDashboardProps) {
 	const router = useRouter();
 	const [isProcessing, setIsProcessing] = useState(false);
+	const [actionResults, setActionResults] = useState<{
+		message: string;
+		type: "success" | "error";
+	} | null>(null);
 
 	const handleDelete = async (id: number) => {
 		if (!confirm("Are you sure you want to delete this launch?")) {
@@ -36,11 +42,18 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 
 		try {
 			setIsProcessing(true);
-			await deleteLaunch(id);
+			const result = await deleteLaunch(id);
+			setActionResults({
+				message: "Launch deleted successfully",
+				type: "success",
+			});
 			router.refresh();
 		} catch (error) {
 			console.error("Error deleting launch:", error);
-			alert("Error deleting launch");
+			setActionResults({
+				message: `Error deleting launch: ${error instanceof Error ? error.message : "Unknown error"}`,
+				type: "error",
+			});
 		} finally {
 			setIsProcessing(false);
 		}
@@ -55,7 +68,11 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 			setIsProcessing(true);
 
 			if (isAll) {
-				await updateAllTokenStats();
+				const results = await updateAllTokenStats();
+				setActionResults({
+					message: `Updated ${results.success} launches, ${results.failed} failed`,
+					type: "success",
+				});
 			} else {
 				// Extract token info from description
 				const tokenAddressMatch = description.match(
@@ -82,12 +99,19 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 					creatorMatch[1],
 					initialTokensMatch[1].replace(/,/g, ""),
 				);
+				setActionResults({
+					message: "Token stats updated successfully",
+					type: "success",
+				});
 			}
 
 			router.refresh();
 		} catch (error) {
 			console.error("Error updating token stats:", error);
-			alert("Error updating token stats");
+			setActionResults({
+				message: `Error updating token stats: ${error instanceof Error ? error.message : "Unknown error"}`,
+				type: "error",
+			});
 		} finally {
 			setIsProcessing(false);
 		}
@@ -98,15 +122,26 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 			setIsProcessing(true);
 
 			if (isAll) {
-				await reanalyzeAllLaunches();
+				const results = await reanalyzeAllLaunches();
+				setActionResults({
+					message: `Reanalyzed ${results.success} launches, ${results.failed} failed`,
+					type: "success",
+				});
 			} else {
-				await reanalyzeLaunch(id);
+				const result = await reanalyzeLaunch(id);
+				setActionResults({
+					message: `Launch reanalyzed with new rating: ${result.rating}/10`,
+					type: "success",
+				});
 			}
 
 			router.refresh();
 		} catch (error) {
 			console.error("Error reanalyzing launch:", error);
-			alert("Error reanalyzing launch");
+			setActionResults({
+				message: `Error reanalyzing launch: ${error instanceof Error ? error.message : "Unknown error"}`,
+				type: "error",
+			});
 		} finally {
 			setIsProcessing(false);
 		}
@@ -125,6 +160,25 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 						Add New Launch
 					</button>
 				</div>
+
+				{actionResults && (
+					<div
+						className={`mb-4 rounded-lg p-4 ${
+							actionResults.type === "success"
+								? "bg-green-800 text-white"
+								: "bg-red-800 text-white"
+						}`}
+					>
+						{actionResults.message}
+						<button
+							type="button"
+							className="ml-2 font-bold"
+							onClick={() => setActionResults(null)}
+						>
+							×
+						</button>
+					</div>
+				)}
 
 				<div className="rounded-lg bg-gray-800 p-6">
 					<div className="mb-4 flex items-center justify-between">

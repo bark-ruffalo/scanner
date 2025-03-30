@@ -4,12 +4,30 @@ import { ChevronDown, Loader2 } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useRef, useState } from "react";
 
-// Create a client component that uses useSearchParams
-function FilterContent() {
+interface FilterOption {
+	value: string;
+	label: string;
+}
+
+interface FilterDropdownProps {
+	options: FilterOption[];
+	paramName: string;
+	defaultValue: string;
+	label?: string;
+	width?: string;
+}
+
+function FilterContent({
+	options,
+	paramName,
+	defaultValue,
+	label,
+	width = "w-48",
+}: FilterDropdownProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const currentFilter = searchParams.get("minRating") ?? "2";
+	const currentValue = searchParams.get(paramName) ?? defaultValue;
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const loadingRef = useRef(false);
@@ -29,12 +47,18 @@ function FilterContent() {
 		}
 	}, [pathname, searchParams]);
 
-	const handleSelect = (rating: string) => {
-		// Set loading state while router navigation is happening
+	const handleSelect = (value: string) => {
 		setIsLoading(true);
 		loadingRef.current = true;
 		const params = new URLSearchParams(searchParams.toString());
-		params.set("minRating", rating);
+
+		if (value === defaultValue && paramName === "filter") {
+			// Special case for filter dropdown with default "All" value
+			params.delete(paramName);
+		} else {
+			params.set(paramName, value);
+		}
+
 		router.push(`${pathname}?${params.toString()}`);
 		setIsOpen(false);
 	};
@@ -61,50 +85,52 @@ function FilterContent() {
 		};
 	}, [isOpen]);
 
-	// Generate rating options from 0 to 10
-	const ratingOptions = Array.from({ length: 11 }, (_, i) => i.toString());
+	// Find current option label
+	const currentOption = options.find((option) => option.value === currentValue);
+	const buttonLabel = currentOption?.label || currentValue;
 
 	return (
-		<div className="relative inline-block text-left" ref={dropdownRef}>
-			<div>
-				<button
-					type="button"
-					disabled={isLoading}
-					className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600 disabled:opacity-70"
-					onClick={() => setIsOpen(!isOpen)}
-				>
-					{isLoading ? (
-						<>
-							<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-							Loading...
-						</>
-					) : (
-						<>
-							Min Rating: {currentFilter}
-							<ChevronDown
-								className="-mr-1 h-5 w-5 text-gray-400"
-								aria-hidden="true"
-							/>
-						</>
-					)}
-				</button>
-			</div>
+		<div
+			className={`relative inline-block text-left ${width}`}
+			ref={dropdownRef}
+		>
+			<button
+				type="button"
+				disabled={isLoading}
+				className="inline-flex w-full justify-center gap-x-1.5 rounded-md bg-gray-700 px-3 py-2 font-semibold text-sm text-white shadow-sm ring-1 ring-gray-600 ring-inset hover:bg-gray-600 disabled:opacity-70"
+				onClick={() => setIsOpen(!isOpen)}
+			>
+				{isLoading ? (
+					<>
+						<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+						Loading...
+					</>
+				) : (
+					<>
+						{label ? `${label}: ${buttonLabel}` : buttonLabel}
+						<ChevronDown
+							className="-mr-1 ml-2 h-5 w-5 text-gray-400"
+							aria-hidden="true"
+						/>
+					</>
+				)}
+			</button>
 
 			{isOpen && (
-				<div className="absolute right-0 z-10 mt-2 max-h-60 w-56 origin-top-right overflow-y-auto rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+				<div className="absolute right-0 z-10 mt-2 max-h-60 w-full origin-top-right overflow-y-auto rounded-md bg-gray-800 shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
 					<div className="py-1">
-						{ratingOptions.map((rating) => (
+						{options.map((option) => (
 							<button
 								type="button"
-								key={rating}
-								onClick={() => handleSelect(rating)}
+								key={option.value}
+								onClick={() => handleSelect(option.value)}
 								className={`block w-full px-4 py-2 text-left text-sm ${
-									currentFilter === rating
+									currentValue === option.value
 										? "bg-[var(--color-scanner-purple-dark)] text-white"
 										: "text-gray-300 hover:bg-gray-700 hover:text-white"
 								}`}
 							>
-								{rating}
+								{option.label}
 							</button>
 						))}
 					</div>
@@ -114,18 +140,19 @@ function FilterContent() {
 	);
 }
 
-// Create a main export with Suspense boundary
-export function RatingFilterDropdown() {
+export function FilterDropdown(props: FilterDropdownProps) {
 	return (
 		<Suspense
 			fallback={
-				<div className="inline-flex h-10 w-48 items-center justify-center rounded-md bg-gray-700 px-3 py-2">
+				<div
+					className={`inline-flex h-10 ${props.width || "w-48"} items-center justify-center rounded-md bg-gray-700 px-3 py-2`}
+				>
 					<Loader2 className="mr-2 h-4 w-4 animate-spin" />
 					Loading...
 				</div>
 			}
 		>
-			<FilterContent />
+			<FilterContent {...props} />
 		</Suspense>
 	);
 }
