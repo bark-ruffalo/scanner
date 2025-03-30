@@ -6,7 +6,12 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { BackButton } from "~/components/BackButton";
 import { linkify } from "~/lib/utils";
-import { getLaunchById, getLaunchMetadata } from "~/server/queries";
+import { analyzeLaunch } from "~/server/lib/ai-utils";
+import {
+	getLaunchById,
+	getLaunchMetadata,
+	updateLaunchAnalysis,
+} from "~/server/queries";
 import { TokenHoldingsUpdater } from "./token-holdings-updater";
 
 type Props = {
@@ -35,6 +40,45 @@ export default async function LaunchDetailPage({ params }: Props) {
 
 	if (!launch) {
 		notFound();
+	}
+
+	// Check if any LLM responses are missing or have default values
+	const needsAnalysis =
+		!launch.analysis ||
+		launch.analysis === "-" ||
+		!launch.summary ||
+		launch.summary === "-" ||
+		launch.rating === -1;
+
+	if (needsAnalysis) {
+		try {
+			console.log(
+				`Launch ${launchId} missing LLM responses. Triggering analysis...`,
+			);
+			const analysisResult = await analyzeLaunch(launch.description);
+
+			// Update the database with new analysis
+			await updateLaunchAnalysis(launchId, {
+				description: launch.description, // Keep existing description
+				analysis: analysisResult.analysis,
+				summary: analysisResult.summary,
+				rating: analysisResult.rating,
+				llmAnalysisUpdatedAt: new Date(),
+			});
+
+			// Update the launch object with new analysis for rendering
+			launch.analysis = analysisResult.analysis;
+			launch.summary = analysisResult.summary;
+			launch.rating = analysisResult.rating;
+			launch.llmAnalysisUpdatedAt = new Date();
+
+			console.log(
+				`Analysis completed for launch ${launchId} with rating: ${analysisResult.rating}/10`,
+			);
+		} catch (error) {
+			console.error("Error during launch analysis:", error);
+			// Continue with existing data if analysis fails
+		}
 	}
 
 	// Extract token address, creator address, and initial allocation from the description
