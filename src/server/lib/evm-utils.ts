@@ -58,9 +58,10 @@ export const erc20Abi = [
 
 // Define common token lock contract addresses
 const KNOWN_LOCK_ADDRESSES: Record<string, string> = {
-	"0x100cc9618a91f242ea6f374bea9ef4e979b6a78a": "Team.Finance",
-	"0x663a5c229c09b049e36dcc11a9dd1d8062d7595f": "UniCrypt",
-	"0xf4c8e32eadec4bfe97e0f595add0f4450a863a11": "DxLock",
+	// "": "Team.Finance",
+	// "": "UniCrypt",
+	// "": "DxLock",
+	"0x3466eb008edd8d5052446293d1a7d212cb65c646": "Hedgey Finance",
 	"0xdad686299fb562f89e55da05f1d96fabeb2a2e32":
 		"Virtuals Protocol 6-Month Lock",
 	// Add more as needed
@@ -71,7 +72,7 @@ const KNOWN_DEX_ADDRESSES: Record<string, string> = {
 	// Base
 	"0x743f2f29cdd66242fb27d292ab2cc92f45674635": "Sigma.Win Sniper",
 	"0x8292b43ab73efac11faf357419c38acf448202c5":
-		"Virtuals Protocol Approval Address", // TODO: in the future, this might be used to track if the creator is planning to sell
+		"Virtuals Protocol Approval Address", // TODO: this may be used to track if the creator is planning to sell
 	// Special handling for dynamic VP pair addresses added by virtuals-base.ts
 	__VP_PAIR_ADDRESS__: "Virtuals Protocol token's bonding curve", // This is a placeholder that will be replaced at runtime
 
@@ -280,7 +281,7 @@ export async function updateEvmTokenStatistics(
 			const movementDetails: string[] = [];
 
 			// Track if any tokens were sent to the zero address (burn)
-			let sentToZeroAddress = false;
+			// let sentToZeroAddress = false; // TODO: find the new token address, update the launch, etc.
 
 			for (const transfer of significantTransfers) {
 				if (!transfer) continue;
@@ -291,9 +292,9 @@ export async function updateEvmTokenStatistics(
 				// Handle zero address (token burn)
 				if (to.toLowerCase() === "0x0000000000000000000000000000000000000000") {
 					movementDetails.push(
-						`Burned ${formattedValue} tokens (sent to address 0x0 - might be token migration).`,
+						`Burned ${formattedValue} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX. The creator might still hold the new token variant; investors should check!`,
 					);
-					sentToZeroAddress = true;
+					// sentToZeroAddress = true;
 					continue;
 				}
 
@@ -338,13 +339,6 @@ export async function updateEvmTokenStatistics(
 						}
 					}
 				}
-			}
-
-			// If tokens were sent to zero address, add a note about potential token migration
-			if (sentToZeroAddress) {
-				movementDetails.push(
-					'Note: tokens sent to the zero address usually indicate a token migration to a DEX-traded "graduated" token; the creator might still hold the new token variant. You should check!',
-				);
 			}
 
 			result.creatorTokenMovementDetails = movementDetails.join(" ");
