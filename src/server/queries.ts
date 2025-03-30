@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gt, ne } from "drizzle-orm";
+import { and, eq, gt, gte, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
@@ -46,12 +46,19 @@ export async function getLaunches(filter?: string, minRating?: string) {
 	if (minRating !== undefined) {
 		const rating = Number.parseInt(minRating, 10);
 		if (!Number.isNaN(rating)) {
-			conditions.push(
-				and(
-					gt(launches.rating, rating - 1), // Using gt with rating-1 is equivalent to gte with rating
-					ne(launches.rating, -1),
-				),
-			);
+			// When minRating is 0, include both unrated (-1) and 0 rated launches
+			if (rating === 0) {
+				conditions.push(
+					gte(launches.rating, -1), // This includes both -1 and 0 ratings
+				);
+			} else {
+				conditions.push(
+					and(
+						gt(launches.rating, rating - 1), // Using gt with rating-1 is equivalent to gte with rating
+						ne(launches.rating, -1),
+					),
+				);
+			}
 		}
 	}
 
