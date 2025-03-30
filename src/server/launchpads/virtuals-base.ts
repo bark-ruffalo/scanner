@@ -222,31 +222,29 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		const totalSupply = dataTuple.supply;
 
 		// Determine if this is a historical event by checking if we're in debug mode
-		// We consider it historical if the block number is more than 100 blocks old
-		const isHistoricalEvent = latestBlock - blockNumber > 100n;
+		// We consider it historical if the block number is more than 10 blocks old
+		const isHistoricalEvent = latestBlock - blockNumber > 10n;
 
-		// Fetch initial and current creator balances in a single block to avoid redundancy
-		const [creatorInitialBalance, creatorCurrentBalance] = await Promise.all([
-			getEvmErc20BalanceAtBlock(
-				publicClient as PublicClient,
-				token,
-				creator,
-				blockNumber, // The block number from the event log
-			),
-			// Only fetch current balance if this is a historical event, otherwise use initial
-			isHistoricalEvent
-				? getEvmErc20BalanceAtBlock(
-						publicClient as PublicClient,
-						token,
-						creator,
-						// No blockNumber parameter - defaults to latest block
-					)
-				: null, // We'll set this to initial balance below if not historical
-		]);
+		// First get initial balance
+		const creatorInitialBalance = await getEvmErc20BalanceAtBlock(
+			publicClient as PublicClient,
+			token,
+			creator,
+			blockNumber, // The block number from the event log
+		);
+
+		// Then get current balance if needed
+		const creatorCurrentBalance = isHistoricalEvent
+			? await getEvmErc20BalanceAtBlock(
+					publicClient as PublicClient,
+					token,
+					creator,
+				)
+			: creatorInitialBalance;
 
 		// For new launches, current = initial
 		const finalCurrentBalance = isHistoricalEvent
-			? creatorCurrentBalance || creatorInitialBalance
+			? creatorCurrentBalance
 			: creatorInitialBalance;
 
 		const timestamp = block.timestamp;
@@ -328,7 +326,7 @@ Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)${
 			finalCurrentBalance !== creatorInitialBalance
-				? `\nNumber of tokens still held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
+				? `\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
 						tokenStats.creatorTokenMovementDetails
 							? `\nToken movement details: ${tokenStats.creatorTokenMovementDetails}`
 							: ""
