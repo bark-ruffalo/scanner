@@ -2,16 +2,49 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { FilterDropdown } from "~/components/common/FilterDropdown";
 
-interface ClientNavbarProps {
-	launchpadNames: string[];
-}
-
-export function ClientNavbar({ launchpadNames }: ClientNavbarProps) {
+export function ClientNavbar() {
 	// Get current path to determine if we should show filters
 	const pathname = usePathname();
 	const isHomePage = pathname === "/" || pathname === "";
+
+	// Only store launchpad data if on homepage
+	const [launchpadNames, setLaunchpadNames] = useState<string[]>([]);
+	const [isLoading, setIsLoading] = useState(false);
+	const [lastLoadTime, setLastLoadTime] = useState(0);
+
+	// Only fetch launchpads when on the homepage
+	useEffect(() => {
+		// Refresh data if:
+		// 1. We're on the homepage
+		// 2. AND either:
+		//    a. We have no data yet, OR
+		//    b. It's been more than 5 minutes since last load
+		// 3. AND we're not currently loading
+		const shouldRefresh =
+			isHomePage &&
+			(launchpadNames.length === 0 ||
+				Date.now() - lastLoadTime > 5 * 60 * 1000) && // TODO: maybe increase the interval in the future, or find a better way
+			!isLoading;
+
+		if (shouldRefresh) {
+			setIsLoading(true);
+			// Create an API route to fetch this data without running server queries directly
+			fetch("/api/launchpads")
+				.then((res) => res.json())
+				.then((data) => {
+					setLaunchpadNames(data);
+					setLastLoadTime(Date.now());
+					setIsLoading(false);
+				})
+				.catch((error) => {
+					console.error("Error fetching launchpads:", error);
+					setIsLoading(false);
+				});
+		}
+	}, [isHomePage, launchpadNames.length, isLoading, lastLoadTime]);
 
 	// Prepare rating options for the dropdown
 	const ratingOptions = Array.from({ length: 11 }, (_, i) => ({
