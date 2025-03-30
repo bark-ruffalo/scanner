@@ -12,6 +12,7 @@ interface HomePageProps {
 	searchParams: {
 		// Make searchParams non-optional, it's always provided
 		filter?: string;
+		minRating?: string;
 	};
 }
 
@@ -19,9 +20,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 	// Await searchParams before accessing its properties
 	const params = await searchParams;
 	const currentFilter = params.filter;
+	const minRating = params.minRating ?? "2"; // Default to 2 if not provided
 
 	// Fetch launches using the DAL - this will now refetch after revalidatePath('/') is called
-	const filteredLaunches = await getLaunches(currentFilter);
+	const filteredLaunches = await getLaunches(currentFilter, minRating);
 
 	return (
 		// Removed items-center justify-center, added pt-8 for spacing below navbar
@@ -31,8 +33,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 				{filteredLaunches.length === 0 ? (
 					<p className="text-center text-gray-300">
 						{currentFilter && currentFilter !== "All"
-							? `No launches found for "${currentFilter}".`
-							: "No launches found."}
+							? `No launches found for "${currentFilter}" with minimum rating of ${minRating}.`
+							: `No launches found with minimum rating of ${minRating}.`}
 					</p>
 				) : (
 					// Changed max-width, removed items-center justify-center from parent main

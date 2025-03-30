@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import Link from "next/link";
 import { LaunchpadFilterDropdown } from "~/components/LaunchpadFilterDropdown";
+import { RatingFilterDropdown } from "~/components/RatingFilterDropdown";
 import { getDistinctLaunchpads } from "~/server/queries";
 
 export const metadata: Metadata = {
@@ -69,7 +70,8 @@ async function Navbar() {
 					</a>
 				</div>
 				<div className="flex items-center gap-2">
-					<span className="mr-1 text-gray-400 text-sm">Filter:</span>
+					<span className="mr-1 text-gray-400 text-sm">Filters:</span>
+					<RatingFilterDropdown />
 					<LaunchpadFilterDropdown launchpads={launchpadNames} />
 				</div>
 			</div>

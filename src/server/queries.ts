@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq } from "drizzle-orm";
+import { and, eq, gt, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "./db";
 import { launches } from "./db/schema";
@@ -25,22 +25,39 @@ export type NewLaunchData = Omit<
 
 /**
  * Fetches launch records from the database.
- * Optionally filters launches by launchpad name.
+ * Optionally filters launches by launchpad name and minimum rating.
  * @param filter Optional string. If provided and not "All", filters by `launches.launchpad`.
+ * @param minRating Optional string. If provided, filters launches by minimum rating.
  * @returns A promise that resolves to an array of launch objects.
  */
-export async function getLaunches(filter?: string) {
+export async function getLaunches(filter?: string, minRating?: string) {
 	console.log(
-		`Fetching launches from DB. Filter: ${filter ?? "None (fetching all)"}`,
+		`Fetching launches from DB. Filter: ${filter ?? "None (fetching all)"}, Min Rating: ${minRating ?? "None"}`,
 	);
+
+	const conditions = [];
+
+	// Add launchpad filter condition if provided
+	if (filter && filter !== "All") {
+		conditions.push(eq(launches.launchpad, filter));
+	}
+
+	// Add minimum rating condition if provided
+	if (minRating !== undefined) {
+		const rating = Number.parseInt(minRating, 10);
+		if (!Number.isNaN(rating)) {
+			conditions.push(
+				and(
+					gt(launches.rating, rating - 1), // Using gt with rating-1 is equivalent to gte with rating
+					ne(launches.rating, -1),
+				),
+			);
+		}
+	}
+
 	// Uses Drizzle's query builder (`db.query.launches`).
 	const result = await db.query.launches.findMany({
-		// Conditional 'where' clause:
-		// - If a filter exists and is not the string "All", it adds a condition
-		//   where the `launchpad` column must equal the filter value (`eq(launches.launchpad, filter)`).
-		// - Otherwise (no filter or filter is "All"), the `where` clause is undefined, fetching all records.
-		where:
-			filter && filter !== "All" ? eq(launches.launchpad, filter) : undefined,
+		where: conditions.length > 0 ? and(...conditions) : undefined,
 		// Orders the results by the `createdAt` column in descending order (newest first).
 		orderBy: (launches, { desc }) => [desc(launches.createdAt)],
 	});
