@@ -176,8 +176,8 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		return; // Skip processing if essential metadata is missing.
 	}
 
-	// Register the pair address as a known DEX address so that transfers to it are detected as token sells
-	addKnownEvmSellingAddress(pair, "Virtuals Protocol Pair");
+	// Register the pair address as a known selling address so that transfers to it are detected as rug pulls
+	addKnownEvmSellingAddress(pair, "the Virtuals Protocol bonding curve");
 
 	try {
 		// Fetch token info from factory and block info (for timestamp) concurrently

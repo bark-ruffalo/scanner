@@ -50,7 +50,7 @@ export async function updateTokenHoldings(
 		if (launch.mainSellingAddress) {
 			addKnownEvmSellingAddress(
 				launch.mainSellingAddress as `0x${string}`,
-				"Launch-specific Selling Address",
+				launch.launchpad,
 			);
 		}
 

@@ -19,8 +19,8 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
+import { formatTokenBalance } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
-
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
 	"function balanceOf(address account) view returns (uint256)",
@@ -286,12 +286,12 @@ export async function updateEvmTokenStatistics(
 				if (!transfer) continue;
 
 				const { to, value, transactionHash } = transfer;
-				const formattedValue = Number(formatUnits(value, 18)).toFixed(2);
+				const formattedValue = formatTokenBalance(value);
 
 				// Handle zero address (token burn)
 				if (to.toLowerCase() === "0x0000000000000000000000000000000000000000") {
 					movementDetails.push(
-						`Burned ${formattedValue} tokens (sent to address 0x0 - might be token migration)`,
+						`Burned ${formattedValue} tokens (sent to address 0x0 - might be token migration).`,
 					);
 					sentToZeroAddress = true;
 					continue;
@@ -304,7 +304,7 @@ export async function updateEvmTokenStatistics(
 
 				if (isKnownLock) {
 					movementDetails.push(
-						`Locked ${formattedValue} tokens in ${isKnownLock[1]} (${to})`,
+						`Locked ${formattedValue} tokens in ${isKnownLock[1]} (${to}).`,
 					);
 				} else {
 					// Check if destination is a known DEX router
@@ -322,18 +322,18 @@ export async function updateEvmTokenStatistics(
 							? isKnownDex[1]
 							: "Launch-specific Selling Address";
 						movementDetails.push(
-							`Sold ${formattedValue} tokens through ${dexName} (${to})`,
+							`Sold ${formattedValue} tokens through ${dexName} (${to}).`,
 						);
 					} else {
 						// Check if destination is any contract
 						const isContract = await isDestinationContract(client, to);
 						if (isContract) {
 							movementDetails.push(
-								`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity)`,
+								`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity).`,
 							);
 						} else {
 							movementDetails.push(
-								`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet)`,
+								`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet).`,
 							);
 						}
 					}
@@ -463,7 +463,7 @@ export function addKnownEvmSellingAddress(
 
 	// Add it to KNOWN_DEX_ADDRESSES if not already present
 	if (!KNOWN_DEX_ADDRESSES[normalizedAddress]) {
-		KNOWN_DEX_ADDRESSES[normalizedAddress] = label || "DEX Pair Address";
+		KNOWN_DEX_ADDRESSES[normalizedAddress] = label || "the launchpad";
 		console.log(
 			`Added selling address ${normalizedAddress} to KNOWN_DEX_ADDRESSES as "${KNOWN_DEX_ADDRESSES[normalizedAddress]}"`,
 		);
