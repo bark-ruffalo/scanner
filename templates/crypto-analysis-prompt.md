@@ -41,7 +41,7 @@ Consider the launchpad information provided in the "launchpad_info" section when
 
 # Rules for rating
 - the rating is based mostly on the analysis
-- if there's not enough information for a proper rating, return -1
+- if there's not enough information for a proper rating, return 0
 - if it's a memecoin, be much more likely to rate it lower
 </rules>
 
