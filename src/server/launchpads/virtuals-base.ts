@@ -326,7 +326,7 @@ Token symbol: $${tokenSymbol}
 Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
-Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})${
+Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)${
 			finalCurrentBalance !== creatorInitialBalance
 				? `\nNumber of tokens still held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
 						tokenStats.creatorTokenMovementDetails

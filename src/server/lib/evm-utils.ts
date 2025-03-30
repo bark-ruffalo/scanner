@@ -343,11 +343,11 @@ export async function updateEvmTokenStatistics(
 			// If tokens were sent to zero address, add a note about potential token migration
 			if (sentToZeroAddress) {
 				movementDetails.push(
-					"Note: Tokens sent to the zero address might indicate a token migration or upgrade. The creator might still hold the new token variant.",
+					'Note: tokens sent to the zero address usually indicate a token migration to a DEX-traded "graduated" token; the creator might still hold the new token variant. You should check!',
 				);
 			}
 
-			result.creatorTokenMovementDetails = movementDetails.join("; ");
+			result.creatorTokenMovementDetails = movementDetails.join(" ");
 			console.log(
 				`- Token movement details: ${result.creatorTokenMovementDetails}`,
 			);
