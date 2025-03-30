@@ -94,8 +94,8 @@ async function callOpenRouter(model: string, prompt: string): Promise<string> {
 	// Read the full response body once
 	const responseBodyText = await response.text();
 
+	// Check if the response is not even valid HTTP
 	if (!response.ok) {
-		// Log the full response body on HTTP error
 		console.error(
 			`OpenRouter API error response body for ${model}: ${responseBodyText}`,
 		);
@@ -104,6 +104,36 @@ async function callOpenRouter(model: string, prompt: string): Promise<string> {
 		);
 	}
 
+	// First check if the response contains an embedded error
+	const jsonResponse = JSON.parse(responseBodyText);
+
+	// Check for embedded provider errors (OpenRouter can return 200 with embedded error)
+	if (jsonResponse.error) {
+		const errorCode = jsonResponse.error.code;
+
+		// Handle rate limit errors specifically
+		if (errorCode === 429) {
+			console.warn("Rate limit exceeded (error 429).");
+			throw new Error("Rate limit exceeded (error 429).");
+		}
+
+		// Handle other embedded errors
+		const errorMessage = jsonResponse.error.message || "Unknown error";
+		console.error(`Provider error for model ${model}: ${errorMessage}`);
+		throw new Error(`Provider error (${errorCode}): ${errorMessage}`);
+	}
+
+	// If we have valid data with choices, return it directly
+	if (
+		jsonResponse.choices &&
+		Array.isArray(jsonResponse.choices) &&
+		jsonResponse.choices.length > 0 &&
+		jsonResponse.choices[0]?.message?.content
+	) {
+		return jsonResponse.choices[0].message.content;
+	}
+
+	// Continue with the normal flow for valid responses that need sanitization
 	// Add better error handling
 	let data: OpenRouterResponse;
 	try {
@@ -112,17 +142,13 @@ async function callOpenRouter(model: string, prompt: string): Promise<string> {
 		data = JSON.parse(sanitizedResponse);
 	} catch (parseError) {
 		// Log the full response body on JSON parse error
-		console.error(
-			`Failed to parse JSON response from ${model}: ${responseBodyText}`,
-		);
+		console.error(`Failed to parse JSON response from ${model}`);
 		throw new Error(`Failed to parse JSON response from ${model}.`);
 	}
 
 	if (!data) {
 		// Log the full response body if data is unexpectedly empty after parsing
-		console.error(
-			`Empty parsed data from model ${model}. Original response: ${responseBodyText}`,
-		);
+		console.error(`Empty parsed data from model ${model}`);
 		throw new Error(`Empty response from model ${model}`);
 	}
 
@@ -132,17 +158,13 @@ async function callOpenRouter(model: string, prompt: string): Promise<string> {
 		data.choices.length === 0
 	) {
 		// Log the full response body if choices are missing
-		console.error(
-			`No choices in response from model ${model}: ${responseBodyText}`,
-		);
+		console.error(`No choices in response from model ${model}`);
 		throw new Error(`No choices in response from model ${model}.`);
 	}
 
 	if (!data.choices[0]?.message?.content) {
 		// Log the full response body if message content is missing
-		console.error(
-			`No message content in response from model ${model}: ${responseBodyText}`,
-		);
+		console.error(`No message content in response from model ${model}`);
 		throw new Error(`No message content in response from model ${model}.`);
 	}
 
@@ -197,7 +219,7 @@ export async function analyzeLaunch(
 			return validatedData;
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
-			console.error(`Error with model ${model}:`, err.message);
+			// console.error(`Error with model ${model}:`, err.message);
 			// Store the error along with the model and potentially the response text
 			errors.push({
 				model,
