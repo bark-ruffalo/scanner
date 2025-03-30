@@ -399,7 +399,6 @@ export async function getEvmErc20BalanceAtBlock(
 	const blockDescription = blockNumber
 		? `at block ${blockNumber}`
 		: `at latest block ${await client.getBlockNumber()}`;
-	console.log(`Fetching creator's balance ${blockDescription}...`);
 	try {
 		const contractArgs: {
 			address: Address;
@@ -423,12 +422,21 @@ export async function getEvmErc20BalanceAtBlock(
 
 		// Handle type conversion with proper guards
 		if (typeof balance === "bigint") {
+			// Log both WEI and ETH values with block number
+			console.log(
+				`Balance fetched at block ${blockNumber || "latest"}: ${balance} WEI (${formatUnits(balance, 18)} ETH)`,
+			);
 			return balance;
 		}
 
 		if (typeof balance === "string" || typeof balance === "number") {
 			// Convert string/number to bigint
-			return BigInt(balance);
+			const balanceBigInt = BigInt(balance);
+			// Log both WEI and ETH values with block number
+			console.log(
+				`Balance fetched at block ${blockNumber || "latest"}: ${balanceBigInt} WEI (${formatUnits(balanceBigInt, 18)} ETH)`,
+			);
+			return balanceBigInt;
 		}
 
 		// If it's neither bigint nor string/number, return 0n as a safe fallback
