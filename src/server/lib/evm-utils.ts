@@ -69,11 +69,11 @@ const KNOWN_LOCK_ADDRESSES: Record<string, string> = {
 // Define common addresses associated with selling
 const KNOWN_DEX_ADDRESSES: Record<string, string> = {
 	// Base
-	"0xf7defc9ac570518cfc88a8a278cb4c8190ee95a3": "VP Pair Address", // pair address
 	"0x743f2f29cdd66242fb27d292ab2cc92f45674635": "Sigma.Win Sniper",
-	"0x8292b43ab73efac11faf357419c38acf448202c5": "VP Approval Address",
+	"0x8292b43ab73efac11faf357419c38acf448202c5":
+		"Virtuals Protocol Approval Address", // TODO: in the future, this might be used to track if the creator is planning to sell
 	// Special handling for dynamic VP pair addresses added by virtuals-base.ts
-	__VP_PAIR_ADDRESS__: "Virtuals Protocol Pair", // This is a placeholder that will be replaced at runtime
+	__VP_PAIR_ADDRESS__: "Virtuals Protocol token's bonding curve", // This is a placeholder that will be replaced at runtime
 
 	// Common routers across networks
 	"0x1111111254eeb25477b68fb85ed929f73a960582": "1inch Router",
