@@ -297,6 +297,9 @@ export async function analyzeLaunch(
 			// Validate against our schema
 			const validatedData = analysisSchema.parse(parsedData);
 			console.log(`Successfully analyzed launch with model: ${model}`);
+			console.log(
+				`Analysis rating: ${validatedData.rating}, Summary: ${validatedData.summary}`,
+			);
 
 			return validatedData;
 		} catch (error) {
