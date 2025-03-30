@@ -4,6 +4,7 @@
 import { sql } from "drizzle-orm";
 import {
 	bigint,
+	boolean,
 	check,
 	index,
 	integer,
@@ -18,9 +19,9 @@ import { env } from "~/env";
 
 // Log which table prefix will be used based on the environment
 const isDevelopment = env.NODE_ENV === "development";
-console.log(
-	`Database tables will use the "${isDevelopment ? "dev_scanner_" : "scanner_"}" prefix because the app is running in ${isDevelopment ? "development" : "production"} mode (NODE_ENV=${env.NODE_ENV}).`,
-);
+// console.log(
+// 	`Database tables will use the "${isDevelopment ? "dev_scanner_" : "scanner_"}" prefix because the app is running in ${isDevelopment ? "development" : "production"} mode (NODE_ENV=${env.NODE_ENV}).`,
+// );
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -69,6 +70,8 @@ export const launches = createTable(
 			precision: 78, // Maximum precision for PostgreSQL numeric type
 			scale: 0, // No decimal places needed for token amounts
 		}),
+		// Add a flag to track if tokens were sent to the zero address (burned)
+		sentToZeroAddress: boolean("sent_to_zero_address").default(false).notNull(),
 		launchedAt: timestamp("launched_at")
 			.default(sql`CURRENT_TIMESTAMP`)
 			.notNull(),

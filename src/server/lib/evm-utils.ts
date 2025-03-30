@@ -281,7 +281,7 @@ export async function updateEvmTokenStatistics(
 			const movementDetails: string[] = [];
 
 			// Track if any tokens were sent to the zero address (burn)
-			// let sentToZeroAddress = false; // TODO: find the new token address, update the launch, etc.
+			let sentToZeroAddress = false; // TODO: find the new token address, update the launch, etc.
 
 			for (const transfer of significantTransfers) {
 				if (!transfer) continue;
@@ -292,9 +292,9 @@ export async function updateEvmTokenStatistics(
 				// Handle zero address (token burn)
 				if (to.toLowerCase() === "0x0000000000000000000000000000000000000000") {
 					movementDetails.push(
-						`Burned ${formattedValue} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX. The creator might still hold the new token variant; investors should check!`,
+						`Burned ${formattedValue} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX with a new token address. The creator might still hold the new token; investors should check!`,
 					);
-					// sentToZeroAddress = true;
+					sentToZeroAddress = true; // Set the flag when burn detected
 					continue;
 				}
 
@@ -342,6 +342,10 @@ export async function updateEvmTokenStatistics(
 			}
 
 			result.creatorTokenMovementDetails = movementDetails.join(" ");
+			// Add the flag to the result if tokens were sent to zero address
+			if (sentToZeroAddress) {
+				result.sentToZeroAddress = true;
+			}
 			console.log(
 				`- Token movement details: ${result.creatorTokenMovementDetails}`,
 			);

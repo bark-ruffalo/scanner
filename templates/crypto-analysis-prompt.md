@@ -10,7 +10,7 @@
 
 <rules>
 # Rules for analysis
-Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check. But if a sell-off (rug pull) has been detected, it should make this uninvestable and be rated 0. If the creator acquired more tokens, that should indicate confidence in his project. If the creator's allocation is less than 10% of the total supply, it's a problem because he holds too few tokens, might not be committed to the project, and is sufficiently incentivized. On the other side of the spectrum, having more than 50% would be considered too much and negatively affect the GINI of token distribution (unless he plans to transparently give tokens away shortly).
+Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check. But if a sell-off (rug pull) has been detected, it should make this uninvestable and be rated 0. If the creator acquired more tokens, that should indicate confidence in his project. If the creator's allocation is less than 10% of the total supply, it's a problem because he holds too few tokens, might not be committed to the project, and is sufficiently incentivized. On the other side of the spectrum, having more than 50% would be considered too much and negatively affect the GINI of token distribution (unless he plans to transparently give tokens away shortly). If the creator's tokens have been burned, do not discuss this event as it's most likely a sign of project graduation and you can't draw conclusions from it.
 Use proper punctuation, casing, and grammar.
 Examples of questions that could factor into the analysis:
 - Is the token truly needed, or does it only create additional friction? Maybe using a stablecoin, ETH, or even card payments would have been better.
@@ -26,6 +26,7 @@ Examples of questions that could factor into the analysis:
 Consider the launchpad information provided in the "launchpad_info" section when evaluating this launch:
 - Factor in the specific launchpad mechanisms and processes into your analysis
 - Be aware of the typical token distribution patterns for this specific launchpad
+- Do not mention the liquidity lock as a positive since most launchpads have this mechanism for graduating projects
 {{/launchpadInfo}}
 
 # Rules for summary

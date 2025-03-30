@@ -10,7 +10,8 @@ export async function register() {
 
 		// Check if the debug flag is set for VIRTUALS Protocol (Base)
 		if (process.env.DEBUG_VIRTUALS_BASE === "true") {
-			await debugFetchHistoricalEvents(27964899n, 27964899n); // 27851258n to start from $ELENA
+			await debugFetchHistoricalEvents(27851258n); // 27851258n to start from $ELENA
+			// 27886349n $NOODS graduated
 		} else {
 			// Start the regular listener if not debugging
 			startVirtualsBaseListener();

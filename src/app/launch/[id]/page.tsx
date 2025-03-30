@@ -130,25 +130,31 @@ export default async function LaunchDetailPage({ params }: Props) {
 				</div>
 
 				{/* Token Statistics Section */}
-				{(launch.creatorTokenHoldingPercentage || launch.creatorTokensHeld) && (
+				{(launch.creatorTokenHoldingPercentage ||
+					launch.creatorTokensHeld ||
+					launch.sentToZeroAddress) && (
 					<div className="mb-8 rounded-lg bg-gray-50 p-6 dark:bg-gray-800">
 						<div className="flex flex-col gap-1">
-							<p>
-								{launch.creatorTokenHoldingPercentage && (
-									<>
-										{Math.round(Number(launch.creatorTokenHoldingPercentage))}%
-										of the initial token allocation is held by the creator
-										{launch.creatorTokensHeld && (
-											<>
-												{" "}
-												({Number(launch.creatorTokensHeld).toLocaleString()}{" "}
-												tokens)
-											</>
-										)}
-										.
-									</>
-								)}
-							</p>
+							{launch.sentToZeroAddress ? (
+								<p>Creator token holdings: unknown</p>
+							) : (
+								<p>
+									{launch.creatorTokenHoldingPercentage && (
+										<>
+											{Math.round(Number(launch.creatorTokenHoldingPercentage))}
+											% of the initial token allocation is held by the creator
+											{launch.creatorTokensHeld && (
+												<>
+													{" "}
+													({Number(launch.creatorTokensHeld).toLocaleString()}{" "}
+													tokens)
+												</>
+											)}
+											.
+										</>
+									)}
+								</p>
+							)}
 							{launch.creatorTokenMovementDetails && (
 								<p className="mt-2">{launch.creatorTokenMovementDetails}</p>
 							)}

@@ -293,6 +293,7 @@ export interface TokenUpdateResult {
 	tokenStatsUpdatedAt: Date;
 	creatorTokenMovementDetails?: string;
 	mainSellingAddress?: string;
+	sentToZeroAddress?: boolean;
 }
 
 /**
@@ -312,6 +313,7 @@ export async function updateTokenStatisticsInDb(
 			creatorTokenHoldingPercentage: tokenStats.creatorTokenHoldingPercentage,
 			creatorTokenMovementDetails: tokenStats.creatorTokenMovementDetails,
 			tokenStatsUpdatedAt: tokenStats.tokenStatsUpdatedAt,
+			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,
 			updatedAt: new Date(),
 		})
 		.where(eq(launches.id, launchId));

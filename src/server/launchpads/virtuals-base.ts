@@ -310,6 +310,25 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		);
 
 		// --- Construct Comprehensive Description ---
+		// Determine the display text for recent developments based on the burn flag
+		let recentDevelopmentsText = "";
+		if (tokenStats.sentToZeroAddress) {
+			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: unknown${
+				tokenStats.creatorTokenMovementDetails
+					? `\n${tokenStats.creatorTokenMovementDetails}`
+					: ""
+			}`;
+		} else if (
+			finalCurrentBalance !== creatorInitialBalance &&
+			isHistoricalEvent
+		) {
+			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
+				tokenStats.creatorTokenMovementDetails
+					? `\n${tokenStats.creatorTokenMovementDetails}`
+					: ""
+			}`;
+		}
+
 		// Access tuple elements by index for description
 		const description = `
 # ${tokenName}
@@ -324,15 +343,10 @@ Token symbol: $${tokenSymbol}
 Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
-Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)${
-			finalCurrentBalance !== creatorInitialBalance
-				? `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
-						tokenStats.creatorTokenMovementDetails
-							? `\n${tokenStats.creatorTokenMovementDetails}`
-							: ""
-					}`
-				: ""
-		}
+Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)
+${
+	recentDevelopmentsText // Use the dynamically generated text
+}
 
 ## Creator info
 Creator address: ${getAddress(creator)}
@@ -365,6 +379,8 @@ YouTube: ${youtube || "N/A"}
 			mainSellingAddress: getAddress(pair),
 			// Use the token stats we already have
 			...tokenStats,
+			// Explicitly include sentToZeroAddress flag from tokenStats
+			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(
