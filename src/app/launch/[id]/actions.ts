@@ -3,8 +3,11 @@
 import { revalidatePath } from "next/cache";
 import { http, type Chain, type Transport, createPublicClient } from "viem";
 import { base } from "viem/chains";
-import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
-import { updateTokenStatisticsInDb } from "~/server/queries";
+import {
+	addKnownEvmSellingAddress,
+	updateEvmTokenStatistics,
+} from "~/server/lib/evm-utils";
+import { getLaunchById, updateTokenStatisticsInDb } from "~/server/queries";
 // Create a public client for Base network with explicit typing
 const publicClient = createPublicClient<Transport, Chain>({
 	chain: base,
@@ -25,11 +28,39 @@ export async function updateTokenHoldings(
 	creatorInitialTokens: string,
 ) {
 	try {
+		// Get the current launch data from the database
+		const launch = await getLaunchById(launchId);
+		if (!launch) {
+			console.error(`Launch with ID ${launchId} not found`);
+			return;
+		}
+
+		// If the creator already has less than 80% of their initial allocation, skip the update
+		const currentPercentage = Number(
+			launch.creatorTokenHoldingPercentage || "100",
+		);
+		if (currentPercentage < 80) {
+			console.log(
+				`Creator has already sold more than 20% of tokens (currently holds ${currentPercentage}%). Skipping token stats update.`,
+			);
+			return;
+		}
+
+		// Register the main selling address if it exists
+		if (launch.mainSellingAddress) {
+			addKnownEvmSellingAddress(
+				launch.mainSellingAddress as `0x${string}`,
+				"Launch-specific Selling Address",
+			);
+		}
+
 		const tokenStats = await updateEvmTokenStatistics(
 			publicClient,
 			tokenAddress as `0x${string}`,
 			creatorAddress as `0x${string}`,
 			creatorInitialTokens,
+			undefined,
+			launch.mainSellingAddress as `0x${string}` | undefined,
 		);
 
 		await updateTokenStatisticsInDb(launchId, tokenStats);

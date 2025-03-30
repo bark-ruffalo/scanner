@@ -272,6 +272,7 @@ export interface TokenUpdateResult {
 	creatorTokenHoldingPercentage: string;
 	tokenStatsUpdatedAt: Date;
 	creatorTokenMovementDetails?: string;
+	mainSellingAddress?: string;
 }
 
 /**

@@ -308,6 +308,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			creator,
 			formattedInitialBalance,
 			finalCurrentBalance, // Pass the current balance we already fetched
+			pair, // Pass the pair address as the launch-specific selling address
 		);
 
 		// --- Construct Comprehensive Description ---
@@ -362,6 +363,8 @@ YouTube: ${youtube || "N/A"}
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
+			// Store the pair address for future token movement detection
+			mainSellingAddress: getAddress(pair),
 			// Use the token stats we already have
 			...tokenStats,
 			// summary/analysis are left for potential future LLM processing

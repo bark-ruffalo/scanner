@@ -51,6 +51,9 @@ export const launches = createTable(
 		creatorTokenMovementDetails: varchar("creator_token_movement_details", {
 			length: 1024,
 		}),
+		mainSellingAddress: varchar("main_selling_address", {
+			length: 256, // Long enough for any blockchain address including Solana
+		}),
 		totalTokenSupply: numeric("total_token_supply", {
 			precision: 78, // Maximum precision for PostgreSQL numeric type
 			scale: 0, // No decimal places needed for token amounts

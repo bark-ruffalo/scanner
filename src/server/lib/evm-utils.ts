@@ -111,6 +111,7 @@ interface ReadContractClient {
  * @param creatorAddress - The creator's address
  * @param creatorInitialTokens - The creator's initial token allocation (as a string)
  * @param currentBalanceBigInt - Optional pre-fetched current balance (as bigint)
+ * @param launchPairAddress - Optional launch-specific selling address
  * @returns TokenUpdateResult containing the updated token statistics
  */
 export async function updateEvmTokenStatistics(
@@ -119,10 +120,19 @@ export async function updateEvmTokenStatistics(
 	creatorAddress: Address,
 	creatorInitialTokens: string,
 	currentBalanceBigInt?: bigint,
+	launchPairAddress?: Address,
 ): Promise<TokenUpdateResult> {
 	console.log(`Updating EVM token statistics for token ${tokenAddress}:`);
 	console.log(`- Creator address: ${creatorAddress}`);
 	console.log(`- Initial tokens: ${creatorInitialTokens}`);
+
+	// Add the launch pair address to known selling addresses if provided
+	if (launchPairAddress) {
+		addKnownEvmSellingAddress(
+			launchPairAddress,
+			"Launch-specific Selling Address",
+		);
+	}
 
 	// Get current balance from blockchain if not provided
 	const currentBalanceWei =
@@ -155,6 +165,8 @@ export async function updateEvmTokenStatistics(
 		creatorTokensHeld: roundedCurrentTokens,
 		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
 		tokenStatsUpdatedAt: new Date(),
+		// Store the launch-specific selling address if provided
+		mainSellingAddress: launchPairAddress ? launchPairAddress : undefined,
 	};
 
 	// Only analyze token movement if creator has at least 1% less than initial allocation
@@ -267,11 +279,23 @@ export async function updateEvmTokenStatistics(
 
 			const movementDetails: string[] = [];
 
+			// Track if any tokens were sent to the zero address (burn)
+			let sentToZeroAddress = false;
+
 			for (const transfer of significantTransfers) {
 				if (!transfer) continue;
 
 				const { to, value, transactionHash } = transfer;
 				const formattedValue = Number(formatUnits(value, 18)).toFixed(2);
+
+				// Handle zero address (token burn)
+				if (to.toLowerCase() === "0x0000000000000000000000000000000000000000") {
+					movementDetails.push(
+						`Burned ${formattedValue} tokens (sent to address 0x0 - might be token migration)`,
+					);
+					sentToZeroAddress = true;
+					continue;
+				}
 
 				// Check if destination is a known lock contract
 				const isKnownLock = Object.entries(KNOWN_LOCK_ADDRESSES).find(
@@ -288,9 +312,17 @@ export async function updateEvmTokenStatistics(
 						([address]) => address.toLowerCase() === to.toLowerCase(),
 					);
 
-					if (isKnownDex) {
+					// Also check if it matches the launch-specific pair address
+					const isLaunchPair =
+						launchPairAddress &&
+						to.toLowerCase() === launchPairAddress.toLowerCase();
+
+					if (isKnownDex || isLaunchPair) {
+						const dexName = isKnownDex
+							? isKnownDex[1]
+							: "Launch-specific Selling Address";
 						movementDetails.push(
-							`Sold ${formattedValue} tokens through ${isKnownDex[1]} (${to})`,
+							`Sold ${formattedValue} tokens through ${dexName} (${to})`,
 						);
 					} else {
 						// Check if destination is any contract
@@ -306,6 +338,13 @@ export async function updateEvmTokenStatistics(
 						}
 					}
 				}
+			}
+
+			// If tokens were sent to zero address, add a note about potential token migration
+			if (sentToZeroAddress) {
+				movementDetails.push(
+					"Note: Tokens sent to the zero address might indicate a token migration or upgrade. The creator might still hold the new token variant.",
+				);
 			}
 
 			result.creatorTokenMovementDetails = movementDetails.join("; ");
