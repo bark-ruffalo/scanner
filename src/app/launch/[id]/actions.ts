@@ -125,3 +125,52 @@ export async function updateTokenHoldings(
 		}
 	}
 }
+
+/**
+ * Performs LLM analysis for a launch in the background
+ * @param launchId The ID of the launch to analyze
+ */
+export async function performLlmAnalysis(launchId: number) {
+	try {
+		// Get the current launch data from the database
+		const launch = await getLaunchById(launchId);
+		if (!launch) {
+			console.error(`Launch with ID ${launchId} not found`);
+			return;
+		}
+
+		// Simulate a delay to show loading state (in production you'd remove this)
+		await new Promise((resolve) => setTimeout(resolve, 2000));
+
+		// Perform the actual analysis
+		const analysisResult = await analyzeLaunch(
+			launch.description,
+			launch.launchpad,
+		);
+
+		// Update the database with new analysis
+		await updateLaunchAnalysis(launchId, {
+			description: launch.description, // Keep existing description
+			analysis: analysisResult.analysis,
+			summary: analysisResult.summary,
+			rating: analysisResult.rating,
+			llmAnalysisUpdatedAt: new Date(),
+		});
+
+		console.log(
+			`Analysis completed for launch ${launchId} with rating: ${analysisResult.rating}/10`,
+		);
+
+		// Revalidate the page to show updated data
+		revalidatePath(`/launch/${launchId}`, "page");
+
+		return analysisResult;
+	} catch (error) {
+		console.error("Error during launch analysis:", error);
+		if (error instanceof Error) {
+			console.error("Error message:", error.message);
+			console.error("Error stack:", error.stack);
+		}
+		return null;
+	}
+}

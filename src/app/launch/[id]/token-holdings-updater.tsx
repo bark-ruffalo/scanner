@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { updateTokenHoldings } from "./actions";
+import { BackgroundProcessIndicator } from "./background-process-indicator";
 
 interface TokenHoldingsUpdaterProps {
 	launchId: number;
@@ -17,6 +18,8 @@ export function TokenHoldingsUpdater({
 	creatorInitialTokens,
 }: TokenHoldingsUpdaterProps) {
 	const [hasUpdated, setHasUpdated] = useState(false);
+	const [isUpdating, setIsUpdating] = useState(false);
+	const [updateComplete, setUpdateComplete] = useState(false);
 
 	useEffect(() => {
 		// Check if we've updated recently (localStorage persists across page refreshes)
@@ -32,6 +35,8 @@ export function TokenHoldingsUpdater({
 		const shouldUpdate = currentTime - lastUpdateTime > 60 * 60 * 1000;
 
 		if (shouldUpdate && !hasUpdated) {
+			setIsUpdating(true);
+
 			updateTokenHoldings(
 				launchId,
 				tokenAddress,
@@ -45,8 +50,17 @@ export function TokenHoldingsUpdater({
 						currentTime.toString(),
 					);
 					setHasUpdated(true);
+					setUpdateComplete(true);
+
+					// Refresh the page to show updated data
+					setTimeout(() => {
+						window.location.reload();
+					}, 1000);
 				})
-				.catch(console.error);
+				.catch((error) => {
+					console.error(error);
+					setIsUpdating(false);
+				});
 		}
 	}, [
 		launchId,
@@ -56,5 +70,18 @@ export function TokenHoldingsUpdater({
 		hasUpdated,
 	]);
 
-	return null;
+	const handleTokenStatsComplete = () => {
+		// Wait briefly before changing UI state
+		setTimeout(() => {
+			setUpdateComplete(true);
+		}, 500);
+	};
+
+	return (
+		<BackgroundProcessIndicator
+			processType="tokenStats"
+			isActive={isUpdating}
+			onComplete={handleTokenStatsComplete}
+		/>
+	);
 }

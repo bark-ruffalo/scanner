@@ -12,6 +12,7 @@ import {
 	getLaunchMetadata,
 	updateLaunchAnalysis,
 } from "~/server/queries";
+import { LlmAnalysisUpdater } from "./llm-analysis-updater";
 import { TokenHoldingsUpdater } from "./token-holdings-updater";
 
 type Props = {
@@ -50,37 +51,16 @@ export default async function LaunchDetailPage({ params }: Props) {
 		launch.summary === "-" ||
 		launch.rating === -1;
 
+	// Only trigger analysis on the server side for initial page load
+	// Client-side component will handle loading UI
 	if (needsAnalysis) {
 		try {
 			console.log(
-				`Launch ${launchId} missing LLM responses. Triggering analysis...`,
+				`Launch ${launchId} missing LLM responses. Queuing analysis...`,
 			);
-			const analysisResult = await analyzeLaunch(
-				launch.description,
-				launch.launchpad,
-			);
-
-			// Update the database with new analysis
-			await updateLaunchAnalysis(launchId, {
-				description: launch.description, // Keep existing description
-				analysis: analysisResult.analysis,
-				summary: analysisResult.summary,
-				rating: analysisResult.rating,
-				llmAnalysisUpdatedAt: new Date(),
-			});
-
-			// Update the launch object with new analysis for rendering
-			launch.analysis = analysisResult.analysis;
-			launch.summary = analysisResult.summary;
-			launch.rating = analysisResult.rating;
-			launch.llmAnalysisUpdatedAt = new Date();
-
-			console.log(
-				`Analysis completed for launch ${launchId} with rating: ${analysisResult.rating}/10`,
-			);
+			// We'll move the actual analysis to a background process shown by LlmAnalysisUpdater
 		} catch (error) {
 			console.error("Error during launch analysis:", error);
-			// Continue with existing data if analysis fails
 		}
 	}
 
@@ -99,8 +79,21 @@ export default async function LaunchDetailPage({ params }: Props) {
 	const creatorAddress = creatorMatch?.[1];
 	const creatorInitialTokens = initialTokensMatch?.[1]?.replace(/,/g, "");
 
+	// Process ID for background tasks
+	const processId = `${launchId}-${Date.now()}`;
+
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
+			{/* Background Processing Indicators */}
+			<div className="container mx-auto mb-4">
+				<Suspense fallback={null}>
+					<LlmAnalysisUpdater
+						launchId={launch.id}
+						needsAnalysis={needsAnalysis}
+					/>
+				</Suspense>
+			</div>
+
 			{tokenAddress && creatorAddress && creatorInitialTokens && (
 				<Suspense fallback={null}>
 					<TokenHoldingsUpdater
