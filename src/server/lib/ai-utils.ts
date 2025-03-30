@@ -7,11 +7,15 @@ import { env } from "~/env";
 // LLM models to try in order
 // Link for reference: https://lmarena.ai/?leaderboard
 const LLM_MODELS = [
+	"deepseek/deepseek-r1",
+	"openai/gpt-4o-mini",
 	"google/gemini-2.5-pro-exp-03-25:free",
 	"google/gemini-2.0-pro-exp-02-05:free",
 	"google/gemini-2.0-flash-thinking-exp:free",
 	"google/gemini-2.0-flash-thinking-exp-1219:free",
 	"google/gemini-2.0-flash-exp:free",
+	"deepseek/deepseek-v3-base:free",
+	"qwen/qwen2.5-vl-32b-instruct:free",
 ];
 
 // Define the output schema for response validation
