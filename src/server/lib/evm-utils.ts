@@ -61,7 +61,25 @@ const KNOWN_LOCK_ADDRESSES: Record<string, string> = {
 	"0x100cc9618a91f242ea6f374bea9ef4e979b6a78a": "Team.Finance",
 	"0x663a5c229c09b049e36dcc11a9dd1d8062d7595f": "UniCrypt",
 	"0xf4c8e32eadec4bfe97e0f595add0f4450a863a11": "DxLock",
+	"0xdad686299fb562f89e55da05f1d96fabeb2a2e32":
+		"Virtuals Protocol 6-Month Lock",
 	// Add more as needed
+};
+
+// Define common addresses associated with selling
+const KNOWN_DEX_ADDRESSES: Record<string, string> = {
+	// Base
+	"0xf7defc9ac570518cfc88a8a278cb4c8190ee95a3": "VP Pair Address", // pair address
+	"0x743f2f29cdd66242fb27d292ab2cc92f45674635": "Sigma.Win Sniper",
+	"0x8292b43ab73efac11faf357419c38acf448202c5": "VP Approval Address",
+	// Special handling for dynamic VP pair addresses added by virtuals-base.ts
+	__VP_PAIR_ADDRESS__: "Virtuals Protocol Pair", // This is a placeholder that will be replaced at runtime
+
+	// Common routers across networks
+	"0x1111111254eeb25477b68fb85ed929f73a960582": "1inch Router",
+	"0x7a250d5630b4cf539739df2c5dacb4c659f2488d": "Uniswap V2 Router",
+	"0xe592427a0aece92de3edee1f18e0157c05861564": "Uniswap V3 Router",
+	"0xdef1c0ded9bec7f1a1670819833240f027b25eff": "0x Exchange Proxy",
 };
 
 // Define a type for Transfer event args
@@ -265,16 +283,27 @@ export async function updateEvmTokenStatistics(
 						`Locked ${formattedValue} tokens in ${isKnownLock[1]} (${to})`,
 					);
 				} else {
-					// Check if destination is a DEX router or LP contract
-					const isContract = await isDestinationContract(client, to);
-					if (isContract) {
+					// Check if destination is a known DEX router
+					const isKnownDex = Object.entries(KNOWN_DEX_ADDRESSES).find(
+						([address]) => address.toLowerCase() === to.toLowerCase(),
+					);
+
+					if (isKnownDex) {
 						movementDetails.push(
-							`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity)`,
+							`Sold ${formattedValue} tokens through ${isKnownDex[1]} (${to})`,
 						);
 					} else {
-						movementDetails.push(
-							`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet)`,
-						);
+						// Check if destination is any contract
+						const isContract = await isDestinationContract(client, to);
+						if (isContract) {
+							movementDetails.push(
+								`Transferred ${formattedValue} tokens to contract ${to} (possibly sold or added liquidity)`,
+							);
+						} else {
+							movementDetails.push(
+								`Transferred ${formattedValue} tokens to address ${to} (possibly to another wallet)`,
+							);
+						}
 					}
 				}
 			}
@@ -376,5 +405,24 @@ export async function getEvmErc20BalanceAtBlock(
 			error,
 		);
 		return 0n;
+	}
+}
+
+/**
+ * Adds a Virtuals Protocol pair address to the KNOWN_DEX_ADDRESSES mapping
+ * @param pairAddress The pair contract address to add
+ */
+export function addVirtualsProtocolPair(pairAddress: Address): void {
+	if (!pairAddress) return;
+
+	// Normalize the address format (lowercase)
+	const normalizedAddress = pairAddress.toLowerCase();
+
+	// Add it to KNOWN_DEX_ADDRESSES if not already present
+	if (!KNOWN_DEX_ADDRESSES[normalizedAddress]) {
+		KNOWN_DEX_ADDRESSES[normalizedAddress] = "Virtuals Protocol Pair";
+		console.log(
+			`Added Virtuals Protocol pair address ${normalizedAddress} to KNOWN_DEX_ADDRESSES`,
+		);
 	}
 }

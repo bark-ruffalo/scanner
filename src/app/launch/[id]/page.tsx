@@ -102,6 +102,12 @@ export default async function LaunchDetailPage({ params }: Props) {
 									</>
 								)}
 							</p>
+							{launch.creatorTokenMovementDetails && (
+								<p className="mt-2">
+									<span className="text-gray-300">Token movements: </span>
+									{launch.creatorTokenMovementDetails}
+								</p>
+							)}
 							{launch.tokenStatsUpdatedAt && (
 								<p className="mt-2 text-gray-500 text-sm">
 									Creator token stats last updated:{" "}

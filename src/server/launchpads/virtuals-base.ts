@@ -15,6 +15,7 @@ import { base } from "viem/chains";
 import { env } from "~/env";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
 import {
+	addVirtualsProtocolPair,
 	getEvmErc20BalanceAtBlock,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
@@ -175,6 +176,9 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		return; // Skip processing if essential metadata is missing.
 	}
 
+	// Register the pair address as a known DEX address so that transfers to it are detected as token sells
+	addVirtualsProtocolPair(pair);
+
 	try {
 		// Fetch token info from factory and block info (for timestamp) concurrently
 		console.log(`[${token}] Fetching tokenInfo and block info...`);
@@ -292,6 +296,20 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Extract image URL
 		const imageUrl = image || null; // Use null if image string is empty
 
+		// Calculate the formatted initial balance for token statistics
+		const formattedInitialBalance = Math.round(
+			Number(formatUnits(creatorInitialBalance, 18)),
+		).toString();
+
+		// Get token statistics from updateEvmTokenStatistics
+		const tokenStats = await updateEvmTokenStatistics(
+			publicClient,
+			token,
+			creator,
+			formattedInitialBalance,
+			finalCurrentBalance, // Pass the current balance we already fetched
+		);
+
 		// --- Construct Comprehensive Description ---
 		// Access tuple elements by index for description
 		const description = `
@@ -309,7 +327,11 @@ Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation})${
 			finalCurrentBalance !== creatorInitialBalance
-				? `\nNumber of tokens still held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)`
+				? `\nNumber of tokens still held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
+						tokenStats.creatorTokenMovementDetails
+							? `\nToken movement details: ${tokenStats.creatorTokenMovementDetails}`
+							: ""
+					}`
 				: ""
 		}
 
@@ -331,11 +353,6 @@ Telegram: ${telegram || "N/A"}
 YouTube: ${youtube || "N/A"}
             `.trim();
 
-		// Calculate the formatted initial balance for token statistics
-		const formattedInitialBalance = Math.round(
-			Number(formatUnits(creatorInitialBalance, 18)),
-		).toString();
-
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
 		const launchData = {
 			launchpad: LAUNCHPAD_NAME,
@@ -345,14 +362,8 @@ YouTube: ${youtube || "N/A"}
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
-			// Use the balances we already have instead of fetching again
-			...(await updateEvmTokenStatistics(
-				publicClient,
-				token,
-				creator,
-				formattedInitialBalance,
-				finalCurrentBalance, // Pass the current balance we already fetched
-			)),
+			// Use the token stats we already have
+			...tokenStats,
 			// summary/analysis are left for potential future LLM processing
 		};
 		console.log(

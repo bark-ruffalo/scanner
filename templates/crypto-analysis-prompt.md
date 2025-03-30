@@ -4,7 +4,7 @@
 
 <rules>
 # Rules for analysis
-Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check.
+Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check. But if a sell-off has been detected, it should make this uninvestable and rated as 0.
 Use proper punctuation, casing and grammar.
 Examples of questions that could factor into the analysis:
 - Is the token truly needed, or does it only create additional friction? Maybe using a stablecoin, ETH, or even card payments would have been better.
@@ -21,6 +21,7 @@ Examples of questions that could factor into the analysis:
 - if it's a memecoin with no utility, you can simply output "memecoin"
 - if it seems to be a scam, you can simply output "scam"
 - if it's just trying to create the illusion of technological sophistication, you can output "technobabble"
+- if the creator sold more than 20% of the tokens, you should output "rug"
 - do not mention that a coin is speculative; since all investments are speculative, that wouldn't add value to the summary
 
 # Rules for rating
