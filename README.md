@@ -16,6 +16,7 @@ Live on: https://scanner.trulyadog.com
 - [x] Check if dev tokens have been sold or locked
 - [x] Modify db schema to also store for each launch if the creator still holds tokens
 - [x] Separate databases for production and development
+- [x] Add .md files for each launchpad with relevant information; they should be used in LLM calls
 - [ ] Add another crypto launchpad, but for Solana (SVM)
 - [ ] Add a traditional VC investing launchpad, where the listener of the class extracts information by crawling the launchpad website
 - [ ] Add Launchpad base class
