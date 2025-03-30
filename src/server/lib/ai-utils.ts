@@ -42,10 +42,46 @@ function renderTemplate(
 	);
 	const template = fs.readFileSync(templatePath, "utf-8");
 
+	// Process any launchpad-specific information if provided
+	const renderedTemplate = template;
+
+	if (variables.launchpad) {
+		// Try to load the launchpad template if it exists
+		try {
+			const launchpadTemplateMap: Record<string, string> = {
+				"VIRTUALS Protocol (Base)": "launchpads/virtuals-protocol",
+				"VIRTUALS Protocol (Solana)": "launchpads/virtuals-protocol",
+				// Add more mappings here as new launchpads are added
+			};
+
+			const launchpadTemplateName = launchpadTemplateMap[variables.launchpad];
+
+			if (launchpadTemplateName) {
+				const launchpadTemplatePath = path.join(
+					process.cwd(),
+					"templates",
+					`${launchpadTemplateName}.md`,
+				);
+
+				// Include launchpad information if the file exists
+				if (fs.existsSync(launchpadTemplatePath)) {
+					const launchpadTemplate = fs.readFileSync(
+						launchpadTemplatePath,
+						"utf-8",
+					);
+					variables.launchpadInfo = launchpadTemplate;
+				}
+			}
+		} catch (error) {
+			console.warn(`Failed to load launchpad template: ${error}`);
+			// Continue without the launchpad info if it can't be loaded
+		}
+	}
+
 	return Object.entries(variables).reduce(
 		(result, [key, value]) =>
 			result.replace(new RegExp(`{{${key}}}`, "g"), value),
-		template,
+		renderedTemplate,
 	);
 }
 
@@ -178,10 +214,12 @@ async function callOpenRouter(model: string, prompt: string): Promise<string> {
 /**
  * Analyzes a launch description, rates it, and creates a summary.
  * @param description The launch description text to analyze
+ * @param launchpad Optional launchpad name for including launchpad-specific information
  * @returns An object with analysis, rating, and summary fields
  */
 export async function analyzeLaunch(
 	description: string,
+	launchpad?: string,
 ): Promise<LaunchAnalysis> {
 	// Simple error tracking
 	const errors: { model: string; error: Error; responseText?: string }[] = [];
@@ -192,7 +230,14 @@ export async function analyzeLaunch(
 		try {
 			console.log(`Analyzing launch with model: ${model}`);
 
-			const prompt = renderTemplate("crypto-analysis-prompt", { description });
+			const variables: Record<string, string> = { description };
+
+			// Include launchpad information if provided
+			if (launchpad) {
+				variables.launchpad = launchpad;
+			}
+
+			const prompt = renderTemplate("crypto-analysis-prompt", variables);
 
 			// console.log(`Prompt for LLM: ${prompt}`);
 

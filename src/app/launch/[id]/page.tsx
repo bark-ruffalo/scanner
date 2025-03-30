@@ -55,7 +55,10 @@ export default async function LaunchDetailPage({ params }: Props) {
 			console.log(
 				`Launch ${launchId} missing LLM responses. Triggering analysis...`,
 			);
-			const analysisResult = await analyzeLaunch(launch.description);
+			const analysisResult = await analyzeLaunch(
+				launch.description,
+				launch.launchpad,
+			);
 
 			// Update the database with new analysis
 			await updateLaunchAnalysis(launchId, {

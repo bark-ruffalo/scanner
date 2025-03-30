@@ -101,7 +101,10 @@ export async function updateTokenHoldings(
 
 			// Trigger reanalysis with updated description
 			try {
-				const analysisResult = await analyzeLaunch(updatedDescription);
+				const analysisResult = await analyzeLaunch(
+					updatedDescription,
+					launch.launchpad,
+				);
 
 				// Update the database with new analysis using the DAL function
 				await updateLaunchAnalysis(launchId, {

@@ -2,6 +2,12 @@
 {{description}}
 </investment>
 
+{{#launchpadInfo}}
+<launchpad_info>
+{{launchpadInfo}}
+</launchpad_info>
+{{/launchpadInfo}}
+
 <rules>
 # Rules for analysis
 Do not jump to conclusions when you don't know if the tokens have been sold or locked. Simply remind the user to check. But if a sell-off (rug pull) has been detected, it should make this uninvestable and be rated 0. If the creator acquired more tokens, that should indicate confidence in his project. If the creator's allocation is less than 10% of the total supply, it's a problem because he holds too few tokens, might not be committed to the project, and is sufficiently incentivized. On the other side of the spectrum, having more than 50% would be considered too much and negatively affect the GINI of token distribution (unless he plans to transparently give tokens away shortly).
@@ -14,6 +20,13 @@ Examples of questions that could factor into the analysis:
 - Do the tokenomics make sense?
 - Is there a problem being solved? Does it add value? Would anyone pay for the solution?
 - Are the security risks acceptable?
+
+{{#launchpadInfo}}
+## Launchpad-specific considerations
+Consider the launchpad's information provided between launchpad_info tags when evaluating this launch:
+- Factor in the specific launchpad mechanisms and processes into your analysis
+- Be aware of the typical token distribution patterns for this specific launchpad
+{{/launchpadInfo}}
 
 # Rules for summary
 - do not sentence case (but do upper case properly otherwise, like "AI" instead of "ai"), and do not use punctuation at the end unless it's for a joke

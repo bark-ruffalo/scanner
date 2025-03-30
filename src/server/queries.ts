@@ -136,7 +136,10 @@ export async function addLaunch(launchData: NewLaunchData) {
 		if (needsAnalysis) {
 			try {
 				console.log("Analyzing launch description with AI...");
-				const analysisResult = await analyzeLaunch(launchData.description);
+				const analysisResult = await analyzeLaunch(
+					launchData.description,
+					launchData.launchpad,
+				);
 				console.log(`Analysis complete! Rating: ${analysisResult.rating}/10`);
 
 				// Enhance the data with AI-generated content
