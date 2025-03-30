@@ -22,8 +22,8 @@ Examples of questions that could factor into the analysis:
 - Are the security risks acceptable?
 
 {{#launchpadInfo}}
-## Launchpad-specific considerations
-Consider the launchpad's information provided between launchpad_info tags when evaluating this launch:
+# Launchpad-specific considerations
+Consider the launchpad information provided in the "launchpad_info" section when evaluating this launch:
 - Factor in the specific launchpad mechanisms and processes into your analysis
 - Be aware of the typical token distribution patterns for this specific launchpad
 {{/launchpadInfo}}
@@ -44,4 +44,4 @@ Consider the launchpad's information provided between launchpad_info tags when e
 - if it's a memecoin, be much more likely to rate it lower
 </rules>
 
-Analyze if the project between investment tags is good, then rate it as an investment opportunity from 0 to 10 and summarize it. Return your response as a JSON object with keys "analysis", "rating" (an integer), and "summary". For each of the three responses, respect the corresponding set of directives mentioned between the rules tags (analysis, summary, and rating, respectively).
+Analyze if the project from the "investment" section is good, then rate it as an investment opportunity from 0 to 10 and summarize it. Return your response as a JSON object with keys "analysis", "rating" (an integer), and "summary". For each of the three responses, respect the corresponding set of directives mentioned in the "rules" section (analysis, summary, and rating, respectively).

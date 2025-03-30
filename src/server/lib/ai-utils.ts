@@ -78,11 +78,44 @@ function renderTemplate(
 		}
 	}
 
-	return Object.entries(variables).reduce(
+	// Process template variables
+	let processedTemplate = Object.entries(variables).reduce(
 		(result, [key, value]) =>
 			result.replace(new RegExp(`{{${key}}}`, "g"), value),
 		renderedTemplate,
 	);
+
+	// Process Mustache-style conditionals
+	// Handle {{#variable}}content{{/variable}} blocks
+	for (const key in variables) {
+		const value = variables[key];
+		if (value) {
+			// If the variable exists and has content, remove the conditional tags but keep the content
+			const conditionalRegex = new RegExp(
+				`{{#${key}}}([\\s\\S]*?){{/${key}}}`,
+				"g",
+			);
+			processedTemplate = processedTemplate.replace(
+				conditionalRegex,
+				(_, content) => content,
+			);
+		} else {
+			// If the variable doesn't exist or is empty, remove the whole block including content
+			const conditionalRegex = new RegExp(
+				`{{#${key}}}[\\s\\S]*?{{/${key}}}`,
+				"g",
+			);
+			processedTemplate = processedTemplate.replace(conditionalRegex, "");
+		}
+	}
+
+	// Remove any remaining conditional blocks that weren't processed
+	processedTemplate = processedTemplate.replace(
+		/{{#\w+}}[\s\S]*?{{\/\w+}}/g,
+		"",
+	);
+
+	return processedTemplate;
 }
 
 /**
