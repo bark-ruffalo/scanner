@@ -61,6 +61,9 @@ export function LaunchProcessLoader({
 
 	// Handle Token Holdings Update
 	useEffect(() => {
+		// Create a consistent process identifier for this specific update
+		const tokenUpdateKey = `tokenUpdate-${launchId}-${tokenAddress}`;
+
 		if (
 			needsTokenUpdate &&
 			!processStates.tokenUpdate.hasStarted &&
@@ -68,6 +71,16 @@ export function LaunchProcessLoader({
 			creatorAddress &&
 			creatorInitialTokens
 		) {
+			// Check if an update is already in progress
+			const updateInProgress =
+				sessionStorage.getItem(tokenUpdateKey) === "running";
+			if (updateInProgress) {
+				console.log(
+					`Token update for launch ${launchId} already in progress, skipping`,
+				);
+				return;
+			}
+
 			// Check if we've updated recently (localStorage persists across page refreshes)
 			const lastUpdateTimeStr = localStorage.getItem(
 				`lastTokenUpdate-${launchId}`,
@@ -77,10 +90,13 @@ export function LaunchProcessLoader({
 				: 0;
 			const currentTime = Date.now();
 
-			// Only update if it's been more than 1 minute since the last update
-			const shouldUpdate = currentTime - lastUpdateTime > 1 * 60 * 1000;
+			// Increase the cooldown to 5 minutes to prevent frequent updates
+			const shouldUpdate = currentTime - lastUpdateTime > 5 * 60 * 1000;
 
 			if (shouldUpdate) {
+				// Mark as running in session storage
+				sessionStorage.setItem(tokenUpdateKey, "running");
+
 				setProcessStates((prev) => ({
 					...prev,
 					tokenUpdate: {
@@ -102,6 +118,8 @@ export function LaunchProcessLoader({
 							`lastTokenUpdate-${launchId}`,
 							currentTime.toString(),
 						);
+						// Clear the running status
+						sessionStorage.removeItem(tokenUpdateKey);
 					})
 					.catch((error) => {
 						console.error("Error updating token holdings:", error);
@@ -109,7 +127,22 @@ export function LaunchProcessLoader({
 							...prev,
 							tokenUpdate: { ...prev.tokenUpdate, isRunning: false },
 						}));
+						// Clear the running status on error too
+						sessionStorage.removeItem(tokenUpdateKey);
 					});
+			} else {
+				console.log(
+					`Skipping token update for launch ${launchId} - updated recently`,
+				);
+				// Skip the update process entirely
+				setProcessStates((prev) => ({
+					...prev,
+					tokenUpdate: {
+						isRunning: false,
+						isComplete: true,
+						hasStarted: true,
+					},
+				}));
 			}
 		}
 	}, [

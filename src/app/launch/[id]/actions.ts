@@ -40,7 +40,7 @@ export async function updateTokenHoldings(
 		);
 		if (currentPercentage < 80) {
 			console.log(
-				`Creator has already sold more than 20% of tokens (currently holds ${currentPercentage}%). Skipping token stats update.`,
+				`Creator already has 20% fewer tokens (currently holds ${currentPercentage}%). Skipping token stats update.`,
 			);
 			return;
 		}

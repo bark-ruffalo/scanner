@@ -24,22 +24,45 @@ export function BackgroundProcessIndicator({
 }: BackgroundProcessIndicatorProps) {
 	const [isComplete, setIsComplete] = useState(false);
 
+	// Track if this process has already been completed
+	const [hasCompleted, setHasCompleted] = useState(false);
+
 	useEffect(() => {
 		if (!isActive) {
 			setIsComplete(false);
 			return;
 		}
 
+		// Only trigger the completion timer once
+		if (hasCompleted) return;
+
+		// Use localStorage to ensure we don't run the same process twice
+		const processKey = `process-${processType}-${Date.now()}`;
+		if (localStorage.getItem(processKey)) return;
+
+		// Store that we've started this process
+		localStorage.setItem(processKey, "true");
+
 		// Simulate completion for demonstration purposes
 		// In real production, this would be triggered by the actual task completion
 		const duration = processType === "tokenStats" ? 5000 : 15000;
 		const timer = setTimeout(() => {
+			if (hasCompleted) return;
 			setIsComplete(true);
+			setHasCompleted(true);
 			onComplete?.();
+
+			// Clean up after 10 minutes
+			setTimeout(
+				() => {
+					localStorage.removeItem(processKey);
+				},
+				10 * 60 * 1000,
+			);
 		}, duration);
 
 		return () => clearTimeout(timer);
-	}, [isActive, processType, onComplete]);
+	}, [isActive, processType, onComplete, hasCompleted]);
 
 	const labels = {
 		tokenStats: "Updating token statistics...",
