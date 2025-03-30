@@ -409,20 +409,24 @@ export async function getEvmErc20BalanceAtBlock(
 }
 
 /**
- * Adds a Virtuals Protocol pair address to the KNOWN_DEX_ADDRESSES mapping
- * @param pairAddress The pair contract address to add
+ * Adds a selling address to the KNOWN_DEX_ADDRESSES mapping
+ * @param sellingAddress The address to add as a known selling destination
+ * @param label Optional custom label for the address, defaults to "DEX Pair Address"
  */
-export function addVirtualsProtocolPair(pairAddress: Address): void {
-	if (!pairAddress) return;
+export function addKnownEvmSellingAddress(
+	sellingAddress: Address,
+	label?: string,
+): void {
+	if (!sellingAddress) return;
 
 	// Normalize the address format (lowercase)
-	const normalizedAddress = pairAddress.toLowerCase();
+	const normalizedAddress = sellingAddress.toLowerCase();
 
 	// Add it to KNOWN_DEX_ADDRESSES if not already present
 	if (!KNOWN_DEX_ADDRESSES[normalizedAddress]) {
-		KNOWN_DEX_ADDRESSES[normalizedAddress] = "Virtuals Protocol Pair";
+		KNOWN_DEX_ADDRESSES[normalizedAddress] = label || "DEX Pair Address";
 		console.log(
-			`Added Virtuals Protocol pair address ${normalizedAddress} to KNOWN_DEX_ADDRESSES`,
+			`Added selling address ${normalizedAddress} to KNOWN_DEX_ADDRESSES as "${KNOWN_DEX_ADDRESSES[normalizedAddress]}"`,
 		);
 	}
 }

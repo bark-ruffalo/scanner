@@ -15,7 +15,7 @@ import { base } from "viem/chains";
 import { env } from "~/env";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
 import {
-	addVirtualsProtocolPair,
+	addKnownEvmSellingAddress,
 	getEvmErc20BalanceAtBlock,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
@@ -177,7 +177,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 	}
 
 	// Register the pair address as a known DEX address so that transfers to it are detected as token sells
-	addVirtualsProtocolPair(pair);
+	addKnownEvmSellingAddress(pair, "Virtuals Protocol Pair");
 
 	try {
 		// Fetch token info from factory and block info (for timestamp) concurrently
