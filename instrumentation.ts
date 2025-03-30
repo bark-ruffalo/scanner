@@ -8,16 +8,14 @@ export async function register() {
 		const { startVirtualsBaseListener, debugFetchHistoricalEvents } =
 			await import("./src/server/launchpads/virtuals-base");
 
-		// Check if the debug flag is set
+		// Check if the debug flag is set for VIRTUALS Protocol (Base)
 		if (process.env.DEBUG_VIRTUALS_BASE === "true") {
-			await debugFetchHistoricalEvents(27843805n, 27843805n); // Use await since it's async
+			await debugFetchHistoricalEvents(27964899n, 27964899n); // 27851258n to start from $ELENA
 		} else {
 			// Start the regular listener if not debugging
 			startVirtualsBaseListener();
 		}
 
 		// Potentially start other listeners here in the future
-		// const { startAnotherListener } = await import('./src/server/launchpads/another-launchpad');
-		// startAnotherListener();
 	}
 }
