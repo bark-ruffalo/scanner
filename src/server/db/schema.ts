@@ -14,6 +14,13 @@ import {
 	timestamp,
 	varchar,
 } from "drizzle-orm/pg-core";
+import { env } from "~/env";
+
+// Log which table prefix will be used based on the environment
+const isDevelopment = env.NODE_ENV === "development";
+console.log(
+	`Database tables will use the "${isDevelopment ? "dev_scanner_" : "scanner_"}" prefix because the app is running in ${isDevelopment ? "development" : "production"} mode (NODE_ENV=${env.NODE_ENV}).`,
+);
 
 /**
  * This is an example of how to use the multi-project schema feature of Drizzle ORM. Use the same
@@ -21,7 +28,11 @@ import {
  *
  * @see https://orm.drizzle.team/docs/goodies#multi-project-schema
  */
-export const createTable = pgTableCreator((name) => `scanner_${name}`);
+export const createTable = pgTableCreator((name) => {
+	// Use different table prefixes based on the environment
+	const prefix = isDevelopment ? "dev_scanner_" : "scanner_";
+	return `${prefix}${name}`;
+});
 
 // Define the 'launches' table
 export const launches = createTable(
