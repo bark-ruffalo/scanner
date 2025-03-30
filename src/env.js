@@ -14,6 +14,7 @@ export const env = createEnv({
 		BASE_RPC_URL: z.string().url().optional(),
 		OPENROUTER_API_KEY: z.string().min(1),
 		OPENROUTER_API_HOST: z.string().url(),
+		ADMIN_PASSWORD: z.string().min(8),
 	},
 
 	/**
@@ -35,6 +36,7 @@ export const env = createEnv({
 		BASE_RPC_URL: process.env.BASE_RPC_URL,
 		OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
+		ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
 	},
 	/**
