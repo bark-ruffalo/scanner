@@ -128,6 +128,11 @@ export async function addLaunch(launchData: NewLaunchData) {
 				creatorTokenHoldingPercentage: true,
 				creatorTokensHeld: true,
 				totalTokenSupply: true,
+				creatorInitialTokensHeld: true, // Get existing value
+				tokensForSale: true, // Get existing value
+				// Get existing addresses
+				creatorAddress: true,
+				tokenAddress: true,
 			},
 		});
 
@@ -183,7 +188,18 @@ export async function addLaunch(launchData: NewLaunchData) {
 						enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
 					totalTokenSupply:
 						enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
+					// Preserve new fields if not provided in update
+					creatorInitialTokensHeld:
+						enhancedData.creatorInitialTokensHeld ??
+						existingLaunch.creatorInitialTokensHeld,
+					tokensForSale:
+						enhancedData.tokensForSale ?? existingLaunch.tokensForSale,
 					basicInfoUpdatedAt: new Date(), // Update basic info timestamp
+					// Preserve addresses if not provided in update
+					creatorAddress:
+						enhancedData.creatorAddress ?? existingLaunch.creatorAddress,
+					tokenAddress:
+						enhancedData.tokenAddress ?? existingLaunch.tokenAddress,
 				};
 				await db
 					.update(launches)

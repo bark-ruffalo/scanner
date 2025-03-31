@@ -43,6 +43,10 @@ export const launches = createTable(
 		launchpad: varchar("launchpad", { length: 256 })
 			.default("added manually")
 			.notNull(),
+		// Add creator address
+		creatorAddress: varchar("creator_address", { length: 256 }),
+		// Add token address
+		tokenAddress: varchar("token_address", { length: 256 }),
 		title: varchar("title", { length: 256 }).notNull(),
 		url: varchar("url", { length: 1024 }).notNull(),
 		description: text("description").notNull(),
@@ -59,6 +63,16 @@ export const launches = createTable(
 		creatorTokensHeld: numeric("creator_tokens_held", {
 			precision: 78, // Maximum precision for PostgreSQL numeric type
 			scale: 0, // No decimal places needed for token amounts
+		}),
+		// Add the new field for initial creator tokens
+		creatorInitialTokensHeld: numeric("creator_initial_tokens_held", {
+			precision: 78,
+			scale: 0,
+		}),
+		// Add the new field for tokens available for sale
+		tokensForSale: numeric("tokens_for_sale", {
+			precision: 78,
+			scale: 0,
 		}),
 		creatorTokenMovementDetails: varchar("creator_token_movement_details", {
 			length: 1024,
@@ -105,6 +119,9 @@ export const launches = createTable(
 		launchpadIdx: index("launchpad_idx").on(table.launchpad),
 		ratingIdx: index("rating_idx").on(table.rating),
 		titleIdx: index("title_idx").on(table.title),
+		// Add indexes for new address fields
+		creatorAddressIdx: index("creator_address_idx").on(table.creatorAddress),
+		tokenAddressIdx: index("token_address_idx").on(table.tokenAddress),
 		// Add check constraint for rating values
 		ratingCheck: check(
 			"rating_check",

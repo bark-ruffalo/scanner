@@ -288,6 +288,14 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			}
 		}
 
+		// Calculate tokens for sale (Total Supply - Creator Initial Balance)
+		// Virtuals Protocol total supply is always 1 billion.
+		const fixedTotalSupply = 1000000000n * 10n ** 18n; // 1 billion with 18 decimals
+		const tokensForSaleCalc = fixedTotalSupply - creatorInitialBalance;
+		// Ensure it's not negative, although unlikely for this launchpad
+		const tokensForSaleBigInt = tokensForSaleCalc > 0n ? tokensForSaleCalc : 0n;
+		const tokensForSaleString = tokensForSaleBigInt.toString();
+
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
 		const launchedAtDate = new Date(Number(timestamp * 1000n));
 
@@ -371,6 +379,9 @@ YouTube: ${youtube || "N/A"}
 			launchpad: LAUNCHPAD_NAME,
 			title: `${tokenName} ($${tokenSymbol})`, // Use name and ticker
 			url: tokenUrl, // Keep Virtuals specific link
+			// Add formatted creator and token addresses
+			creatorAddress: getAddress(creator),
+			tokenAddress: getAddress(token),
 			description: description, // Use the comprehensive description
 			launchedAt: launchedAtDate,
 			imageUrl: imageUrl, // Add the image URL
@@ -379,11 +390,16 @@ YouTube: ${youtube || "N/A"}
 			mainSellingAddress: getAddress(pair),
 			// Add total token supply (always 1 billion for Virtuals Protocol)
 			totalTokenSupply: "1000000000",
+			// Add the initial creator balance
+			creatorInitialTokensHeld: creatorInitialBalance.toString(),
+			// Add the calculated tokens available for sale
+			tokensForSale: tokensForSaleString,
 			// Use the token stats we already have
 			...tokenStats,
 			// Explicitly include sentToZeroAddress flag from tokenStats
 			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,
 			// summary/analysis are left for potential future LLM processing
+			// tokensForSale is left null for now
 		};
 		console.log(
 			`[${token}] Prepared launch data for DB insertion:`,
