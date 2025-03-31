@@ -10,7 +10,7 @@ export async function register() {
 
 		// Check if the debug flag is set for VIRTUALS Protocol (Base)
 		if (process.env.DEBUG_VIRTUALS_BASE === "true") {
-			await debugFetchHistoricalEvents(27851258n);
+			await debugFetchHistoricalEvents(28159722n, 28159722n);
 			// 27851258n to start from $ELENA
 			// 27886349n $NOODS graduated
 			// 28159722n $DOOD has two links in the description

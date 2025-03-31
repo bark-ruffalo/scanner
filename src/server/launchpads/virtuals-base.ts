@@ -13,6 +13,13 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
+import {
+	type LaunchpadLinkGenerator,
+	extractUrls,
+	fetchFirecrawlContent,
+	fetchUrlContent,
+	formatFetchedContent,
+} from "~/lib/content-utils";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
 import {
 	addKnownEvmSellingAddress,
@@ -142,7 +149,71 @@ type TokenInfoResult = readonly [
 	tradingOnUniswap: boolean,
 ];
 
+// Add the custom link generator for Virtuals Protocol
+const virtualsLinkGenerator: LaunchpadLinkGenerator = {
+	getCustomLinks: (params) => {
+		const links = [];
+
+		// Add creator profile API link if creator address is provided
+		if (params.creatorAddress) {
+			links.push({
+				url: `https://api.virtuals.io/api/profile/${params.creatorAddress}`,
+				useFirecrawl: false, // Use simple fetch for API endpoints
+			});
+		}
+
+		// Add other custom links here as needed
+		// Example:
+		// if (params.tokenAddress) {
+		//   links.push({
+		//     url: `https://some-api.com/token/${params.tokenAddress}`,
+		//     useFirecrawl: false,
+		//   });
+		// }
+
+		return links;
+	},
+};
+
 // --- Listener Logic ---
+
+/**
+ * Fetches additional content from relevant links
+ * @param platformDescription The platform description to extract links from
+ * @param creatorAddress The creator's address for custom links
+ */
+async function fetchAdditionalContent(
+	platformDescription: string,
+	creatorAddress: string,
+): Promise<string> {
+	const contents: Array<{ url: string; content: string }> = [];
+
+	// Get URLs from platform description
+	const descriptionUrls = extractUrls(platformDescription);
+
+	// Get custom links for this launchpad
+	const customLinks = virtualsLinkGenerator.getCustomLinks({
+		creatorAddress,
+	});
+
+	// Fetch content from all URLs
+	const fetchPromises = [
+		...descriptionUrls.map(async (url) => {
+			const content = await fetchFirecrawlContent(url);
+			contents.push({ url, content });
+		}),
+		...customLinks.map(async ({ url, useFirecrawl }) => {
+			const content = useFirecrawl
+				? await fetchFirecrawlContent(url)
+				: await fetchUrlContent(url);
+			contents.push({ url, content });
+		}),
+	];
+
+	await Promise.all(fetchPromises);
+
+	return formatFetchedContent(contents);
+}
 
 /**
  * Processes a single 'Launched' event log.
@@ -365,6 +436,9 @@ Creator on debank.com: https://debank.com/profile/${getAddress(creator)}
 
 ## Description at launch
 ${platformDescription}
+
+## Additional information extracted from relevant pages
+${await fetchAdditionalContent(platformDescription, getAddress(creator))}
 
 ## Additional links
 These fields aren't used anymore when launching on Virtuals Protocol, therefore they're likely to be empty:

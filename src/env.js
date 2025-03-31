@@ -33,6 +33,10 @@ export const env = createEnv({
 			.startsWith("sk-or-v1-", "OPENROUTER_API_KEY must start with sk-or-v1-"),
 		OPENROUTER_API_HOST: z.string().url(),
 		ADMIN_PASSWORD: adminPasswordSchema,
+		FIRECRAWL_API_KEY: z
+			.string()
+			.min(10, "A valid FIRECRAWL_API_KEY has to be added to the environment")
+			.startsWith("fc-", "FIRECRAWL_API_KEY must start with fc-"),
 	},
 
 	/**
@@ -57,6 +61,7 @@ export const env = createEnv({
 		OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
 		ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
+		FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR, // Ensure client vars are mapped if added to the 'client' schema
 	},
 	/**
