@@ -38,6 +38,8 @@ Always use the following command after a new chat has started in order to unders
 The main data model is defined in `src/server/db/schema.ts` within the `launches` table. Key properties include:
 - `id`: Unique identifier
 - `launchpad`: Name of the launchpad
+- `creatorAddress`: Address of the project creator/deployer (optional)
+- `tokenAddress`: Contract address of the launched token (optional)
 - `title`: Launch title
 - `url`: Link to the launch page
 - `description`: Original description/data gathered from the source (potentially augmented)
@@ -45,7 +47,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - `analysis`: LLM-generated analysis
 - `rating`: LLM-generated rating (-1 to 10)
 - `imageUrl`: Optional image URL
-- Tokenomics fields (`creatorTokenHoldingPercentage`, `creatorTokensHeld`, `creatorTokenMovementDetails`, `totalTokenSupply`, `sentToZeroAddress`, `mainSellingAddress`)
+- Tokenomics fields (`creatorTokenHoldingPercentage`, `creatorTokensHeld`, `creatorInitialTokensHeld`, `tokensForSale`, `creatorTokenMovementDetails`, `totalTokenSupply`, `sentToZeroAddress`, `mainSellingAddress`)
 - Timestamps (`launchedAt`, `basicInfoUpdatedAt`, `tokenStatsUpdatedAt`, `llmAnalysisUpdatedAt`, `createdAt`, `updatedAt`)
 
 ## Important Notes (also regarding tool usage)

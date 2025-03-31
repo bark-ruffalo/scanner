@@ -43,9 +43,7 @@ export const launches = createTable(
 		launchpad: varchar("launchpad", { length: 256 })
 			.default("added manually")
 			.notNull(),
-		// Add creator address
 		creatorAddress: varchar("creator_address", { length: 256 }),
-		// Add token address
 		tokenAddress: varchar("token_address", { length: 256 }),
 		title: varchar("title", { length: 256 }).notNull(),
 		url: varchar("url", { length: 1024 }).notNull(),
@@ -54,7 +52,6 @@ export const launches = createTable(
 		analysis: text("analysis").default("-").notNull(),
 		// Rating: -1 (not rated), 0-10 (rated)
 		rating: integer("rating").default(-1).notNull(),
-		// Add optional imageUrl field
 		imageUrl: varchar("image_url", { length: 1024 }),
 		creatorTokenHoldingPercentage: numeric("creator_token_holding_percentage", {
 			precision: 6,
