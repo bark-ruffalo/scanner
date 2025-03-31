@@ -377,6 +377,8 @@ YouTube: ${youtube || "N/A"}
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
 			// Store the pair address for future token movement detection
 			mainSellingAddress: getAddress(pair),
+			// Add total token supply (always 1 billion for Virtuals Protocol)
+			totalTokenSupply: "1000000000",
 			// Use the token stats we already have
 			...tokenStats,
 			// Explicitly include sentToZeroAddress flag from tokenStats

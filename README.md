@@ -53,6 +53,7 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - [ ] Add a traditional VC investing launchpad listener (e.g., scraping a website like AngelList or Republic).
 - [ ] Refine and test the Admin page functionality (add/edit/delete launches).
 - [ ] Research other launchpads to integrated with.
+- [ ] Integrate Sentry.
 
 ### Medium Priority
 - [ ] Enhance LLM analysis to access and incorporate information from external links found in launch descriptions (socials, websites, docs) or custom launchpad-specific URLs. Two common functions will be available for this, one that does simple fetching and another that uses the Firecrawl API.
@@ -63,6 +64,9 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 ### Low Priority
 - [ ] Add comprehensive unit and integration tests.
 - [ ] Ensure the "Creator initial number of tokens" percentage display uses a common utility function. (`src/lib/utils.ts`)
+
+### Bugs
+- ...
 
 ---
 *Previously Completed:*
@@ -85,4 +89,5 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - Show unrated launches when rating filter is set to 0
 - Use different LLMs in prod/dev
 - Improve error handling and user feedback for background processes (LLM analysis, token stats updates).
+- Fixed bugs: middleware wrong location, not adding total token supply to DB, etc.
 - etc.
