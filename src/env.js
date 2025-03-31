@@ -1,6 +1,14 @@
 import { createEnv } from "@t3-oss/env-nextjs";
 import { z } from "zod";
 
+// Determine the admin password schema based on the environment
+const adminPasswordSchema =
+	process.env.NODE_ENV === "production"
+		? z
+				.string()
+				.min(8, "ADMIN_PASSWORD must be at least 8 characters in production") // Stricter validation for production
+		: z.string().min(1, "ADMIN_PASSWORD cannot be empty"); // Allow short passwords in development/test
+
 export const env = createEnv({
 	/**
 	 * Specify your server-side environment variables schema here. This way you can ensure the app
@@ -11,10 +19,20 @@ export const env = createEnv({
 		NODE_ENV: z
 			.enum(["development", "test", "production"])
 			.default("development"),
-		BASE_RPC_URL: z.string().url().optional(),
-		OPENROUTER_API_KEY: z.string().min(1),
+		BASE_RPC_URL: z
+			.string()
+			.url()
+			.optional()
+			.refine(
+				(url) => !url || url.startsWith("wss://"), // Check only if url is defined
+				{ message: "BASE_RPC_URL must start with wss:// if provided" },
+			),
+		OPENROUTER_API_KEY: z
+			.string()
+			.min(10, "A valid OPENROUTER_API_KEY has to be added to the environment")
+			.startsWith("sk-or-v1-", "OPENROUTER_API_KEY must start with sk-or-v1-"),
 		OPENROUTER_API_HOST: z.string().url(),
-		ADMIN_PASSWORD: z.string().min(8),
+		ADMIN_PASSWORD: adminPasswordSchema,
 	},
 
 	/**
@@ -29,6 +47,8 @@ export const env = createEnv({
 	/**
 	 * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
 	 * middlewares) or client-side so we need to destruct manually.
+	 *
+	 * Use `runtimeEnv` - `runtimeEnvStrict` may not be supported by @t3-oss/env-nextjs.
 	 */
 	runtimeEnv: {
 		POSTGRES_URL: process.env.POSTGRES_URL,
@@ -37,7 +57,7 @@ export const env = createEnv({
 		OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
 		ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
-		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR,
+		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR, // Ensure client vars are mapped if added to the 'client' schema
 	},
 	/**
 	 * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
