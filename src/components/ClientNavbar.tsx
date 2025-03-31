@@ -14,19 +14,22 @@ export function ClientNavbar() {
 	const [launchpadNames, setLaunchpadNames] = useState<string[]>([]);
 	const [isLoading, setIsLoading] = useState(false);
 	const [lastLoadTime, setLastLoadTime] = useState(0);
+	// Add empty array state to prevent continuous polling when no launchpads exist
+	const [attemptedLoad, setAttemptedLoad] = useState(false);
 
 	// Only fetch launchpads when on the homepage
 	useEffect(() => {
 		// Refresh data if:
 		// 1. We're on the homepage
 		// 2. AND either:
-		//    a. We have no data yet, OR
-		//    b. It's been more than 5 minutes since last load
+		//    a. We have not attempted to load yet, OR
+		//    b. We have data AND it's been more than 5 minutes since last load
 		// 3. AND we're not currently loading
 		const shouldRefresh =
 			isHomePage &&
-			(launchpadNames.length === 0 ||
-				Date.now() - lastLoadTime > 5 * 60 * 1000) && // TODO: maybe increase the interval in the future, or find a better way
+			(!attemptedLoad ||
+				(launchpadNames.length > 0 &&
+					Date.now() - lastLoadTime > 5 * 60 * 1000)) && // 5 minutes
 			!isLoading;
 
 		if (shouldRefresh) {
@@ -37,14 +40,22 @@ export function ClientNavbar() {
 				.then((data) => {
 					setLaunchpadNames(data);
 					setLastLoadTime(Date.now());
+					setAttemptedLoad(true);
 					setIsLoading(false);
 				})
 				.catch((error) => {
 					console.error("Error fetching launchpads:", error);
+					setAttemptedLoad(true);
 					setIsLoading(false);
 				});
 		}
-	}, [isHomePage, launchpadNames.length, isLoading, lastLoadTime]);
+	}, [
+		isHomePage,
+		launchpadNames.length,
+		isLoading,
+		lastLoadTime,
+		attemptedLoad,
+	]);
 
 	// Prepare rating options for the dropdown
 	const ratingOptions = Array.from({ length: 11 }, (_, i) => ({
@@ -105,7 +116,7 @@ export function ClientNavbar() {
 						</svg>
 					</a>
 					<Link
-						href="/admin"
+						href="/admin prefetch={false}"
 						className="text-gray-300 hover:text-[var(--color-scanner-purple-dark)]"
 						aria-label="Admin"
 					>
