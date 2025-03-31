@@ -4,19 +4,31 @@ import path from "node:path";
 import { z } from "zod";
 import { env } from "~/env";
 
-// LLM models to try in order
+// LLM models to try in order - Production List
 // Link for reference: https://lmarena.ai/?leaderboard
-const LLM_MODELS = [
+const PROD_LLM_MODELS = [
 	"deepseek/deepseek-r1",
-	"openai/gpt-4o-mini",
 	"google/gemini-2.5-pro-exp-03-25:free",
+	"openai/gpt-4o-mini",
 	"google/gemini-2.0-pro-exp-02-05:free",
+	"deepseek/deepseek-v3-base:free",
 	"google/gemini-2.0-flash-thinking-exp:free",
+	"qwen/qwen2.5-vl-32b-instruct:free",
 	"google/gemini-2.0-flash-thinking-exp-1219:free",
 	"google/gemini-2.0-flash-exp:free",
+];
+
+// LLM models to try in order - Development List (Faster/Cheaper options)
+const DEV_LLM_MODELS = [
+	"openai/gpt-4o-mini",
+	"google/gemini-2.5-pro-exp-03-25:free",
 	"deepseek/deepseek-v3-base:free",
 	"qwen/qwen2.5-vl-32b-instruct:free",
 ];
+
+// Select the appropriate model list based on the environment
+const LLM_MODELS =
+	env.NODE_ENV === "production" ? PROD_LLM_MODELS : DEV_LLM_MODELS;
 
 // Define the output schema for response validation
 const analysisSchema = z.object({
