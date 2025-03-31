@@ -170,21 +170,24 @@ export default async function LaunchDetailPage({ params }: Props) {
 							<strong>Rating:</strong> {launch.rating}
 						</p>
 					)}
-					{/* Extract and display the LLM model information if present */}
-					{launch.analysis?.includes("Generated with LLM:") && (
-						<p className="mt-2 text-gray-500 text-sm">
-							{launch.analysis?.match(/Generated with LLM: .*$/)?.[0] || ""}
-						</p>
-					)}
-					{launch.llmAnalysisUpdatedAt && (
-						<p className="mt-2 text-gray-500 text-sm">
-							LLM responses last updated:{" "}
-							{format(
-								new Date(launch.llmAnalysisUpdatedAt),
-								"MMM d, yyyy HH:mm",
-							)}
-						</p>
-					)}
+					{/* Container for LLM metadata */}
+					<div>
+						{/* Extract and display the LLM model information if present */}
+						{launch.analysis?.includes("Generated with LLM:") && (
+							<p className="text-gray-500 text-sm">
+								{launch.analysis?.match(/Generated with LLM: .*$/)?.[0] || ""}
+							</p>
+						)}
+						{launch.llmAnalysisUpdatedAt && (
+							<p className="text-gray-500 text-sm">
+								LLM responses last updated:{" "}
+								{format(
+									new Date(launch.llmAnalysisUpdatedAt),
+									"MMM d, yyyy HH:mm",
+								)}
+							</p>
+						)}
+					</div>
 				</div>
 
 				{/* Description Section */}
