@@ -3,30 +3,19 @@ import type { NextRequest } from "next/server";
 import { env } from "~/env";
 
 // Log when this file is loaded
-console.error("🚀 Middleware file loaded!");
+console.log("🚀 Middleware file loaded!");
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
 	// Use console.error for more visibility
-	console.error("⭐ [Middleware] Starting middleware execution");
-	console.error("[Middleware] Request URL:", request.nextUrl.pathname);
-
-	// Only run middleware on admin routes
-	if (!request.nextUrl.pathname.startsWith("/admin")) {
-		console.error("[Middleware] Not an admin route, skipping auth");
-		return NextResponse.next();
-	}
-
-	console.error("[Middleware] Admin route detected, checking auth");
+	console.log("[Middleware] Request URL:", request.nextUrl.pathname);
 
 	// Check for basic auth header
 	const authHeader = request.headers.get("authorization");
-	console.error("[Middleware] Auth header present:", !!authHeader);
+	console.log("[Middleware] Auth header present:", !!authHeader);
 
 	if (!authHeader || !authHeader.startsWith("Basic ")) {
-		console.error(
-			"[Middleware] No valid auth header, requesting authentication",
-		);
+		console.log("[Middleware] No valid auth header, requesting authentication");
 		return new NextResponse("Authentication required", {
 			status: 401,
 			headers: {
@@ -52,15 +41,7 @@ export function middleware(request: NextRequest) {
 	);
 	const [username, password] = credentials.split(":");
 
-	console.error("[Middleware] Checking credentials:");
-	console.error("- Username matches:", username === "admin");
-	console.error("- Password matches:", password === env.ADMIN_PASSWORD);
-	console.error(
-		"- Expected password from env:",
-		typeof env.ADMIN_PASSWORD,
-		"length:",
-		env.ADMIN_PASSWORD?.length ?? 0,
-	);
+	console.log("[Middleware] Checking credentials:");
 
 	if (username !== "admin" || password !== env.ADMIN_PASSWORD) {
 		console.error("[Middleware] Invalid credentials provided");
@@ -78,5 +59,5 @@ export function middleware(request: NextRequest) {
 
 // See "Matching Paths" below to learn more
 export const config = {
-	matcher: "/admin/:path*",
+	matcher: ["/admin", "/admin/:path*"],
 };
