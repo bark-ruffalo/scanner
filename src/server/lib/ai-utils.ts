@@ -313,6 +313,9 @@ export async function analyzeLaunch(
 				`Analysis rating: ${validatedData.rating}, Summary: ${validatedData.summary}`,
 			);
 
+			// Add model attribution to the analysis
+			validatedData.analysis = `${validatedData.analysis}\n\nGenerated with LLM: ${model}`;
+
 			return validatedData;
 		} catch (error) {
 			const err = error instanceof Error ? error : new Error(String(error));
