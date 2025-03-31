@@ -62,62 +62,22 @@ export interface FirecrawlOptions {
 	formats?: string[]; // Output formats (default: ["markdown"])
 }
 
-// Interface for Firecrawl page response structure
-interface FirecrawlPage {
-	url: string;
-	data?: {
-		markdown?: string;
-		html?: string;
-		[key: string]: unknown;
-	};
-}
-
-// Interface for Firecrawl page response with flexible structure
-interface FlexibleFirecrawlPage {
-	url?: string;
-	data?: {
-		markdown?: string;
-		html?: string;
-		data?: {
-			markdown?: string;
-			html?: string;
-		};
-		formats?: {
-			markdown?: string;
-			html?: string;
-		};
-	};
-	formats?: {
-		markdown?: string;
-		html?: string;
-	};
-	markdown?: string;
-	html?: string;
-	[key: string]: unknown;
-}
-
-// Define an interface for Firecrawl API responses
+// Interface for Firecrawl V1 API response structure
 interface FirecrawlResponse {
 	success: boolean;
 	error?: string;
 	id?: string;
 	url?: string;
 	status?: string;
-	pages?: FlexibleFirecrawlPage[];
-	data?: {
-		markdown?: string;
+	pages?: Array<{
+		url?: string;
 		data?: {
 			markdown?: string;
 		};
-		formats?: {
-			markdown?: string;
-		};
-	};
-	markdown?: string;
-	formats?: {
+	}>;
+	data?: {
 		markdown?: string;
 	};
-	[key: string]: unknown;
 }
 
 /**
@@ -139,7 +99,7 @@ function isWebsiteHomepage(url: string): boolean {
 }
 
 /**
- * Fetches and extracts clean content from a URL using Firecrawl API.
+ * Fetches and extracts clean content from a URL using Firecrawl API V1.
  * Automatically decides between scraping a single URL or crawling a website.
  *
  * @param url The URL to scrape/crawl content from
@@ -190,7 +150,6 @@ export async function fetchFirecrawlContent(
 		let requestBody: Record<string, unknown>;
 
 		if (shouldCrawl) {
-			// Add crawl-specific options - exactly match the Node.js example
 			requestBody = {
 				url,
 				limit: maxPages,
@@ -199,7 +158,6 @@ export async function fetchFirecrawlContent(
 				},
 			};
 		} else {
-			// For scrape, use the formats at the top level
 			requestBody = {
 				url,
 				formats,
@@ -220,8 +178,7 @@ export async function fetchFirecrawlContent(
 			return `Firecrawl API error: ${response.status}`;
 		}
 
-		// Use let instead of const for data since we might replace it later
-		let data = await response.json();
+		let data = (await response.json()) as FirecrawlResponse;
 
 		if (!data.success) {
 			console.error(`Firecrawl API error: ${data.error || "Unknown error"}`);
@@ -234,13 +191,13 @@ export async function fetchFirecrawlContent(
 				`Received crawl job ID: ${data.id}, fetching results from: ${data.url}`,
 			);
 
-			// Make up to 3 attempts to fetch the results with increasing delay
+			// Make attempts to fetch the results with exponential backoff
 			let resultData = null;
 			let attempts = 0;
 			const maxAttempts = 6;
 
 			while (attempts < maxAttempts) {
-				// Wait before retrying - 2s, 4s, 8s (use ** instead of Math.pow)
+				// Wait before retrying - 2s, 4s, 8s, 16s, 32s, 64s
 				const delay = attempts === 0 ? 2000 : 2 ** (attempts + 1) * 1000;
 				console.log(
 					`Waiting ${delay}ms before fetching crawl results (attempt ${attempts + 1}/${maxAttempts})...`,
@@ -265,7 +222,7 @@ export async function fetchFirecrawlContent(
 						continue;
 					}
 
-					resultData = await resultResponse.json();
+					resultData = (await resultResponse.json()) as FirecrawlResponse;
 
 					if (
 						resultData.success &&
@@ -308,9 +265,9 @@ export async function fetchFirecrawlContent(
 			}
 		}
 
-		// Process different response types based on endpoint
+		// Process response based on endpoint
 		if (shouldCrawl) {
-			return handleCrawlResponse(data, url);
+			return handleCrawlResponse(data);
 		}
 
 		return handleScrapeResponse(data);
@@ -321,211 +278,71 @@ export async function fetchFirecrawlContent(
 }
 
 /**
- * Handles the response from a crawl request
+ * Handles the response from a crawl request - simplified for V1 API
  */
-function handleCrawlResponse(
-	data: FirecrawlResponse,
-	originalUrl: string,
-): string {
-	// Dump the whole response structure for debugging
+function handleCrawlResponse(data: FirecrawlResponse): string {
+	// Log structure for debugging
 	console.log(
 		`Crawl response structure: ${JSON.stringify(data).substring(0, 500)}...`,
 	);
 
-	// For crawl, we have two possibilities:
-	// 1. Complete response with pages array
+	// For crawl, we expect pages array with markdown content
 	if (data.pages && Array.isArray(data.pages) && data.pages.length > 0) {
 		console.log(`Crawl returned ${data.pages.length} pages`);
 
-		// Dump first page structure to see what it looks like
+		// Log first page structure
 		if (data.pages.length > 0) {
-			const firstPage = data.pages[0];
 			console.log(
-				`First page structure: ${JSON.stringify(firstPage).substring(0, 300)}...`,
+				`First page structure: ${JSON.stringify(data.pages[0]).substring(0, 300)}...`,
 			);
 		}
 
-		// Correctly navigate the structure based on examples in the documentation
+		// Extract markdown from each page
 		const markdownPages = data.pages
-			.filter((page: FlexibleFirecrawlPage) => {
-				// We need to correctly identify where the markdown content is
-				return (
-					// Try all possible locations based on documentation
-					page.data?.markdown ||
-					page.data?.formats?.markdown ||
-					page.formats?.markdown ||
-					page.markdown ||
-					// V0 structure where markdown is directly in the page
-					page.markdown ||
-					// Try to find markdown in nested data structure
-					(page.data &&
-						typeof page.data === "object" &&
-						"markdown" in page.data)
-				);
-			})
-			.map((page: FlexibleFirecrawlPage) => {
-				const pageUrl = page.url || originalUrl;
-				// Extract markdown from the correct location
-				let markdown =
-					page.data?.markdown ||
-					page.data?.formats?.markdown ||
-					page.formats?.markdown ||
-					page.markdown ||
-					"";
-
-				// Handle V0 API structure if markdown is not found in above paths
-				if (!markdown && page.data && typeof page.data === "object") {
-					// Handle case where data is an array (V0 API)
-					if (Array.isArray(page.data)) {
-						// Look for markdown in each array item
-						for (const item of page.data) {
-							if (item && typeof item === "object" && "markdown" in item) {
-								markdown = item.markdown as string;
-								break;
-							}
-						}
-					} else if ("markdown" in page.data) {
-						// Direct property in data object
-						markdown = page.data.markdown as string;
-					}
-				}
-
+			.filter((page) => page.data?.markdown)
+			.map((page) => {
+				const pageUrl = page.url || "Unknown URL";
+				const markdown = page.data?.markdown || "";
 				return `## ${pageUrl}\n\n${markdown}`;
 			});
 
 		if (markdownPages.length > 0) {
 			return markdownPages.join("\n\n");
 		}
+	}
 
-		// Check for V0 API structure where data is an array at the top level
-		if (data.data && Array.isArray(data.data)) {
-			const markdownFromDataArray = data.data
-				.filter(
-					(item) => item && typeof item === "object" && "markdown" in item,
-				)
-				.map((item) => {
-					const pageUrl = (item.metadata?.sourceURL as string) || originalUrl;
-					return `## ${pageUrl}\n\n${item.markdown as string}`;
-				});
+	// Handle V1 API structure where data is an array
+	if (data.data && Array.isArray(data.data) && data.data.length > 0) {
+		console.log(`Crawl returned data array with ${data.data.length} items`);
 
-			if (markdownFromDataArray.length > 0) {
-				return markdownFromDataArray.join("\n\n");
-			}
-		}
-
-		// If we got pages but couldn't extract markdown, try an alternative structure
-		// For some API versions, the content might be directly in the response
-		if (data.markdown) {
-			return data.markdown;
-		}
-
-		// Last resort, try to extract content from raw HTML if available
-		const pagesWithHtml = data.pages
-			.filter(
-				(page: FlexibleFirecrawlPage) =>
-					page.data?.html ||
-					page.data?.formats?.html ||
-					page.formats?.html ||
-					page.html,
-			)
-			.map((page: FlexibleFirecrawlPage) => {
-				const pageUrl = page.url || originalUrl;
-				const html =
-					page.data?.html ||
-					page.data?.formats?.html ||
-					page.formats?.html ||
-					page.html ||
-					"";
-
-				// Basic HTML to markdown conversion
-				const markdown = html
-					.replace(/<h1[^>]*>(.*?)<\/h1>/gi, "# $1\n\n")
-					.replace(/<h2[^>]*>(.*?)<\/h2>/gi, "## $1\n\n")
-					.replace(/<h3[^>]*>(.*?)<\/h3>/gi, "### $1\n\n")
-					.replace(/<p[^>]*>(.*?)<\/p>/gi, "$1\n\n")
-					.replace(/<br\s*\/?>/gi, "\n")
-					.replace(/<(?:.|\n)*?>/gm, "") // Remove remaining HTML tags
-					.replace(/&nbsp;/gi, " ")
-					.replace(/\n{3,}/g, "\n\n"); // Replace multiple newlines with double newlines
-
-				return `## ${pageUrl}\n\n${markdown}`;
+		const markdownTexts = data.data
+			.filter((item) => typeof item === "object" && item && "markdown" in item)
+			.map((item) => {
+				// Some implementations put URL in metadata.sourceURL
+				const url = (item.metadata?.sourceURL as string) || "Unknown URL";
+				return `## ${url}\n\n${item.markdown as string}`;
 			});
 
-		if (pagesWithHtml.length > 0) {
-			return pagesWithHtml.join("\n\n");
+		if (markdownTexts.length > 0) {
+			return markdownTexts.join("\n\n");
 		}
 	}
 
-	// 2. If pages array is empty or non-existent, check for top-level data
-	if (data.data && typeof data.data === "object") {
-		console.log(
-			`Checking top-level data structure: ${JSON.stringify(data.data).substring(0, 300)}...`,
-		);
-
-		// Check if data is an array (V0 API structure)
-		if (Array.isArray(data.data)) {
-			const markdownFromDataArray = data.data
-				.filter(
-					(item) => item && typeof item === "object" && "markdown" in item,
-				)
-				.map((item) => {
-					const pageUrl = (item.metadata?.sourceURL as string) || originalUrl;
-					return `## ${pageUrl}\n\n${item.markdown as string}`;
-				});
-
-			if (markdownFromDataArray.length > 0) {
-				return markdownFromDataArray.join("\n\n");
-			}
-		}
-
-		// Try to extract from top level data
-		const topLevelMarkdown =
-			data.data?.markdown ||
-			data.data?.formats?.markdown ||
-			(data.data.data &&
-				typeof data.data.data === "object" &&
-				data.data.data.markdown);
-
-		if (topLevelMarkdown) {
-			return topLevelMarkdown;
-		}
-	}
-
-	// Last resort, dump the entire response as text
-	console.error(
-		"Failed to extract markdown from crawl response. Response structure:",
-		data,
-	);
-	return `No markdown found in crawl response. Raw data received from API:\n${JSON.stringify(data, null, 2).substring(0, 1000)}...`;
+	console.error("Failed to extract markdown from crawl response");
+	return "No markdown content found in crawl response";
 }
 
 /**
- * Handles the response from a scrape request
+ * Handles the response from a scrape request - simplified for V1 API
  */
 function handleScrapeResponse(data: FirecrawlResponse): string {
-	// First try the V1 structure
+	// For scrape, we expect markdown in data
 	if (data.data?.markdown) {
 		return data.data.markdown;
 	}
 
-	// Then try alternative structures
-	const markdown =
-		data.data?.data?.markdown ||
-		data.data?.formats?.markdown ||
-		data.formats?.markdown ||
-		data.markdown;
-
-	if (markdown) {
-		return markdown;
-	}
-
-	// If we got here, we couldn't extract markdown - output the response structure
-	console.error(
-		"Failed to extract markdown from response. Response structure:",
-		`${JSON.stringify(data).substring(0, 500)}...`,
-	);
-
-	return `No markdown content found in API response. Raw data received:\n${JSON.stringify(data, null, 2).substring(0, 1000)}...`;
+	console.error("Failed to extract markdown from scrape response");
+	return "No markdown content found in scrape response";
 }
 
 /**

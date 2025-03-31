@@ -207,7 +207,7 @@ async function fetchAdditionalContent(
 			// For description URLs, use auto-detection (crawl for websites, scrape for specific pages)
 			const content = await fetchFirecrawlContent(url, {
 				// Auto-detect mode based on URL
-				maxPages: 12, // Limit to 10 pages max for website crawls
+				maxPages: 12, // Limit to 12 pages max for website crawls
 				formats: ["markdown"],
 			});
 			contents.push({ url, content });
@@ -235,7 +235,7 @@ async function fetchAdditionalContent(
 	return formatFetchedContent(contents, {
 		includeUrls: true,
 		combineContent: false,
-		maxContentLength: 15000, // Increased limit to get more content (15K chars max per source)
+		maxContentLength: 50000,
 	});
 }
 
@@ -497,7 +497,6 @@ YouTube: ${youtube || "N/A"}
 			// Explicitly include sentToZeroAddress flag from tokenStats
 			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,
 			// summary/analysis are left for potential future LLM processing
-			// tokensForSale is left null for now
 		};
 		console.log(
 			`[${token}] Prepared launch data for DB insertion:`,
