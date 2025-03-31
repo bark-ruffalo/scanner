@@ -432,7 +432,16 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 			}`;
 		}
 
-		// Access tuple elements by index for description
+		// Check if creator has sold tokens (potential rug pull)
+		const hasSoldTokens =
+			tokenStats.creatorTokenMovementDetails?.includes("Sold ");
+
+		// Fetch additional content only if no token sales detected
+		const additionalContent = !hasSoldTokens
+			? await fetchAdditionalContent(platformDescription, getAddress(creator))
+			: "";
+
+		// Modify description construction to conditionally include additional content section
 		const description = `
 # ${tokenName}
 URL on launchpad: ${tokenUrl}
@@ -447,9 +456,7 @@ Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
 Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)
-${
-	recentDevelopmentsText // Use the dynamically generated text
-}
+${recentDevelopmentsText}
 
 ## Creator info
 Creator address: ${getAddress(creator)}
@@ -460,9 +467,7 @@ Creator on debank.com: https://debank.com/profile/${getAddress(creator)}
 
 ## Description at launch
 ${platformDescription}
-
-## Additional information extracted from relevant pages
-${await fetchAdditionalContent(platformDescription, getAddress(creator))}
+${!hasSoldTokens ? `\n## Additional information extracted from relevant pages\n${additionalContent}` : ""}
 
 ## Additional links
 These fields aren't used anymore when launching on Virtuals Protocol, therefore they're likely to be empty:
@@ -470,7 +475,7 @@ Website: ${website || "N/A"}
 Twitter: ${twitter || "N/A"}
 Telegram: ${telegram || "N/A"}
 YouTube: ${youtube || "N/A"}
-            `.trim();
+`.trim();
 
 		// Prepare the data object structured according to the NewLaunchData type expected by addLaunch.
 		const launchData = {
