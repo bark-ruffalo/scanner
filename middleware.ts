@@ -7,7 +7,6 @@ console.log("🚀 Middleware file loaded!");
 
 // This function can be marked `async` if using `await` inside
 export function middleware(request: NextRequest) {
-	// Use console.error for more visibility
 	console.log("[Middleware] Request URL:", request.nextUrl.pathname);
 
 	// Check for basic auth header
@@ -53,7 +52,7 @@ export function middleware(request: NextRequest) {
 		});
 	}
 
-	console.error("[Middleware] Authentication successful");
+	console.log("[Middleware] Authentication successful");
 	return NextResponse.next();
 }
 
