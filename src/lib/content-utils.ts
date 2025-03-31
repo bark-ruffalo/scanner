@@ -57,6 +57,21 @@ export async function fetchUrlContent(url: string): Promise<string> {
  */
 export async function fetchFirecrawlContent(url: string): Promise<string> {
 	try {
+		// Skip URLs that are likely to cause issues
+		if (url.includes("twitter.com") || url.includes("x.com")) {
+			console.warn("Skipping social media URL: requires authentication");
+			return `Skipped social media URL (${url}) - requires authentication`;
+		}
+
+		// Validate URL
+		try {
+			new URL(url);
+		} catch {
+			console.error("Invalid URL format");
+			return `Invalid URL: ${url}`;
+		}
+
+		console.log(`Fetching content via Firecrawl: ${url}`);
 		const response = await fetch("https://api.firecrawl.dev/v1/scrape", {
 			method: "POST",
 			headers: {
@@ -65,22 +80,20 @@ export async function fetchFirecrawlContent(url: string): Promise<string> {
 			},
 			body: JSON.stringify({
 				url,
-				scrapeOptions: {
-					onlyMainContent: true, // Get main content only
-					formats: ["markdown"], // Get markdown format
-				},
+				formats: ["markdown"],
 			}),
 		});
 
 		if (!response.ok) {
-			throw new Error(`Firecrawl API error! status: ${response.status}`);
+			console.error(`Firecrawl API error: ${response.status}`);
+			return `Firecrawl API error: ${response.status}`;
 		}
 
 		const data = await response.json();
 		return data.data?.markdown || "No content extracted";
 	} catch (error) {
-		console.error(`Error fetching ${url} with Firecrawl:`, error);
-		return `Error fetching content: ${error instanceof Error ? error.message : String(error)}`;
+		console.error(`Firecrawl API exception: ${error}`);
+		return `Error fetching content with Firecrawl: ${error instanceof Error ? error.message : String(error)}`;
 	}
 }
 
@@ -92,13 +105,24 @@ export async function fetchFirecrawlContent(url: string): Promise<string> {
 export function formatFetchedContent(
 	contents: Array<{ url: string; content: string }>,
 ): string {
-	const formattedContents = contents
+	// Filter out empty or error-only contents
+	const validContents = contents.filter(({ content }) => {
+		const isError = content.startsWith("Error fetching content:");
+		const isEmpty = content.trim() === "" || content === "No content extracted";
+		return !isError && !isEmpty;
+	});
+
+	if (validContents.length === 0) {
+		return ""; // Return empty string if no valid content
+	}
+
+	const formattedContents = validContents
 		.map(({ url, content }) => {
 			return `""" ${url}\n${content}\n"""`;
 		})
 		.join("\n\n");
 
-	return `<fetched_info>\n${formattedContents}\n</fetched_info>`;
+	return `<extracted_info>\n${formattedContents}\n</extracted_info>`;
 }
 
 /**
