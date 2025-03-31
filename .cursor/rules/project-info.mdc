@@ -72,9 +72,10 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - Configuration uses `runtimeEnv: process.env` (not `runtimeEnvStrict`) as Next.js provides `process.env` access.
     - `emptyStringAsUndefined: true` is set for better validation handling.
     - Currently, only `server` variables are defined. If client variables are needed, they *must* be prefixed `NEXT_PUBLIC_` (as defined in `src/env.js`) and added to the `client` schema section.
-- After modifying the UI, you may use the `Playwright MCP` to confirm that the changes are as expected.
+- After modifying the UI, you may use the `Playwright MCP` to confirm that the changes are as expected. Always close Playwright windows after use.
 - When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
+- Do not use template literals if interpolation and special-character handling are not needed.
 - Use `pnpm` instead of `npm`.
 - Never write code for database migration because I'll just do `pnpm db:push` instead
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.

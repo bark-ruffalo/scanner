@@ -196,23 +196,47 @@ async function fetchAdditionalContent(
 		creatorAddress,
 	});
 
+	// Log what we're going to fetch
+	console.log(
+		`Fetching ${descriptionUrls.length} URLs from description and ${customLinks.length} custom links`,
+	);
+
 	// Fetch content from all URLs
 	const fetchPromises = [
 		...descriptionUrls.map(async (url) => {
-			const content = await fetchFirecrawlContent(url);
+			// For description URLs, use auto-detection (crawl for websites, scrape for specific pages)
+			const content = await fetchFirecrawlContent(url, {
+				// Auto-detect mode based on URL
+				maxPages: 12, // Limit to 10 pages max for website crawls
+				formats: ["markdown"],
+			});
 			contents.push({ url, content });
 		}),
-		...customLinks.map(async ({ url, useFirecrawl }) => {
-			const content = useFirecrawl
-				? await fetchFirecrawlContent(url)
-				: await fetchUrlContent(url);
-			contents.push({ url, content });
-		}),
+		...customLinks.map(
+			async ({ url, useFirecrawl, firecrawlOptions, formatOptions }) => {
+				const content = useFirecrawl
+					? await fetchFirecrawlContent(
+							url,
+							firecrawlOptions || {
+								// Default options if none specified
+								maxPages: 11,
+								formats: ["markdown"],
+							},
+						)
+					: await fetchUrlContent(url);
+				contents.push({ url, content });
+			},
+		),
 	];
 
 	await Promise.all(fetchPromises);
 
-	return formatFetchedContent(contents);
+	// Format the fetched content with default options
+	return formatFetchedContent(contents, {
+		includeUrls: true,
+		combineContent: false,
+		maxContentLength: 15000, // Increased limit to get more content (15K chars max per source)
+	});
 }
 
 /**
