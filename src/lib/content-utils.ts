@@ -356,12 +356,12 @@ export interface FormatOptions {
 
 /**
  * Formats fetched content into the required section format.
- * @param contents Array of {url, content} pairs
+ * @param contents Array of {url, content, name?} pairs
  * @param options Optional formatting options
  * @returns Formatted string with all contents
  */
 export function formatFetchedContent(
-	contents: Array<{ url: string; content: string }>,
+	contents: Array<{ url: string; content: string; name?: string }>,
 	options?: FormatOptions,
 ): string {
 	// Filter out empty or error-only contents
@@ -381,12 +381,12 @@ export function formatFetchedContent(
 	const maxLength = options?.maxContentLength;
 
 	// Apply max length if specified
-	const processedContents = validContents.map(({ url, content }) => {
+	const processedContents = validContents.map(({ url, content, name }) => {
 		let processedContent = content;
 		if (maxLength && content.length > maxLength) {
 			processedContent = `${content.substring(0, maxLength)}... (truncated)`;
 		}
-		return { url, content: processedContent };
+		return { url, content: processedContent, name };
 	});
 
 	// Format based on options
@@ -395,16 +395,18 @@ export function formatFetchedContent(
 	if (combineContent) {
 		// Combine all content into a single string
 		formattedContent = processedContents
-			.map(({ url, content }) =>
-				includeUrls ? `## ${url}\n\n${content}` : content,
+			.map(({ url, content, name }) =>
+				includeUrls
+					? `## ${name ? `[${name}](${url})` : url}\n\n${content}`
+					: content,
 			)
 			.join("\n\n");
 	} else {
 		// Use triple quote format for each content item
 		const formattedContents = processedContents
 			.map(
-				({ url, content }) =>
-					`""" ${includeUrls ? `${url}\n` : ""}${content}\n"""`,
+				({ url, content, name }) =>
+					`""" ${includeUrls ? `${name ? `[${name}](${url})` : url}\n` : ""}${content}\n"""`,
 			)
 			.join("\n\n");
 
@@ -420,6 +422,7 @@ export function formatFetchedContent(
 export interface LaunchpadLinkGenerator {
 	getCustomLinks: (params: Record<string, string>) => Array<{
 		url: string;
+		name?: string; // Optional name for the URL to be displayed in the link
 		useFirecrawl?: boolean; // If true, use Firecrawl API, otherwise use simple fetch
 		firecrawlOptions?: FirecrawlOptions; // Options for Firecrawl if useFirecrawl is true
 		formatOptions?: FormatOptions; // Options for formatting the content

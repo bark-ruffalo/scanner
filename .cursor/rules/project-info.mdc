@@ -57,15 +57,28 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - LLM calls are handled in `src/server/lib/ai-utils.ts`. Templates for prompts are in the `/templates` directory.
 - New launch detection logic resides in `src/server/launchpads/`. The `instrumentation.ts` file registers these listeners to run on server start.
 - For blockchain interactions for EVM chains use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/web3-client.ts`.
-- EVM utilities (`src/server/lib/evm-utils.ts`):
-    - `updateEvmTokenStatistics`: Calculates creator token holding percentage, formats current balance, and analyzes significant outgoing transfers to detect potential sales (rug pulls), burns, or locking actions. Requires the token address, creator address, and initial token allocation. Can optionally take a pre-fetched current balance and a specific DEX/pair address to check against. Returns a `TokenUpdateResult` object.
-    - `getEvmErc20BalanceAtBlock`: Fetches the ERC20 token balance for an address at a specific block number (or latest).
-    - `addKnownEvmSellingAddress`: Allows dynamically adding addresses (like specific launchpad pairs) to the list of known selling destinations used by `updateEvmTokenStatistics`.
-    - The file also contains ABI definitions and lists of known lock/DEX contract addresses used internally.
+- Launchpad implementation (`src/server/launchpads/virtuals-base.ts`):
+    - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.
+    - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling.
+    - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances, and formatting a comprehensive description before adding to the database.
+    - `fetchAdditionalContent`: Fetches additional information from various URLs mentioned in the project description and custom launchpad-specific links.
+- Content utilities (`src/lib/content-utils.ts`):
+    - `extractUrls`: Extracts all URLs from a text string using regex.
+    - `fetchUrlContent`: Simple utility to fetch content from a URL.
+    - `fetchFirecrawlContent`: Advanced content fetching using the Firecrawl API, with auto-detection between crawling a website and scraping a specific page.
+    - `formatFetchedContent`: Formats fetched content with options for including URLs, combining content, and limiting length.
+    - `LaunchpadLinkGenerator`: Interface for defining custom link generators for launchpads to provide additional content sources based on launch parameters.
+    - `handleCrawlResponse` and `handleScrapeResponse`: Helper functions for processing different types of responses from the Firecrawl API.
 - Common helper utilities (`src/lib/utils.ts`):
     - `linkify`: Parses a string to find URLs and returns an array of segments, marking URLs specifically so they can be rendered as links.
     - `formatTokenBalance`: Converts a raw BigInt token amount (like from a contract call) into a human-readable, comma-separated string, rounded to the nearest whole number.
     - `calculateBigIntPercentage`: Calculates the percentage between two BigInt numbers, returning the numeric percentage and a formatted string (e.g., "87.40%"). Handles potential division-by-zero.
+- EVM utilities (`src/server/lib/evm-utils.ts`):
+    - `updateEvmTokenStatistics`: Calculates creator token holding percentage, formats current balance, and analyzes significant outgoing transfers to detect potential sales (rug pulls), burns, or locking actions. Requires the token address, creator address, and initial token allocation. Can optionally take a pre-fetched current balance and a specific DEX/pair address to check against. Returns a `TokenUpdateResult` object.
+    - `getEvmErc20BalanceAtBlock`: Fetches the ERC20 token balance for an address at a specific block number (or latest).
+    - `addKnownEvmSellingAddress`: Allows dynamically adding addresses (like specific launchpad pairs) to the list of known selling destinations used by `updateEvmTokenStatistics`.
+    - `isDestinationContract`: Helper function to check if an address is a contract.
+    - The file also contains ERC20 ABIs, known lock contract addresses and DEX addresses for token movement analysis.
 - `npm run dev` has been run, and it should be live on localhost:3000; remind me to start it myself if it's not and you need it; never run the command yourself, and if you want it restarted, ask for it.
 - We do not plan to add authentication for users of this web app. Admin routes (`/admin/*`) are protected by Basic Auth configured via `src/middleware.ts` and environment variables.
 - Environment variables are strictly validated at runtime using the T3 Env schema defined in `src/env.js`.

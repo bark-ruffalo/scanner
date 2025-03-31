@@ -158,6 +158,7 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 		if (params.creatorAddress) {
 			links.push({
 				url: `https://api.virtuals.io/api/profile/${params.creatorAddress}`,
+				name: "Creator profile on Virtuals Protocol",
 				useFirecrawl: false, // Use simple fetch for API endpoints
 			});
 		}
@@ -167,6 +168,7 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 		// if (params.tokenAddress) {
 		//   links.push({
 		//     url: `https://some-api.com/token/${params.tokenAddress}`,
+		//     name: "Token API Data",
 		//     useFirecrawl: false,
 		//   });
 		// }
@@ -186,7 +188,7 @@ async function fetchAdditionalContent(
 	platformDescription: string,
 	creatorAddress: string,
 ): Promise<string> {
-	const contents: Array<{ url: string; content: string }> = [];
+	const contents: Array<{ url: string; content: string; name?: string }> = [];
 
 	// Get URLs from platform description
 	const descriptionUrls = extractUrls(platformDescription);
@@ -213,7 +215,7 @@ async function fetchAdditionalContent(
 			contents.push({ url, content });
 		}),
 		...customLinks.map(
-			async ({ url, useFirecrawl, firecrawlOptions, formatOptions }) => {
+			async ({ url, name, useFirecrawl, firecrawlOptions, formatOptions }) => {
 				const content = useFirecrawl
 					? await fetchFirecrawlContent(
 							url,
@@ -224,7 +226,7 @@ async function fetchAdditionalContent(
 							},
 						)
 					: await fetchUrlContent(url);
-				contents.push({ url, content });
+				contents.push({ url, content, name });
 			},
 		),
 	];
