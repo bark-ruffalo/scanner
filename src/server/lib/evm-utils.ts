@@ -198,8 +198,6 @@ export async function updateEvmTokenStatistics(
 				? env.BASE_RPC_URL.replace("wss://", "https://")
 				: undefined;
 
-			console.log(`Using HTTP RPC URL: ${httpUrl || "(default)"}`);
-
 			// Create a specific client for log analysis to ensure proper RPC URL
 			const analysisClient = httpUrl
 				? createPublicClient({
