@@ -6,20 +6,26 @@ alwaysApply: true
 
 # About Scanner
 
-The project is a WIP. The objective of the web app will be to monitor the main launchpads from crypto and traditional VC finance and output all the launches, summarize and evaluate them as potential investments, but also have various filters only to show the launches:
+The project is a WIP web app. The objective is to monitor various launchpads (crypto and traditional finance), aggregate launch information, use LLMs to summarize and evaluate them as potential investments, and offer filtering capabilities based on:
 
-- from certain categories of launchpads (crypto vs traditional);
-- from certain launchpads;
-- that are highly-rated (using LLM, data gathering and certain evaluation frameworks);
-- where the devs haven't sold tokens;
-- where there's a certain minimum percentage of tokens or shares offered to the public;
+- Launchpad category (crypto vs traditional);
+- Specific launchpads;
+- LLM-generated rating;
+- Tokenomics (e.g., creator token holdings and movements);
+- Public token allocation percentage;
 - etc.
 
 ## Tech Stack
 
-- [Next.js](https://nextjs.org)
-- [Tailwind CSS](https://tailwindcss.com)
-- [Drizzle](https://orm.drizzle.team) with PostgreSQL
+- **Framework**: [Next.js](https://nextjs.org) (App Router)
+- **Styling**: [Tailwind CSS v4](https://tailwindcss.com)
+- **Database**: PostgreSQL
+- **ORM**: [Drizzle ORM](https://orm.drizzle.team)
+- **Language**: TypeScript
+- **Environment Variables**: [T3 Env](https://env.t3.gg/) (Schema in `src/env.js`)
+- **Linting/Formatting**: [Biome](https://biomejs.dev/)
+- **Package Manager**: [pnpm](https://pnpm.io/)
+- **Deployment**: [Render](https://render.com/)
 
 ## Project Structure
 
@@ -27,19 +33,49 @@ Always use the following command after a new chat has started in order to unders
 
 `tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc'`
 
-## Data Models
+## Data Models / Schema
 
-- **Launch**: Represents a launch event from a launchpad
-  - Properties: id, launchpad, title, URL, description, summary, analysis, rating, timestamps
+The main data model is defined in `src/server/db/schema.ts` within the `launches` table. Key properties include:
+- `id`: Unique identifier
+- `launchpad`: Name of the launchpad
+- `title`: Launch title
+- `url`: Link to the launch page
+- `description`: Original description/data gathered from the source (potentially augmented)
+- `summary`: LLM-generated summary
+- `analysis`: LLM-generated analysis
+- `rating`: LLM-generated rating (-1 to 10)
+- `imageUrl`: Optional image URL
+- Tokenomics fields (`creatorTokenHoldingPercentage`, `creatorTokensHeld`, `creatorTokenMovementDetails`, `totalTokenSupply`, `sentToZeroAddress`, `mainSellingAddress`)
+- Timestamps (`launchedAt`, `basicInfoUpdatedAt`, `tokenStatsUpdatedAt`, `llmAnalysisUpdatedAt`, `createdAt`, `updatedAt`)
 
 ## Important Notes (also regarding tool usage)
+- Regarding styling with Tailwind CSS v4:
+    - It's integrated via the `@tailwindcss/postcss` plugin configured in `postcss.config.js`.
+    - Custom theme values (colors, fonts, etc.) are defined directly within `src/styles/globals.css` using the `@theme { ... }` directive. There is **no** `tailwind.config.js` file as used in Tailwind v3 and earlier.
+- LLM calls are handled in `src/server/lib/ai-utils.ts`. Templates for prompts are in the `/templates` directory.
+- New launch detection logic resides in `src/server/launchpads/`. The `instrumentation.ts` file registers these listeners to run on server start.
+- For blockchain interactions for EVM chains use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/web3-client.ts`.
+- EVM utilities (`src/server/lib/evm-utils.ts`):
+    - `updateEvmTokenStatistics`: Calculates creator token holding percentage, formats current balance, and analyzes significant outgoing transfers to detect potential sales (rug pulls), burns, or locking actions. Requires the token address, creator address, and initial token allocation. Can optionally take a pre-fetched current balance and a specific DEX/pair address to check against. Returns a `TokenUpdateResult` object.
+    - `getEvmErc20BalanceAtBlock`: Fetches the ERC20 token balance for an address at a specific block number (or latest).
+    - `addKnownEvmSellingAddress`: Allows dynamically adding addresses (like specific launchpad pairs) to the list of known selling destinations used by `updateEvmTokenStatistics`.
+    - The file also contains ABI definitions and lists of known lock/DEX contract addresses used internally.
+- Common helper utilities (`src/lib/utils.ts`):
+    - `linkify`: Parses a string to find URLs and returns an array of segments, marking URLs specifically so they can be rendered as links.
+    - `formatTokenBalance`: Converts a raw BigInt token amount (like from a contract call) into a human-readable, comma-separated string, rounded to the nearest whole number.
+    - `calculateBigIntPercentage`: Calculates the percentage between two BigInt numbers, returning the numeric percentage and a formatted string (e.g., "87.40%"). Handles potential division-by-zero.
 - `npm run dev` has been run, and it should be live on localhost:3000; remind me to start it myself if it's not and you need it; never run the command yourself, and if you want it restarted, ask for it.
-- We do not plan to add authentication for users of this web app.
-- After modifying the UI, you may use the Playwright MCP to confirm that the changes are as expected.
+- We do not plan to add authentication for users of this web app. Admin routes (`/admin/*`) are protected by Basic Auth configured via `src/middleware.ts` and environment variables.
+- Environment variables are strictly validated at runtime using the T3 Env schema defined in `src/env.js`.
+    - Configuration uses `runtimeEnv: process.env` (not `runtimeEnvStrict`) as Next.js provides `process.env` access.
+    - `emptyStringAsUndefined: true` is set for better validation handling.
+    - Currently, only `server` variables are defined. If client variables are needed, they *must* be prefixed `NEXT_PUBLIC_` (as defined in `src/env.js`) and added to the `client` schema section.
+- After modifying the UI, you may use the `Playwright MCP` to confirm that the changes are as expected.
 - When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
-- Use pnpm instead of npm.
+- Use `pnpm` instead of `npm`.
 - Never write code for database migration because I'll just do `pnpm db:push` instead
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
 - Add many comments that ELI5 the parts of the code that are more difficult to understand. Additionally, often add comments valuable for technical people and coding AI agents.
+- After you finish a task, update `.cursor/rules/project-info.mdc` with the latest information (for example, descriptions for new common helpers or EVM/SVM utilities). You may also edit `README.md` to add the completed task in the `Previously Completed` section, or update the `TODO` section with proposals for future tasks.
 - The fewer lines of code, the better.
