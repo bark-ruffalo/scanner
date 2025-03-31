@@ -13,7 +13,7 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const currentFilter = searchParams.get("filter") ?? "All";
+	const currentFilter = searchParams?.get("launchpad") ?? "All";
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const loadingRef = useRef(false);
@@ -33,19 +33,26 @@ function FilterContent({ launchpads }: LaunchpadFilterDropdownProps) {
 		}
 	}, [pathname, searchParams]);
 
-	const handleSelect = (filter: string) => {
+	const handleSelect = (value: string) => {
+		// If the selected value is the same as the current filter, just close the dropdown
+		if (value === currentFilter) {
+			setIsOpen(false);
+			return;
+		}
+
 		// Set loading state while router navigation is happening
 		setIsLoading(true);
 		loadingRef.current = true;
-		const params = new URLSearchParams(searchParams.toString());
-		if (filter === "All") {
-			params.delete("filter");
+		const params = new URLSearchParams(searchParams?.toString() || "");
+
+		if (value === "All") {
+			params.delete("launchpad");
 		} else {
-			params.set("filter", filter);
+			params.set("launchpad", value);
 		}
-		// Use router.push to navigate, preserving other potential query params
+
 		router.push(`${pathname}?${params.toString()}`);
-		setIsOpen(false); // Close dropdown after selection
+		setIsOpen(false);
 	};
 
 	// Close dropdown if clicked outside

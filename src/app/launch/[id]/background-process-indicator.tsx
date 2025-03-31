@@ -23,8 +23,6 @@ export function BackgroundProcessIndicator({
 	className,
 }: BackgroundProcessIndicatorProps) {
 	const [isComplete, setIsComplete] = useState(false);
-
-	// Track if this process has already been completed
 	const [hasCompleted, setHasCompleted] = useState(false);
 
 	useEffect(() => {
@@ -36,6 +34,13 @@ export function BackgroundProcessIndicator({
 		// Only trigger the completion timer once
 		if (hasCompleted) return;
 
+		// For llmAnalysis, don't use a timer - we'll let the server action complete it
+		if (processType === "llmAnalysis") {
+			// Don't set a completion timer for LLM analysis
+			// It will be marked complete when the server action finishes
+			return;
+		}
+
 		// Use localStorage to ensure we don't run the same process twice
 		const processKey = `process-${processType}-${Date.now()}`;
 		if (localStorage.getItem(processKey)) return;
@@ -43,9 +48,9 @@ export function BackgroundProcessIndicator({
 		// Store that we've started this process
 		localStorage.setItem(processKey, "true");
 
-		// Simulate completion for demonstration purposes
-		// In real production, this would be triggered by the actual task completion
-		const duration = processType === "tokenStats" ? 5000 : 15000;
+		// Simulate completion for token stats only
+		// LLM analysis will be marked complete by the server action
+		const duration = 5000; // Only for tokenStats
 		const timer = setTimeout(() => {
 			if (hasCompleted) return;
 			setIsComplete(true);
@@ -63,6 +68,19 @@ export function BackgroundProcessIndicator({
 
 		return () => clearTimeout(timer);
 	}, [isActive, processType, onComplete, hasCompleted]);
+
+	// If this is LLM analysis and it's not active anymore, it means the server
+	// action has completed, so mark it as complete
+	useEffect(() => {
+		if (
+			processType === "llmAnalysis" &&
+			!isActive &&
+			!isComplete &&
+			hasCompleted
+		) {
+			setIsComplete(true);
+		}
+	}, [isActive, isComplete, hasCompleted, processType]);
 
 	const labels = {
 		tokenStats: "Updating token statistics...",

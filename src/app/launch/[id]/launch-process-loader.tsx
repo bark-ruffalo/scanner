@@ -46,13 +46,26 @@ export function LaunchProcessLoader({
 					analysis: { ...prev.analysis, isRunning: true, hasStarted: true },
 				}));
 
-				performLlmAnalysis(launchId).catch((error) => {
-					console.error("Error performing LLM analysis:", error);
-					setProcessStates((prev) => ({
-						...prev,
-						analysis: { ...prev.analysis, isRunning: false },
-					}));
-				});
+				performLlmAnalysis(launchId)
+					.then(() => {
+						// Analysis completed successfully
+						setProcessStates((prev) => ({
+							...prev,
+							analysis: {
+								...prev.analysis,
+								isComplete: true,
+								isRunning: false,
+							},
+						}));
+						setShouldRefresh(true);
+					})
+					.catch((error) => {
+						console.error("Error performing LLM analysis:", error);
+						setProcessStates((prev) => ({
+							...prev,
+							analysis: { ...prev.analysis, isRunning: false },
+						}));
+					});
 			}, 300);
 
 			return () => clearTimeout(timer);
@@ -156,6 +169,10 @@ export function LaunchProcessLoader({
 
 	// Handle completion of processes
 	const handleAnalysisComplete = () => {
+		// We no longer need this for LLM analysis
+		// The completion is handled in the promise resolution
+		if (processStates.analysis.isComplete) return;
+
 		setProcessStates((prev) => ({
 			...prev,
 			analysis: { ...prev.analysis, isComplete: true, isRunning: false },
@@ -179,11 +196,26 @@ export function LaunchProcessLoader({
 				(!needsTokenUpdate || processStates.tokenUpdate.isComplete);
 
 			if (allComplete) {
+				// Keep loading state active until page is actually refreshed
+				const beforeUnloadHandler = () => {
+					setProcessStates((prev) => ({
+						...prev,
+						analysis: { ...prev.analysis, isRunning: false },
+						tokenUpdate: { ...prev.tokenUpdate, isRunning: false },
+					}));
+				};
+
+				// Add event listener to detect when page is about to be unloaded/refreshed
+				window.addEventListener("beforeunload", beforeUnloadHandler);
+
 				const timer = setTimeout(() => {
 					router.refresh();
 				}, 500);
 
-				return () => clearTimeout(timer);
+				return () => {
+					clearTimeout(timer);
+					window.removeEventListener("beforeunload", beforeUnloadHandler);
+				};
 			}
 		}
 	}, [shouldRefresh, processStates, needsAnalysis, needsTokenUpdate, router]);

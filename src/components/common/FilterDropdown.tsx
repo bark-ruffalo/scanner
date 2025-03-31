@@ -27,7 +27,7 @@ function FilterContent({
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams();
-	const currentValue = searchParams.get(paramName) ?? defaultValue;
+	const currentValue = searchParams?.get(paramName) ?? defaultValue;
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const loadingRef = useRef(false);
@@ -48,9 +48,15 @@ function FilterContent({
 	}, [pathname, searchParams]);
 
 	const handleSelect = (value: string) => {
+		// If the selected value is the same as the current value, just close the dropdown
+		if (value === currentValue) {
+			setIsOpen(false);
+			return;
+		}
+
 		setIsLoading(true);
 		loadingRef.current = true;
-		const params = new URLSearchParams(searchParams.toString());
+		const params = new URLSearchParams(searchParams?.toString() || "");
 
 		if (value === defaultValue && paramName === "filter") {
 			// Special case for filter dropdown with default "All" value

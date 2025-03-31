@@ -9,7 +9,7 @@ function FilterContent() {
 	const router = useRouter();
 	const pathname = usePathname();
 	const searchParams = useSearchParams() || new URLSearchParams();
-	const currentFilter = searchParams.get("minRating") ?? "2";
+	const currentFilter = searchParams?.get("minRating") ?? "2";
 	const [isOpen, setIsOpen] = useState(false);
 	const [isLoading, setIsLoading] = useState(false);
 	const loadingRef = useRef(false);
@@ -30,10 +30,16 @@ function FilterContent() {
 	}, [pathname, searchParams]);
 
 	const handleSelect = (rating: string) => {
+		// If the selected rating is the same as the current filter, just close the dropdown
+		if (rating === currentFilter) {
+			setIsOpen(false);
+			return;
+		}
+
 		// Set loading state while router navigation is happening
 		setIsLoading(true);
 		loadingRef.current = true;
-		const params = new URLSearchParams(searchParams.toString());
+		const params = new URLSearchParams(searchParams?.toString() || "");
 		params.set("minRating", rating);
 		router.push(`${pathname}?${params.toString()}`);
 		setIsOpen(false);
