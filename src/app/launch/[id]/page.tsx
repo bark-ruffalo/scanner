@@ -1,18 +1,11 @@
 import { format } from "date-fns";
-import { eq } from "drizzle-orm";
 import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { Suspense } from "react";
 import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
 import { BackButton } from "~/components/BackButton";
 import { linkify } from "~/lib/utils";
-import { analyzeLaunch } from "~/server/lib/ai-utils";
-import {
-	getLaunchById,
-	getLaunchMetadata,
-	updateLaunchAnalysis,
-} from "~/server/queries";
+import { getLaunchById, getLaunchMetadata } from "~/server/queries";
 
 type Props = {
 	params: { id: string };
@@ -110,7 +103,7 @@ export default async function LaunchDetailPage({ params }: Props) {
 						<div className="mt-8">
 							<h2 className="mb-4 font-bold text-xl">Recent developments:</h2>
 						</div>
-						<div className="rounded-lg bg-gray-800 border border-white/20 p-6">
+						<div className="rounded-lg border border-white/20 bg-gray-800 p-6">
 							<div className="flex flex-col gap-1">
 								{launch.sentToZeroAddress ? (
 									<p>Creator token holdings: unknown</p>
