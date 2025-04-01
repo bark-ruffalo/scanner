@@ -49,3 +49,6 @@ yarn-error.log*
 # Render specific
 .render-buildpacks/
 .render-build.log
+
+# Sentry Config File
+.env.sentry-build-plugin
