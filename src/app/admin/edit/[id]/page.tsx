@@ -1,12 +1,11 @@
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { getLaunchById } from "~/server/queries";
 import { EditLaunchForm } from "./EditLaunchForm";
 
-interface Props {
-	params: { id: string };
-}
-
-export default async function EditLaunchPage({ params }: Props) {
+export default async function EditLaunchPage({
+	params,
+}: { params: { id: string } }): Promise<ReactNode> {
 	const launchId = Number.parseInt(params.id, 10);
 	if (Number.isNaN(launchId)) {
 		notFound();

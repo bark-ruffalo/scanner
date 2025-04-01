@@ -1,5 +1,6 @@
 import { format, formatDistanceToNow } from "date-fns"; // Import format function
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { getLaunches } from "~/server/queries";
 
 // Ensure the page is dynamically rendered to pick up revalidated data
@@ -7,20 +8,16 @@ export const dynamic = "force-dynamic";
 // Alternatively, consider using route segment config:
 // export const revalidate = 0; // Equivalent to force-dynamic for data fetching
 
-// Define the expected shape of searchParams
-interface HomePageProps {
+export default async function HomePage({
+	searchParams,
+}: {
 	searchParams: {
-		// Make searchParams non-optional, it's always provided
 		filter?: string;
 		minRating?: string;
 	};
-}
-
-export default async function HomePage({ searchParams }: HomePageProps) {
-	// Await searchParams before accessing its properties
-	const params = await searchParams;
-	const currentFilter = params.filter;
-	const minRating = params.minRating ?? "2"; // Default to 2 if not provided
+}): Promise<ReactNode> {
+	const currentFilter = searchParams.filter;
+	const minRating = searchParams.minRating ?? "2"; // Default to 2 if not provided
 
 	// Fetch launches using the DAL - this will now refetch after revalidatePath('/') is called
 	const filteredLaunches = await getLaunches(currentFilter, minRating);

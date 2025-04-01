@@ -1,20 +1,24 @@
 import { format } from "date-fns";
-import type { Metadata } from "next";
+import type { Metadata, ResolvingMetadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 import { BackButton } from "~/app/_components/BackButton";
 import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
 import { linkify } from "~/lib/utils";
 import { getLaunchById, getLaunchMetadata } from "~/server/queries";
 
-type Props = {
+export type PageProps = {
 	params: { id: string };
+	searchParams: Record<string, string | string[] | undefined>;
 };
 
 // Add metadata generation
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-	const resolvedParams = await Promise.resolve(params);
-	const launchId = Number.parseInt(resolvedParams.id, 10);
+export async function generateMetadata(
+	{ params }: { params: { id: string } },
+	parent: ResolvingMetadata,
+): Promise<Metadata> {
+	const launchId = Number.parseInt(params.id, 10);
 	if (Number.isNaN(launchId)) {
 		return { title: "Invalid Launch | Scanner" };
 	}
@@ -22,9 +26,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 }
 
 // Make the main page component a server component again
-export default async function LaunchDetailPage({ params }: Props) {
-	const resolvedParams = await Promise.resolve(params);
-	const launchId = Number.parseInt(resolvedParams.id, 10);
+export default async function LaunchDetailPage({
+	params,
+}: { params: { id: string } }): Promise<ReactNode> {
+	const launchId = Number.parseInt(params.id, 10);
 	if (Number.isNaN(launchId)) {
 		notFound();
 	}
