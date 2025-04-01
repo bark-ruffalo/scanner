@@ -5,8 +5,11 @@ import { EditLaunchForm } from "./EditLaunchForm";
 
 export default async function EditLaunchPage({
 	params,
-}: { params: { id: string } }): Promise<ReactNode> {
-	const launchId = Number.parseInt(params.id, 10);
+}: {
+	params: Promise<{ id: string }>;
+}): Promise<ReactNode> {
+	const resolvedParams = await params;
+	const launchId = Number.parseInt(resolvedParams.id, 10);
 	if (Number.isNaN(launchId)) {
 		notFound();
 	}

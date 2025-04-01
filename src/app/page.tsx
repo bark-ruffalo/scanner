@@ -11,13 +11,14 @@ export const dynamic = "force-dynamic";
 export default async function HomePage({
 	searchParams,
 }: {
-	searchParams: {
+	searchParams: Promise<{
 		filter?: string;
 		minRating?: string;
-	};
+	}>;
 }): Promise<ReactNode> {
-	const currentFilter = searchParams.filter;
-	const minRating = searchParams.minRating ?? "2"; // Default to 2 if not provided
+	const resolvedSearchParams = await searchParams;
+	const currentFilter = resolvedSearchParams.filter;
+	const minRating = resolvedSearchParams.minRating ?? "2"; // Default to 2 if not provided
 
 	// Fetch launches using the DAL - this will now refetch after revalidatePath('/') is called
 	const filteredLaunches = await getLaunches(currentFilter, minRating);

@@ -15,10 +15,11 @@ export type PageProps = {
 
 // Add metadata generation
 export async function generateMetadata(
-	{ params }: { params: { id: string } },
+	{ params }: { params: Promise<{ id: string }> },
 	parent: ResolvingMetadata,
 ): Promise<Metadata> {
-	const launchId = Number.parseInt(params.id, 10);
+	const resolvedParams = await params;
+	const launchId = Number.parseInt(resolvedParams.id, 10);
 	if (Number.isNaN(launchId)) {
 		return { title: "Invalid Launch | Scanner" };
 	}
@@ -28,8 +29,11 @@ export async function generateMetadata(
 // Make the main page component a server component again
 export default async function LaunchDetailPage({
 	params,
-}: { params: { id: string } }): Promise<ReactNode> {
-	const launchId = Number.parseInt(params.id, 10);
+}: {
+	params: Promise<{ id: string }>;
+}): Promise<ReactNode> {
+	const resolvedParams = await params;
+	const launchId = Number.parseInt(resolvedParams.id, 10);
 	if (Number.isNaN(launchId)) {
 		notFound();
 	}
