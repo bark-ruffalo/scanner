@@ -2,7 +2,7 @@ import "~/styles/globals.css";
 
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
-import { ClientNavbar } from "~/components/ClientNavbar";
+import { ClientNavbar } from "~/app/_components/ClientNavbar";
 
 export const metadata: Metadata = {
 	title: "Scanner",

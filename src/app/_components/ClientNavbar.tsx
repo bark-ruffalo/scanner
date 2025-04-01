@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FilterDropdown } from "~/components/common/FilterDropdown";
+import { FilterDropdown } from "~/app/_components/common/FilterDropdown";
 
 export function ClientNavbar() {
 	// Get current path to determine if we should show filters

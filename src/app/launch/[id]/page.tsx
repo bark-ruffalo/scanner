@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Image from "next/image";
 import { notFound } from "next/navigation";
 import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
-import { BackButton } from "~/components/BackButton";
+import { BackButton } from "~/app/_components/BackButton";
 import { linkify } from "~/lib/utils";
 import { getLaunchById, getLaunchMetadata } from "~/server/queries";
 
