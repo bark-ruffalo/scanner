@@ -116,7 +116,8 @@ export function ClientNavbar() {
 						</svg>
 					</a>
 					<Link
-						href="/admin prefetch={false}"
+						href="/admin"
+						prefetch={false}
 						className="text-gray-300 hover:text-[var(--color-scanner-purple-dark)]"
 						aria-label="Admin"
 					>
