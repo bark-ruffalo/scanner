@@ -31,7 +31,7 @@ The project is a WIP web app. The objective is to monitor various launchpads (cr
 
 Always use the following command after a new chat has started in order to understand the project structure!
 
-`tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc'`
+`tree -L 4 -a -I 'node_modules|.git|**pycache**|.DS_Store|pytest_cache|.vscode|.next|.cursor|.swc|context*'`
 
 ## Data Models / Schema
 
