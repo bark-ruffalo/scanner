@@ -5,7 +5,7 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { BackButton } from "~/app/_components/BackButton";
 import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
-import { linkify } from "~/lib/utils";
+import { calculateBigIntPercentage, linkify } from "~/lib/utils";
 import { getLaunchById, getLaunchMetadata } from "~/server/queries";
 
 export type PageProps = {
@@ -74,6 +74,28 @@ export default async function LaunchDetailPage({
 		creatorInitialTokens
 	);
 
+	// Calculate percentage of total supply held by creator if possible
+	let percentageOfTotalSupplyFormatted: string | null = null;
+	if (launch.creatorTokensHeld && launch.totalTokenSupply) {
+		try {
+			const creatorHeldBigInt = BigInt(launch.creatorTokensHeld);
+			const totalBigInt = BigInt(launch.totalTokenSupply);
+			// Use the helper function to calculate the percentage
+			const result = calculateBigIntPercentage(creatorHeldBigInt, totalBigInt);
+			if (result) {
+				percentageOfTotalSupplyFormatted = result.formatted;
+			}
+		} catch (error) {
+			console.error(
+				"Error calculating percentage of total supply:",
+				error,
+				launch.creatorTokensHeld,
+				launch.totalTokenSupply,
+			);
+			// Handle potential BigInt conversion errors if strings are invalid
+		}
+	}
+
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
 			{/* Centralized process loader */}
@@ -128,7 +150,11 @@ export default async function LaunchDetailPage({
 													<>
 														{" "}
 														({Number(launch.creatorTokensHeld).toLocaleString()}{" "}
-														tokens)
+														tokens
+														{/* Add the percentage of total supply here */}
+														{percentageOfTotalSupplyFormatted &&
+															` / ${percentageOfTotalSupplyFormatted} of total supply`}
+														)
 													</>
 												)}
 												.
