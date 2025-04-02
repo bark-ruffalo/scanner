@@ -55,7 +55,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - It's integrated via the `@tailwindcss/postcss` plugin configured in `postcss.config.js`.
     - Custom theme values (colors, fonts, etc.) are defined directly within `src/styles/globals.css` using the `@theme { ... }` directive. There is **no** `tailwind.config.js` file as used in Tailwind v3 and earlier.
 - LLM calls are handled in `src/server/lib/ai-utils.ts`. Templates for prompts are in the `/templates` directory.
-- New launch detection logic resides in `src/server/launchpads/`. The `instrumentation.ts` file registers these listeners to run on server start.
+- New launch detection logic resides in `src/server/launchpads/`. The `src/instrumentation.ts` file registers these listeners to run on server start.
 - For blockchain interactions for EVM chains use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/web3-client.ts`.
 - Launchpad implementation (`src/server/launchpads/virtuals-base.ts`):
     - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.

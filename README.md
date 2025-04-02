@@ -35,7 +35,7 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - The `./update-context.sh` script can generate a `context-codebase.md` file containing the entire codebase, which is useful for providing context to LLMs. You'll probably want to also add relevant rule files (`.mdc` from the `.cursor/rules` directory) before sending the task to your own AI agent.
 - Hosted on Render due to its WebSocket support, which is necessary for listening to on-chain contract events via wss RPC endpoints.
 - In `src/server/lib/ai-utils.ts`, LLM models can be configured differently for development and production environments.
-- When implementing a new launchpad listener (e.g., in `src/server/launchpads/`), consider adding a corresponding `debugFetchHistoricalEvents` function and integrating it into `instrumentation.ts` for testing and backfilling.
+- When implementing a new launchpad listener (e.g., in `src/server/launchpads/`), consider adding a corresponding `debugFetchHistoricalEvents` function and integrating it into `src/instrumentation.ts` for testing and backfilling.
 - Run `pnpm check:write` after making code changes to format and lint the code.
 - Database migrations are handled via `pnpm db:push`. Schema changes are defined in `src/server/db/schema.ts`.
 - All database access should go through the Data Access Layer (DAL) defined in `src/server/queries.ts`. The database client itself is instantiated globally in `src/server/db/index.ts`.
