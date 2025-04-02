@@ -40,9 +40,12 @@ Consider the launchpad information provided in the "launchpad_info" section when
 - the summary must focus on describing what the investment is about unless a one or two-word summary would save users' time; be more likely to do super-short summaries if it's a low-rated investment
 
 # Rules for rating
-- the rating is based mostly on the analysis
+- the rating is based mainly on the analysis
 - if there's not enough information for a proper rating, return 0
-- if it's a memecoin, be much more likely to rate it lower
+- if it's a memecoin, be much more likely to rate it lower, and never higher than 2
+- if the creator's allocation is less than 10% or more than 50% of the total supply, you should rate it much lower unless the tokenomics explains why it's reasonable
+- if the creator's allocation is less than 5% and this pretends to be a serious investment instead of a memecoin, return 0
+- if the creator's allocation is more than 80% of the total supply, return 0
 </rules>
 
 Analyze if the project from the "investment" section is good, then rate it as an investment opportunity from 0 to 10 and summarize it. Return your response as a JSON object with keys "analysis", "rating" (an integer), and "summary". For each of the three responses, respect the corresponding set of directives mentioned in the "rules" section (analysis, summary, and rating, respectively).
