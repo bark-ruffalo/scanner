@@ -1,20 +1,12 @@
 import "server-only";
 // Use type imports for types
-import type {
-	Abi,
-	AbiItem,
-	Address,
-	GetLogsReturnType,
-	Log,
-	PublicClient,
-} from "viem";
+import type { AbiItem, Address, PublicClient } from "viem";
 // Keep value imports separate
 import {
 	http,
 	createPublicClient,
 	decodeEventLog,
 	formatUnits,
-	parseAbi,
 	parseAbiItem,
 } from "viem";
 import { base } from "viem/chains";

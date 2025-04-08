@@ -2,11 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { analyzeLaunch } from "~/server/lib/ai-utils";
+import { publicClient } from "~/server/lib/evm-client";
 import {
 	addKnownEvmSellingAddress,
 	updateEvmTokenStatistics,
 } from "~/server/lib/evm-utils";
-import { publicClient } from "~/server/lib/web3-client";
 import {
 	getLaunchById,
 	updateLaunchAnalysis,

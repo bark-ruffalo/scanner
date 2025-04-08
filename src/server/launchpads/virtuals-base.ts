@@ -13,14 +13,9 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import {
-	type LaunchpadLinkGenerator,
-	extractUrls,
-	fetchFirecrawlContent,
-	fetchUrlContent,
-	formatFetchedContent,
-} from "~/lib/content-utils";
+import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
+import { fetchAdditionalContent } from "~/server/lib/common-utils";
 import {
 	addKnownEvmSellingAddress,
 	getEvmErc20BalanceAtBlock,
@@ -29,20 +24,6 @@ import {
 import { addLaunch } from "~/server/queries";
 
 // --- Types ---
-
-interface LaunchData {
-	launchpad: string;
-	title: string;
-	url: string;
-	description: string;
-	launchedAt: Date;
-	imageUrl: string | null;
-	totalTokenSupply: string;
-	creatorTokensHeld: string;
-	creatorTokenHoldingPercentage: string;
-	basicInfoUpdatedAt: Date;
-	tokenStatsUpdatedAt: Date;
-}
 
 // --- Configuration ---
 
@@ -178,68 +159,6 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 };
 
 // --- Listener Logic ---
-
-/**
- * Fetches additional content from relevant links
- * @param platformDescription The platform description to extract links from
- * @param creatorAddress The creator's address for custom links
- */
-async function fetchAdditionalContent(
-	platformDescription: string,
-	creatorAddress: string,
-): Promise<string> {
-	const contents: Array<{ url: string; content: string; name?: string }> = [];
-
-	// Get URLs from platform description
-	const descriptionUrls = extractUrls(platformDescription);
-
-	// Get custom links for this launchpad
-	const customLinks = virtualsLinkGenerator.getCustomLinks({
-		creatorAddress,
-	});
-
-	// Log what we're going to fetch
-	console.log(
-		`Fetching ${descriptionUrls.length} URLs from description and ${customLinks.length} custom links`,
-	);
-
-	// Fetch content from all URLs
-	const fetchPromises = [
-		...descriptionUrls.map(async (url) => {
-			// For description URLs, use auto-detection (crawl for websites, scrape for specific pages)
-			const content = await fetchFirecrawlContent(url, {
-				// Auto-detect mode based on URL
-				maxPages: 12, // Limit to 12 pages max for website crawls
-				formats: ["markdown"],
-			});
-			contents.push({ url, content });
-		}),
-		...customLinks.map(
-			async ({ url, name, useFirecrawl, firecrawlOptions, formatOptions }) => {
-				const content = useFirecrawl
-					? await fetchFirecrawlContent(
-							url,
-							firecrawlOptions || {
-								// Default options if none specified
-								maxPages: 11,
-								formats: ["markdown"],
-							},
-						)
-					: await fetchUrlContent(url);
-				contents.push({ url, content, name });
-			},
-		),
-	];
-
-	await Promise.all(fetchPromises);
-
-	// Format the fetched content with default options
-	return formatFetchedContent(contents, {
-		includeUrls: true,
-		combineContent: false,
-		maxContentLength: 50000,
-	});
-}
 
 /**
  * Processes a single 'Launched' event log.
@@ -440,7 +359,11 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Fetch additional content only if no token sales detected
 		const additionalContent = !hasSoldTokens
-			? await fetchAdditionalContent(platformDescription, getAddress(creator))
+			? await fetchAdditionalContent(
+					platformDescription,
+					getAddress(creator),
+					virtualsLinkGenerator,
+				)
 			: "";
 
 		// Modify description construction to conditionally include additional content section
@@ -456,7 +379,7 @@ Token address: ${getAddress(token)}
 Token symbol: $${tokenSymbol}
 Token supply: 1 billion
 Top holders: https://basescan.org/token/${getAddress(token)}#balances
-Liquidity contract: https://basescan.org/address/${getAddress(pair)}#code (the token graduates when this gets 42k $VIRTUAL)
+Liquidity contract: https://basescan.org/address/${getAddress(pair)}#asset-tokens (the token graduates when this gets 42k $VIRTUAL)
 Creator initial number of tokens: ${displayInitialBalance} (${formattedAllocation} of token supply)
 ${recentDevelopmentsText}
 

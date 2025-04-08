@@ -9,9 +9,9 @@ globs: **/*.tsx, **/*.ts, src/**/*.ts, src/**/*.tsx
 
 - Use the App Router directory structure
 - Place components in `app` directory for route-specific components
-- Place shared components in `components` directory
+- Place shared components in `app/_components` directory
 - Place utilities and helpers in `lib` directory
-- Use lowercase with dashes for directories (e.g., `components/auth-wizard`)
+- Use lowercase with dashes for directories (e.g., `app/_components/auth-wizard`)
 
 ## Components
 

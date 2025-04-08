@@ -40,8 +40,8 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - Database migrations are handled via `pnpm db:push`. Schema changes are defined in `src/server/db/schema.ts`.
 - All database access should go through the Data Access Layer (DAL) defined in `src/server/queries.ts`. The database client itself is instantiated globally in `src/server/db/index.ts`.
 - The application requires several environment variables (see `.env.example`). These are validated using T3 Env (`src/env.js`). Ensure your `.env` file is configured correctly.
-- Shared utility functions (e.g., formatting, URL parsing) reside in `src/lib/utils.ts`.
-- Server-specific utilities, including Web3 client setup (`src/server/lib/web3-client.ts`), EVM interactions (`src/server/lib/evm-utils.ts`), and AI interactions (`src/server/lib/ai-utils.ts`), are located in `src/server/lib/`.
+- Shared utility functions (e.g., formatting, URL parsing) reside in `src/lib/utils.ts`. Content fetching utilities are in `src/lib/content-utils.ts`.
+- Server-specific utilities, including blockchain client setup (`src/server/lib/evm-client.ts`, `src/server/lib/svm-client.ts`), chain-specific interactions (`src/server/lib/evm-utils.ts`, `src/server/lib/svm-utils.ts`), AI interactions (`src/server/lib/ai-utils.ts`), and launchpad-specific helpers (`src/server/lib/virtuals-utils.ts`), are located in `src/server/lib/`.
 - This project was bootstrapped using the T3 Stack. You might want to read their documentations first:
   - [Create T3 App](https://create.t3.gg/en/introduction)
   - [T3 Env](https://env.t3.gg/docs/introduction)
@@ -49,7 +49,7 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 ## TODO
 
 ### High Priority
-- [ ] Add another crypto launchpad but for Solana (SVM). Consider using Helius or Triton for RPC/event listening.
+- [ ] Complete the Solana launchpad implementation (Virtuals Protocol - Solana):
 - [ ] Add a traditional VC investing launchpad listener (e.g., scraping a website like AngelList or Republic).
 - [ ] Refine and test the Admin page functionality (add/edit/delete launches).
 - [ ] Research other launchpads to integrated with.
@@ -60,13 +60,14 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - [ ] Allow users to submit a URL for a launch to be analyzed and potentially added.
 - [ ] Implement a comment section for each launch (consider a simple backend or a third-party service).
 - [ ] Add like/dislike functionality for launches.
+- [ ] Make evm-client.ts more general so that it can be used for other EVM chains.
 
-### Low Priority
+### Low Priority or Optional
 - [ ] Add comprehensive unit and integration tests.
 - [ ] Ensure the "Creator initial number of tokens" percentage display uses a common utility function. (`src/lib/utils.ts`)
 
 ### Bugs
-- ...
+- [ ]
 
 ---
 *Previously Completed:*
@@ -90,4 +91,12 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - Use different LLMs in prod/dev
 - Improve error handling and user feedback for background processes (LLM analysis, token stats updates).
 - Fixed bugs: middleware wrong location, not adding total token supply to DB, etc.
+- Completed implementation of Solana launchpad (Virtuals Protocol - Solana):
+  - Added Solana dependencies (@coral-xyz/anchor, @solana/web3.js, etc.)
+  - Added Solana RPC URL and program ID configuration
+  - Created launchpad implementation with WebSocket event listening (using Helius for parsing)
+  - Implemented robust historical fetching (`debugFetchHistoricalEvents`) using paginated `getSignaturesForAddress` and `getTransaction`, parsing instructions (including inner instructions) with Anchor's `BorshInstructionCoder`
+  - Added Solana utilities for token monitoring and statistics
+  - Implemented token burn and transfer monitoring
+  - Added support for fetching token metadata and balances
 - etc.

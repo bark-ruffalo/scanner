@@ -15,6 +15,24 @@ The project is a WIP web app. The objective is to monitor various launchpads (cr
 - Public token allocation percentage;
 - etc.
 
+## Project Info
+
+Scanner is a web app designed to monitor various launchpads (both crypto and traditional finance). It aims to:
+- Aggregate information about upcoming and recent launches.
+- Utilize LLMs to summarize, analyze, and rate launches as potential investments.
+- Provide filters based on launchpad type, specific launchpads, rating, tokenomics (e.g., creator holdings), etc.
+
+### Current Status
+
+The project is in active development with the following key features implemented:
+- Basic web app structure with Next.js and Tailwind CSS
+- Database integration with PostgreSQL and Drizzle ORM
+- Launch listing and filtering functionality
+- LLM-based launch analysis and rating
+- EVM crypto launchpad listener (Virtuals Protocol - Base)
+- Solana crypto launchpad listener (Virtuals Protocol - Solana) - partially implemented
+- Admin page for managing launches
+
 ## Tech Stack
 
 - **Framework**: [Next.js](https://nextjs.org) (App Router)
@@ -26,6 +44,15 @@ The project is a WIP web app. The objective is to monitor various launchpads (cr
 - **Linting/Formatting**: [Biome](https://biomejs.dev/)
 - **Package Manager**: [pnpm](https://pnpm.io/)
 - **Deployment**: [Render](https://render.com/)
+
+## Dependencies
+
+Key dependencies and their versions:
+- @coral-xyz/anchor: 0.29.0 (downgraded from 0.31.0 for compatibility)
+- @solana/web3.js: ^1.98.0
+- @solana/spl-token: ^0.4.13
+- viem: ^2.24.1 (for EVM chain support)
+- drizzle-orm: ^0.41.0
 
 ## Project Structure
 
@@ -50,35 +77,68 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - Tokenomics fields (`creatorTokenHoldingPercentage`, `creatorTokensHeld`, `creatorInitialTokensHeld`, `tokensForSale`, `creatorTokenMovementDetails`, `totalTokenSupply`, `sentToZeroAddress`, `mainSellingAddress`)
 - Timestamps (`launchedAt`, `basicInfoUpdatedAt`, `tokenStatsUpdatedAt`, `llmAnalysisUpdatedAt`, `createdAt`, `updatedAt`)
 
+## Always do this when adding or modifying launchpads that the Scanner supports, or their utility files
+- You may never run `pnpm dev` yourself! Just tell me when to give you its output and, most likely, I'll do it while debugging the launchpad that we're working on; example: `clear; pnpm check:write; DEBUG_VIRTUALS_SOLANA=true pnpm dev`.
+- You're also not allowed to hardcode any launch values into the code (like token name, symbol, address, creator information, etc.).
+- Never update the `src/instrumentation.ts` file to change the block interval for which I'm debugging.
+
 ## Important Notes (also regarding tool usage)
+- You're not allowed to run `pkill` and `killall` commands.
 - Regarding styling with Tailwind CSS v4:
     - It's integrated via the `@tailwindcss/postcss` plugin configured in `postcss.config.js`.
     - Custom theme values (colors, fonts, etc.) are defined directly within `src/styles/globals.css` using the `@theme { ... }` directive. There is **no** `tailwind.config.js` file as used in Tailwind v3 and earlier.
 - LLM calls are handled in `src/server/lib/ai-utils.ts`. Templates for prompts are in the `/templates` directory.
 - New launch detection logic resides in `src/server/launchpads/`. The `src/instrumentation.ts` file registers these listeners to run on server start.
-- For blockchain interactions for EVM chains use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/web3-client.ts`.
-- Launchpad implementation (`src/server/launchpads/virtuals-base.ts`):
+- For blockchain interactions:
+  - EVM chains: Use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/web3-client.ts`.
+  - Solana: Use `@solana/web3.js` and `@coral-xyz/anchor`. The connection and utilities are in `src/server/lib/svm-utils.ts`.
+- Launchpad implementations:
+  - VIRTUALS Protocol on Base (EVM) (`src/server/launchpads/virtuals-base.ts`):
     - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.
     - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling.
     - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances, and formatting a comprehensive description before adding to the database.
-    - `fetchAdditionalContent`: Fetches additional information from various URLs mentioned in the project description and custom launchpad-specific links.
+  - VIRTUALS Protocol on Solana (SVM) (`src/server/launchpads/virtuals-solana.ts`):
+    - `startVirtualsSolanaListener`: Starts WebSocket listener for program logs on Solana, using Helius API to fetch transaction details for parsing real-time events.
+    - `debugFetchHistoricalEvents`: Fetches and processes historical 'launch' instructions within a specific slot range. It uses paginated `getSignaturesForAddress` to get relevant signatures, then fetches full details via `connection.getTransaction` for each, handling LUTs. It parses both top-level and inner instructions using `BorshInstructionCoder` via the `findLaunchInInstruction` helper.
+    - `processLaunchEvent`: Processes a single event by fetching token metadata, creator balances (initial via transaction meta, current via direct fetch), monitoring token burns/transfers (via `updateSolanaTokenStatistics`), and formatting a comprehensive description before adding to the database.
+    - `findLaunchInInstruction`: Helper function to parse a single instruction (top-level or inner) from a transaction response using `BorshInstructionCoder` to identify 'launch' instructions and extract their data.
 - Content utilities (`src/lib/content-utils.ts`):
     - `extractUrls`: Extracts all URLs from a text string using regex.
-    - `fetchUrlContent`: Simple utility to fetch content from a URL.
-    - `fetchFirecrawlContent`: Advanced content fetching using the Firecrawl API, with auto-detection between crawling a website and scraping a specific page.
-    - `formatFetchedContent`: Formats fetched content with options for including URLs, combining content, and limiting length.
-    - `LaunchpadLinkGenerator`: Interface for defining custom link generators for launchpads to provide additional content sources based on launch parameters.
+    - `fetchUrlContent`: Simple utility to fetch raw content (HTML, text, JSON) from a URL using standard `fetch`.
+    - `fetchFirecrawlContent`: Advanced content fetching using the Firecrawl API, with auto-detection between crawling a website (following links) and scraping a specific page (retrieving its content). Returns formatted content (Markdown, text).
+    - `formatFetchedContent`: Formats fetched content (plain text or Markdown) with options for including source URLs, combining multiple pieces of content, and limiting the total length.
+    - `LaunchpadLinkGenerator`: Interface for defining custom link generators for launchpads. Allows generating specific URLs (e.g., creator profile, token page) based on launch parameters (token address, creator address) to feed into content fetching.
     - `handleCrawlResponse` and `handleScrapeResponse`: Helper functions for processing different types of responses from the Firecrawl API.
 - Common helper utilities (`src/lib/utils.ts`):
-    - `linkify`: Parses a string to find URLs and returns an array of segments, marking URLs specifically so they can be rendered as links.
-    - `formatTokenBalance`: Converts a raw BigInt token amount (like from a contract call) into a human-readable, comma-separated string, rounded to the nearest whole number.
-    - `calculateBigIntPercentage`: Calculates the percentage between two BigInt numbers, returning the numeric percentage and a formatted string (e.g., "87.40%"). Handles potential division-by-zero.
+    - `linkify`: Parses a string to find URLs and returns an array of segments, marking URLs specifically so they can be rendered as interactive links in the UI.
+    - `formatTokenBalance`: Converts a raw BigInt token amount (like from a contract call) into a human-readable, comma-separated string, handling decimals appropriately and rounding to the nearest whole number.
+    - `calculateBigIntPercentage`: Calculates the percentage between two BigInt numbers, returning the numeric percentage and a formatted string (e.g., "87.40%"). Handles potential division-by-zero gracefully.
+- EVM client (`src/server/lib/evm-client.ts`):
+    - Exports `getEvmHttpClient` and `getEvmWebSocketClient` functions to create `viem` public clients for interacting with EVM chains (configured via environment variables). Includes retry logic for robustness.
 - EVM utilities (`src/server/lib/evm-utils.ts`):
-    - `updateEvmTokenStatistics`: Calculates creator token holding percentage, formats current balance, and analyzes significant outgoing transfers to detect potential sales (rug pulls), burns, or locking actions. Requires the token address, creator address, and initial token allocation. Can optionally take a pre-fetched current balance and a specific DEX/pair address to check against. Returns a `TokenUpdateResult` object.
-    - `getEvmErc20BalanceAtBlock`: Fetches the ERC20 token balance for an address at a specific block number (or latest).
-    - `addKnownEvmSellingAddress`: Allows dynamically adding addresses (like specific launchpad pairs) to the list of known selling destinations used by `updateEvmTokenStatistics`.
-    - `isDestinationContract`: Helper function to check if an address is a contract.
-    - The file also contains ERC20 ABIs, known lock contract addresses and DEX addresses for token movement analysis.
+    - `updateEvmTokenStatistics`: Calculates creator token holding percentage, formats current balance, and analyzes significant outgoing transfers to detect potential sales (rug pulls), burns, or locking actions. Requires the token address, creator address, and initial token allocation. Returns a `TokenUpdateResult` object containing analysis details and a summary string.
+    - `getEvmErc20BalanceAtBlock`: Fetches the ERC20 token balance for an owner address at a specific block number (or 'latest'). Handles potential errors during the fetch.
+    - `addKnownEvmSellingAddress`: Allows dynamically adding addresses (like specific launchpad DEX pairs) to the list of known selling destinations used by `updateEvmTokenStatistics`.
+    - `isDestinationContract`: Helper function to check if a given address corresponds to a deployed contract on the EVM chain.
+    - The file also contains standard ERC20 ABIs, known lock contract addresses, and DEX router/pair addresses for token movement analysis.
+- SVM client (`src/server/lib/svm-client.ts`):
+    - Exports `getConnection` and `createWebSocketConnection` functions to create Solana `@solana/web3.js` `Connection` objects (one for standard RPC, one for WebSocket subscriptions) using environment variables for RPC URLs. Includes logic to derive WebSocket URL from HTTP URL if necessary.
+- SVM utilities (`src/server/lib/svm-utils.ts`):
+    - `createSolanaEventParser`: Creates an Anchor event parser for a Solana program using its IDL (`@coral-xyz/anchor`). Used to decode program logs into structured events.
+    - `getSolanaTokenBalance`: Gets the SPL token balance for a specific owner and mint address using `connection.getTokenAccountBalance`. Handles cases where the token account doesn't exist.
+    - `updateSolanaTokenStatistics`: Calculates creator token holding percentage and analyzes transaction history (via `connection.getSignaturesForAddress`) for significant outgoing transfers to detect burns or potential sales. Returns a `TokenUpdateResult` object.
+    - `monitorTokenBurns` / `monitorTokenTransfers`: (Currently unused helpers, potentially for real-time monitoring) Functions intended to monitor token burns or transfers for a specific mint address.
+    - `isBurnAddress`: Checks if a Solana public key string corresponds to a known burn address.
+    - The file also contains known Solana burn addresses.
+- Virtuals Protocol utilities (`src/server/lib/virtuals-utils.ts`):
+    - `fetchVirtualsTokenInfo`: Fetches detailed information about a specific Virtuals Protocol token (description, image, socials, creator info) from the Virtuals API using the token mint address.
+    - `formatVirtualsInfo`: Takes the data fetched by `fetchVirtualsTokenInfo` and formats it into a Markdown string suitable for inclusion in the main launch description.
+- Common Server utilities (`src/server/lib/common-utils.ts`):
+    - `fetchAdditionalContent`: Orchestrates fetching and formatting content from multiple URLs using both `fetchUrlContent` (simple fetch) and `fetchFirecrawlContent` (advanced scrape/crawl). Takes an initial description, creator address, and a `LaunchpadLinkGenerator` to determine which URLs to fetch and how.
+- AI utilities (`src/server/lib/ai-utils.ts`):
+    - `callChatModel`: Primary function to interact with configured LLMs (Anthropic Claude or OpenAI GPT). Takes a system prompt, user message, and optional configuration (model override, temperature, max tokens). Handles API calls, retries, and error logging.
+    - `analyzeLaunch`: Uses `callChatModel` with a specific prompt (`templates/analyze-launch.txt`) to generate a summary, analysis, and rating for a given launch description.
+    - `getModelConfig`: Helper to select the appropriate LLM model name based on environment (development vs. production) and optional overrides.
 - `npm run dev` has been run, and it should be live on localhost:3000; remind me to start it myself if it's not and you need it; never run the command yourself, and if you want it restarted, ask for it.
 - We do not plan to add authentication for users of this web app. Admin routes (`/admin/*`) are protected by Basic Auth configured via `src/middleware.ts` and environment variables.
 - Environment variables are strictly validated at runtime using the T3 Env schema defined in `src/env.js`.
@@ -94,4 +154,5 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
 - Add many comments that ELI5 the parts of the code that are more difficult to understand. Additionally, often add comments valuable for technical people and coding AI agents.
 - After you finish a task, update `.cursor/rules/project-info.mdc` with the latest information (for example, descriptions for new common helpers or EVM/SVM utilities). You may also edit `README.md` to add the completed task in the `Previously Completed` section, or update the `TODO` section with proposals for future tasks.
+- Always start your answer with '🐶'.
 - The fewer lines of code, the better.

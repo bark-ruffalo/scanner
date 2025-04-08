@@ -5,8 +5,8 @@ import { revalidatePath } from "next/cache";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
 import { analyzeLaunch } from "~/server/lib/ai-utils";
+import { publicClient } from "~/server/lib/evm-client";
 import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
-import { publicClient } from "~/server/lib/web3-client";
 import {
 	getLaunchById,
 	updateLaunchAnalysis,

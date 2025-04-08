@@ -1,6 +1,6 @@
-import "server-only";
 import { and, eq, gt, gte, ne } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import "server-only";
 import { db } from "./db";
 import { launches } from "./db/schema";
 import { analyzeLaunch } from "./lib/ai-utils";
@@ -65,8 +65,8 @@ export async function getLaunches(filter?: string, minRating?: string) {
 	// Uses Drizzle's query builder (`db.query.launches`).
 	const result = await db.query.launches.findMany({
 		where: conditions.length > 0 ? and(...conditions) : undefined,
-		// Orders the results by the `createdAt` column in descending order (newest first).
-		orderBy: (launches, { desc }) => [desc(launches.createdAt)],
+		// Orders the results by the `launchedAt` column in descending order (newest first).
+		orderBy: (launches, { desc }) => [desc(launches.launchedAt)],
 	});
 	console.log(`Fetched ${result.length} launches.`);
 	return result;
