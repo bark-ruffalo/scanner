@@ -2,55 +2,37 @@ import "server-only";
 import { Connection } from "@solana/web3.js";
 import { env } from "~/env";
 
-// Cache the connection instance
 let connection: Connection | null = null;
+let webSocketConnection: Connection | null = null;
+
+const HELIUS_RPC_BASE_URL = "mainnet.helius-rpc.com";
 
 /**
- * Creates a Solana connection with retry and error handling
- * @returns Connection instance
+ * Returns a singleton Solana Connection instance for standard HTTPS RPC calls.
+ * Constructs the URL using the HELIUS_API_KEY environment variable.
  */
 export function getConnection(): Connection {
 	if (!connection) {
-		const rpcUrl = env.SOLANA_RPC_URL?.replace("wss://", "https://");
-		if (!rpcUrl) {
-			throw new Error("SOLANA_RPC_URL environment variable is not set");
-		}
-
-		// Create connection with commitment level and timeout settings
-		connection = new Connection(rpcUrl, {
-			commitment: "confirmed",
-			confirmTransactionInitialTimeout: 60000,
-		});
+		const rpcUrl = `https://${HELIUS_RPC_BASE_URL}/?api-key=${env.HELIUS_API_KEY}`;
+		console.log("Initializing Solana HTTPS connection:", rpcUrl);
+		connection = new Connection(rpcUrl, "confirmed");
 	}
-
 	return connection;
 }
 
-// Export a shared connection instance
-export const publicConnection = getConnection();
-
-// For WebSocket connections (real-time events)
-export function createWebSocketConnection() {
-	const rpcUrl = env.SOLANA_RPC_URL;
-	if (!rpcUrl) {
-		throw new Error("SOLANA_RPC_URL environment variable is not set");
+/**
+ * Returns a singleton Solana Connection instance for WebSocket subscriptions.
+ * Constructs the WSS URL using the HELIUS_API_KEY environment variable.
+ *
+ * Note: The Connection class doesn't expose methods to directly monitor WebSocket
+ * connection status. The underlying WebSocket connection is managed internally
+ * by the Connection class and will attempt to reconnect automatically if disconnected.
+ */
+export function createWebSocketConnection(): Connection {
+	if (!webSocketConnection) {
+		const wsRpcUrl = `wss://${HELIUS_RPC_BASE_URL}/?api-key=${env.HELIUS_API_KEY}`;
+		console.log("Initializing Solana WebSocket connection:", wsRpcUrl);
+		webSocketConnection = new Connection(wsRpcUrl, "confirmed");
 	}
-
-	try {
-		// For Solana Connection:
-		// 1. First parameter must be an HTTP/HTTPS URL
-		// 2. wsEndpoint can be a WebSocket URL
-		const httpUrl = rpcUrl.replace("wss://", "https://");
-		const wsUrl = rpcUrl.startsWith("wss://")
-			? rpcUrl
-			: rpcUrl.replace("https://", "wss://");
-
-		return new Connection(httpUrl, {
-			commitment: "confirmed",
-			wsEndpoint: wsUrl,
-		});
-	} catch (error) {
-		console.error("Failed to create WebSocket connection:", error);
-		return getConnection();
-	}
+	return webSocketConnection;
 }

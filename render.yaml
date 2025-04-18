@@ -54,6 +54,50 @@ services:
     domains:
       - scanner.trulyadog.com
 
+  - type: worker
+    name: scanner-listener
+    env: node
+    plan: starter
+    buildCommand: pnpm install && pnpm build
+    startCommand: node ./src/worker.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: POSTGRES_URL
+        sync: false
+      - key: POSTGRES_PRISMA_URL
+        sync: false
+      - key: POSTGRES_URL_NON_POOLING
+        sync: false
+      - key: POSTGRES_USER
+        sync: false
+      - key: POSTGRES_PASSWORD
+        sync: false
+      - key: POSTGRES_DATABASE
+        sync: false
+      - key: POSTGRES_HOST
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_URL
+        sync: false
+      - key: NEXT_PUBLIC_SUPABASE_ANON_KEY
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: BASE_RPC_URL
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: OPENROUTER_API_HOST
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: NEXT_PUBLIC_APP_URL
+        value: https://scanner.trulyadog.com
+
 # Add this to ensure WebSocket connections work properly
 headers:
   - path: /*

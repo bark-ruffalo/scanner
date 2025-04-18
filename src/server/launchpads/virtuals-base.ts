@@ -448,7 +448,7 @@ YouTube: ${youtube || "N/A"}
 /**
  * Starts the WebSocket listener for 'Launched' events from the Virtuals Factory contract.
  */
-export function startVirtualsBaseListener() {
+export function startVirtualsBaseListener(retryCount = 0) {
 	console.log(`Attempting to start listener for ${LAUNCHPAD_NAME}...`);
 
 	// Check if the WebSocket transport was successfully created.
@@ -479,12 +479,15 @@ export function startVirtualsBaseListener() {
 					`[${LAUNCHPAD_NAME}] Error in WebSocket event watcher:`,
 					error.message,
 				);
-				// Potential implementation for reconnection logic:
-				// setTimeout(() => {
-				//   console.log(`[${LAUNCHPAD_NAME}] Attempting to reconnect listener...`);
-				//   unwatch(); // Stop the current watcher
-				//   startVirtualsBaseListener(); // Restart listener
-				// }, 5000);
+				// --- Reconnection logic ---
+				const delay = Math.min(30000, 5000 * (retryCount + 1)); // Exponential backoff, max 30s
+				console.log(
+					`[${LAUNCHPAD_NAME}] Attempting to reconnect listener in ${delay / 1000}s...`,
+				);
+				unwatch(); // Stop the current watcher
+				setTimeout(() => {
+					startVirtualsBaseListener(retryCount + 1);
+				}, delay);
 			},
 			// strict: true // Consider adding strict: true for stricter ABI parsing/matching
 		});
@@ -498,6 +501,14 @@ export function startVirtualsBaseListener() {
 			`[${LAUNCHPAD_NAME}] Critical error: Failed to start event listener:`,
 			error,
 		);
+		// Try to reconnect after a delay
+		const delay = Math.min(30000, 5000 * (retryCount + 1));
+		console.log(
+			`[${LAUNCHPAD_NAME}] Attempting to reconnect listener in ${delay / 1000}s after critical error...`,
+		);
+		setTimeout(() => {
+			startVirtualsBaseListener(retryCount + 1);
+		}, delay);
 	}
 }
 

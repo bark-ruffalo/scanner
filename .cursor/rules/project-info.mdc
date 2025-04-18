@@ -150,6 +150,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
 - Do not use template literals if interpolation and special-character handling are not needed.
 - Use `pnpm` instead of `npm`.
+- Grepping the codebase is free, do it often!
 - Never write code for database migration because I'll just do `pnpm db:push` instead
 - All database queries must be centralized in the Data Access Layer (DAL) at `src/server/queries.ts`. Never write direct database queries in components or pages.
 - Add many comments that ELI5 the parts of the code that are more difficult to understand. Additionally, often add comments valuable for technical people and coding AI agents.

@@ -582,7 +582,7 @@ function findLaunchInInstruction(
 /**
  * Starts the WebSocket listener for Launch events from the Virtuals Protocol program.
  */
-export function startVirtualsSolanaListener() {
+export function startVirtualsSolanaListener(retryCount = 0) {
 	console.log(`Attempting to start listener for ${LAUNCHPAD_NAME}...`);
 
 	try {
@@ -592,27 +592,28 @@ export function startVirtualsSolanaListener() {
 		wsConnection.onLogs(
 			VIRTUALS_PROGRAM_ID,
 			async (logs: SolanaLogInfo) => {
-				const { signature } = logs;
-				if (!signature) {
-					console.error("[SVM Listener] No signature in logs");
-					return;
-				}
-
-				// Use Helius for real-time parsing as well for consistency
-				const HELIUS_API_KEY = env.HELIUS_API_KEY;
-				if (!HELIUS_API_KEY) {
-					console.error(
-						`[${signature}] HELIUS_API_KEY not set, cannot parse real-time event via Helius.`,
-					);
-					return; // Cannot parse without API key
-				}
-
-				const url = `https://api.helius.xyz/v0/transactions/?api-key=${HELIUS_API_KEY}`;
-				console.log(
-					`[${signature}] Processing real-time event using Helius single tx endpoint...`,
-				);
-
+				let signature: string | undefined = undefined;
 				try {
+					signature = logs.signature;
+					if (!signature) {
+						console.error("[SVM Listener] No signature in logs");
+						return;
+					}
+
+					// Use Helius for real-time parsing as well for consistency
+					const HELIUS_API_KEY = env.HELIUS_API_KEY;
+					if (!HELIUS_API_KEY) {
+						console.error(
+							`[${signature}] HELIUS_API_KEY not set, cannot parse real-time event via Helius.`,
+						);
+						return; // Cannot parse without API key
+					}
+
+					const url = `https://api.helius.xyz/v0/transactions/?api-key=${HELIUS_API_KEY}`;
+					console.log(
+						`[${signature}] Processing real-time event using Helius single tx endpoint...`,
+					);
+
 					const response = await fetch(url, {
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
@@ -705,9 +706,17 @@ export function startVirtualsSolanaListener() {
 					}
 				} catch (error) {
 					console.error(
-						`[${signature}] Error processing real-time event via Helius:`,
+						`[${signature ?? "unknown"}] Error processing real-time event via Helius:`,
 						error,
 					);
+					// --- Reconnection logic for handler errors ---
+					const delay = Math.min(30000, 5000 * (retryCount + 1));
+					console.log(
+						`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after handler error...`,
+					);
+					setTimeout(() => {
+						startVirtualsSolanaListener(retryCount + 1);
+					}, delay);
 				}
 			},
 			"confirmed",
@@ -721,6 +730,14 @@ export function startVirtualsSolanaListener() {
 			`[${LAUNCHPAD_NAME}] Critical error: Failed to start event listener:`,
 			error,
 		);
+		// --- Reconnection logic for setup errors ---
+		const delay = Math.min(30000, 5000 * (retryCount + 1));
+		console.log(
+			`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after critical error...`,
+		);
+		setTimeout(() => {
+			startVirtualsSolanaListener(retryCount + 1);
+		}, delay);
 	}
 }
 

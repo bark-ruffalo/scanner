@@ -27,18 +27,7 @@ export const env = createEnv({
 				(url) => !url || url.startsWith("wss://"), // Check only if url is defined
 				{ message: "BASE_RPC_URL must start with wss:// if provided" },
 			),
-		SOLANA_RPC_URL: z
-			.string()
-			.url()
-			.optional()
-			.refine(
-				(url) => !url || url.startsWith("https://") || url.startsWith("wss://"),
-				{
-					message:
-						"SOLANA_RPC_URL must start with https:// or wss:// if provided",
-				},
-			),
-		HELIUS_API_KEY: z.string().min(1).optional(), // Add Helius API Key
+		HELIUS_API_KEY: z.string().min(1),
 		VIRTUALS_SOLANA_PROGRAM_ID: z.string().optional(),
 		OPENROUTER_API_KEY: z
 			.string()
@@ -71,8 +60,7 @@ export const env = createEnv({
 		POSTGRES_URL: process.env.POSTGRES_URL,
 		NODE_ENV: process.env.NODE_ENV,
 		BASE_RPC_URL: process.env.BASE_RPC_URL,
-		SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
-		HELIUS_API_KEY: process.env.HELIUS_API_KEY, // Add Helius API Key
+		HELIUS_API_KEY: process.env.HELIUS_API_KEY,
 		VIRTUALS_SOLANA_PROGRAM_ID: process.env.VIRTUALS_SOLANA_PROGRAM_ID,
 		OPENROUTER_API_KEY: process.env.OPENROUTER_API_KEY,
 		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
