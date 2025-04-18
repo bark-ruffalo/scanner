@@ -14,10 +14,7 @@ import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
 import { fetchAdditionalContent } from "~/server/lib/common-utils";
-import {
-	createWebSocketConnection,
-	getConnection,
-} from "~/server/lib/svm-client";
+import { getConnection } from "~/server/lib/svm-client";
 import {
 	type SolanaLogInfo,
 	getSolanaTokenBalance,
@@ -586,10 +583,10 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 	console.log(`Attempting to start listener for ${LAUNCHPAD_NAME}...`);
 
 	try {
-		// Use WebSocket connection for real-time events
-		const wsConnection = createWebSocketConnection();
+		// Use getConnection for both HTTP and WebSocket subscriptions
+		const connection = getConnection();
 
-		wsConnection.onLogs(
+		connection.onLogs(
 			VIRTUALS_PROGRAM_ID,
 			async (logs: SolanaLogInfo) => {
 				let signature: string | undefined = undefined;
