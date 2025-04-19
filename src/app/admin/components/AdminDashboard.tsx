@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import {
+	debugLaunchpadHistoricalEvents,
 	deleteLaunch,
 	reanalyzeAllLaunches,
 	reanalyzeLaunch,
@@ -33,6 +34,15 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 		message: string;
 		type: "success" | "error";
 	} | null>(null);
+
+	// --- Debug Launchpad State ---
+	const [debugLaunchpad, setDebugLaunchpad] = useState<string>(
+		"VIRTUALS Protocol (Base)",
+	);
+	const [debugFrom, setDebugFrom] = useState<string>("");
+	const [debugTo, setDebugTo] = useState<string>("");
+	const [debugResult, setDebugResult] = useState<string>("");
+	const [debugLoading, setDebugLoading] = useState(false);
 
 	const handleDelete = async (id: number) => {
 		if (!confirm("Are you sure you want to delete this launch?")) {
@@ -146,6 +156,22 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 		}
 	};
 
+	const handleDebug = async () => {
+		setDebugLoading(true);
+		setDebugResult("");
+		try {
+			const res = await debugLaunchpadHistoricalEvents({
+				launchpad: debugLaunchpad,
+				from: debugFrom.trim() || undefined,
+				to: debugTo.trim() || undefined,
+			});
+			setDebugResult(res.message);
+		} catch (e) {
+			setDebugResult(`Error: ${e instanceof Error ? e.message : String(e)}`);
+		}
+		setDebugLoading(false);
+	};
+
 	return (
 		<main className="min-h-screen bg-gradient-to-b from-[var(--color-scanner-purple-light)] to-indigo-950 p-8 text-white">
 			<div className="container mx-auto">
@@ -158,6 +184,83 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 					>
 						Add New Launch
 					</button>
+				</div>
+
+				{/* Debug Launchpad Historical Events Section */}
+				<div className="mb-8 rounded-lg bg-gray-900 p-6 shadow-lg">
+					<h2 className="mb-4 font-semibold text-xl">
+						Debug Launchpad Historical Events
+					</h2>
+					<div className="flex flex-col gap-4 md:flex-row md:items-end">
+						<div>
+							<label
+								htmlFor="debug-launchpad-select"
+								className="mb-1 block font-medium"
+							>
+								Launchpad
+							</label>
+							<select
+								id="debug-launchpad-select"
+								className="rounded bg-gray-800 px-3 py-2 text-white"
+								value={debugLaunchpad}
+								onChange={(e) => setDebugLaunchpad(e.target.value)}
+							>
+								<option value="VIRTUALS Protocol (Base)">
+									VIRTUALS Protocol (Base)
+								</option>
+								<option value="VIRTUALS Protocol (Solana)">
+									VIRTUALS Protocol (Solana)
+								</option>
+							</select>
+						</div>
+						<div>
+							<label
+								htmlFor="debug-from-input"
+								className="mb-1 block font-medium"
+							>
+								From (block/slot)
+							</label>
+							<input
+								id="debug-from-input"
+								type="text"
+								className="w-40 rounded bg-gray-800 px-3 py-2 text-white"
+								placeholder="Optional"
+								value={debugFrom}
+								onChange={(e) => setDebugFrom(e.target.value)}
+							/>
+						</div>
+						<div>
+							<label
+								htmlFor="debug-to-input"
+								className="mb-1 block font-medium"
+							>
+								To (block/slot)
+							</label>
+							<input
+								id="debug-to-input"
+								type="text"
+								className="w-40 rounded bg-gray-800 px-3 py-2 text-white"
+								placeholder="Optional"
+								value={debugTo}
+								onChange={(e) => setDebugTo(e.target.value)}
+							/>
+						</div>
+						<div>
+							<button
+								type="button"
+								className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
+								disabled={debugLoading}
+								onClick={handleDebug}
+							>
+								{debugLoading ? "Running..." : "Run Debug"}
+							</button>
+						</div>
+					</div>
+					{debugResult && (
+						<div className="mt-4 rounded bg-gray-800 p-3 text-sm text-white">
+							{debugResult}
+						</div>
+					)}
 				</div>
 
 				{actionResults && (

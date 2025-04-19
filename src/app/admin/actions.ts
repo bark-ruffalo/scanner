@@ -182,3 +182,44 @@ export async function reanalyzeAllLaunches() {
 	revalidatePath("/");
 	return results;
 }
+
+// --- Debug Launchpad Historical Events ---
+export async function debugLaunchpadHistoricalEvents({
+	launchpad,
+	from,
+	to,
+}: {
+	launchpad: string;
+	from?: string;
+	to?: string;
+}) {
+	try {
+		let resultMsg = "";
+		if (launchpad === "VIRTUALS Protocol (Base)") {
+			const { debugFetchHistoricalEvents } = await import(
+				"~/server/launchpads/virtuals-base"
+			);
+			const fromBlock = from ? BigInt(from) : undefined;
+			const toBlock = to ? BigInt(to) : undefined;
+			await debugFetchHistoricalEvents(fromBlock, toBlock);
+			resultMsg = `Base: Debugged events from block ${from || "default"} to ${to || "latest"}`;
+		} else if (launchpad === "VIRTUALS Protocol (Solana)") {
+			const { debugFetchHistoricalEvents } = await import(
+				"~/server/launchpads/virtuals-solana"
+			);
+			const fromSlot = from ? BigInt(from) : undefined;
+			const toSlot = to ? BigInt(to) : undefined;
+			await debugFetchHistoricalEvents(fromSlot, toSlot);
+			resultMsg = `Solana: Debugged events from slot ${from || "default"} to ${to || "latest"}`;
+		} else {
+			throw new Error("Unsupported launchpad for debugging");
+		}
+		return { success: true, message: resultMsg };
+	} catch (error) {
+		console.error("Error debugging launchpad historical events:", error);
+		return {
+			success: false,
+			message: `Error: ${error instanceof Error ? error.message : String(error)}`,
+		};
+	}
+}
