@@ -580,7 +580,9 @@ function findLaunchInInstruction(
  * Starts the WebSocket listener for Launch events from the Virtuals Protocol program.
  */
 export function startVirtualsSolanaListener(retryCount = 0) {
-	console.log(`Attempting to start listener for ${LAUNCHPAD_NAME}...`);
+	console.log(
+		`Attempting to start listener for ${LAUNCHPAD_NAME}... (retryCount=${retryCount})`,
+	);
 
 	try {
 		// Use getConnection for both HTTP and WebSocket subscriptions
@@ -707,7 +709,8 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 						error,
 					);
 					// --- Reconnection logic for handler errors ---
-					const delay = Math.min(30000, 5000 * (retryCount + 1));
+					const delay =
+						retryCount === 0 ? 500 : Math.min(30000, 5000 * retryCount);
 					console.log(
 						`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after handler error...`,
 					);
@@ -727,8 +730,21 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 			`[${LAUNCHPAD_NAME}] Critical error: Failed to start event listener:`,
 			error,
 		);
+		if (
+			typeof error === "object" &&
+			error !== null &&
+			"message" in error &&
+			typeof (error as { message?: unknown }).message === "string" &&
+			(error as { message: string }).message.includes(
+				"Endpoint URL must start with `http:` or `https:`",
+			)
+		) {
+			console.error(
+				`[${LAUNCHPAD_NAME}] Detected protocol mismatch: @solana/web3.js Connection requires http(s) endpoint, not wss. Check getConnection implementation.`,
+			);
+		}
 		// --- Reconnection logic for setup errors ---
-		const delay = Math.min(30000, 5000 * (retryCount + 1));
+		const delay = retryCount === 0 ? 500 : Math.min(30000, 5000 * retryCount);
 		console.log(
 			`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after critical error...`,
 		);
