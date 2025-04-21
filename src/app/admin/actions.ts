@@ -188,10 +188,12 @@ export async function debugLaunchpadHistoricalEvents({
 	launchpad,
 	from,
 	to,
+	overwriteExisting,
 }: {
 	launchpad: string;
-	from?: string;
+	from: string;
 	to?: string;
+	overwriteExisting?: boolean;
 }) {
 	try {
 		let resultMsg = "";
@@ -199,27 +201,29 @@ export async function debugLaunchpadHistoricalEvents({
 			const { debugFetchHistoricalEvents } = await import(
 				"~/server/launchpads/virtuals-base"
 			);
-			const fromBlock = from ? BigInt(from) : undefined;
+			const fromBlock = BigInt(from);
 			const toBlock = to ? BigInt(to) : undefined;
-			await debugFetchHistoricalEvents(fromBlock, toBlock);
-			resultMsg = `Base: Debugged events from block ${from || "default"} to ${to || "latest"}`;
+			await debugFetchHistoricalEvents(fromBlock, toBlock, overwriteExisting);
+			resultMsg = `Debug completed for VIRTUALS Protocol (Base) from block ${from}${to ? ` to ${to}` : ""}`;
 		} else if (launchpad === "VIRTUALS Protocol (Solana)") {
 			const { debugFetchHistoricalEvents } = await import(
 				"~/server/launchpads/virtuals-solana"
 			);
-			const fromSlot = from ? BigInt(from) : undefined;
+			const fromSlot = BigInt(from);
 			const toSlot = to ? BigInt(to) : undefined;
-			await debugFetchHistoricalEvents(fromSlot, toSlot);
-			resultMsg = `Solana: Debugged events from slot ${from || "default"} to ${to || "latest"}`;
+			await debugFetchHistoricalEvents(fromSlot, toSlot, overwriteExisting);
+			resultMsg = `Debug completed for VIRTUALS Protocol (Solana) from slot ${from}${to ? ` to ${to}` : ""}`;
 		} else {
-			throw new Error("Unsupported launchpad for debugging");
+			throw new Error(`Unknown launchpad: ${launchpad}`);
 		}
-		return { success: true, message: resultMsg };
+
+		revalidatePath("/admin");
+		revalidatePath("/");
+		return { message: resultMsg };
 	} catch (error) {
-		console.error("Error debugging launchpad historical events:", error);
-		return {
-			success: false,
-			message: `Error: ${error instanceof Error ? error.message : String(error)}`,
-		};
+		console.error("Error debugging historical events:", error);
+		throw new Error(
+			`Failed to debug historical events: ${error instanceof Error ? error.message : String(error)}`,
+		);
 	}
 }

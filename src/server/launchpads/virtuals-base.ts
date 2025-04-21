@@ -1,3 +1,4 @@
+import { eq } from "drizzle-orm";
 import {
 	http,
 	type Chain,
@@ -15,6 +16,8 @@ import { base } from "viem/chains";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
+import { db } from "~/server/db";
+import { launches } from "~/server/db/schema";
 import { fetchAdditionalContent } from "~/server/lib/common-utils";
 import {
 	addKnownEvmSellingAddress,
@@ -520,10 +523,13 @@ export function startVirtualsBaseListener(retryCount = 0) {
  * @param toBlock - Optional ending block number (defaults to latest block if not provided)
  */
 export async function debugFetchHistoricalEvents(
-	fromBlock?: bigint,
+	fromBlock: bigint,
 	toBlock?: bigint,
+	overwriteExisting = false,
 ) {
-	console.log(`Attempting to debug ${LAUNCHPAD_NAME} historical events...`);
+	console.log(
+		`--- Debugging [VIRTUALS Protocol (Base)]: Fetching events from block ${fromBlock} to ${toBlock ?? "latest"} ---`,
+	);
 
 	// Check if the HTTP transport was successfully created.
 	if (!httpTransport) {
@@ -533,57 +539,59 @@ export async function debugFetchHistoricalEvents(
 		return; // Stop execution if transport is not available.
 	}
 
-	try {
-		// Define the block range to query. Use BigInt literals (e.g., 12345n).
-		const startBlock = fromBlock || 27843805n; // Default start block if not provided; it starts from $ACP.
-		// other good examples for startBlock:
-		// $MAR: 25684212 https://basescan.org/tx/0x3b5e48b9748ac83ff98949b0d579298314ff20e71abadf5b743f9661a5d2ef64
-		// $DFY: 23639253 https://basescan.org/address/0xf66dea7b3e897cd44a5a231c61b6b4423d613259#readProxyContract
+	const events = await publicClient.getLogs({
+		address: VIRTUALS_FACTORY_ADDRESS,
+		event: launchedEventAbi,
+		fromBlock,
+		toBlock,
+	});
 
-		// Fetch the latest block if toBlock is not provided
-		const endBlock = toBlock || (await publicClient.getBlockNumber());
-		console.log(`Using block range: ${startBlock} to ${endBlock}`);
+	console.log(`Found ${events.length} launch events.`);
 
-		console.log(
-			`--- Debugging [${LAUNCHPAD_NAME}]: Fetching historical events from block ${startBlock} to ${endBlock} ---`,
-		);
+	let launchEventsFound = 0;
 
-		const getLogsParams = {
-			address: VIRTUALS_FACTORY_ADDRESS,
-			event: launchedEventAbi,
-			fromBlock: startBlock,
-			toBlock: endBlock,
-		};
+	for (const event of events) {
+		try {
+			const args = event.args as { token: `0x${string}`; pair: `0x${string}` };
+			if (!args.token) {
+				console.error(`[${event.transactionHash}] Event missing token address`);
+				continue;
+			}
 
-		// Fetch logs using an event filter.
-		const logs = await publicClient.getLogs(getLogsParams);
+			// Check if launch already exists and we're not overwriting
+			if (!overwriteExisting) {
+				const tokenAddress = args.token.toLowerCase() as `0x${string}`;
+				const existingLaunch = await db.query.launches.findFirst({
+					where: eq(launches.tokenAddress, tokenAddress),
+				});
 
-		console.log(
-			`[${LAUNCHPAD_NAME} Debug] Found ${logs.length} '${
-				getLogsParams.event.name ?? "Launched" // Safely access event name
-			}' event(s) in the specified range (using event filter).`,
-		);
+				if (existingLaunch) {
+					console.log(
+						`[${event.transactionHash}] Launch already exists for token ${args.token}, skipping (overwrite=false)`,
+					);
+					continue;
+				}
+			}
 
-		// Process each fetched historical log.
-		for (const log of logs) {
-			console.log(
-				`[${LAUNCHPAD_NAME} Debug] Processing matched historical log from block ${log.blockNumber}, tx: ${log.transactionHash}...`,
+			await processLaunchedEvent(event as unknown as LaunchedEventLog);
+			launchEventsFound++;
+		} catch (error) {
+			console.error(
+				`Error processing launch event at block ${event.blockNumber}:`,
+				error,
 			);
-			await processLaunchedEvent(log as unknown as LaunchedEventLog);
 		}
-
-		console.log(
-			`--- Debugging [${LAUNCHPAD_NAME}]: Finished fetching historical events ---`,
-		);
-	} catch (error) {
-		console.error(
-			`[${LAUNCHPAD_NAME} Debug] Error fetching or processing historical events:`,
-			error,
-		);
-		console.log(
-			`--- Debugging [${LAUNCHPAD_NAME}]: Failed to fetch historical events ---`,
-		);
 	}
+
+	console.log(
+		`--- Debugging [VIRTUALS Protocol (Base)]: Finished processing ${events.length} events, Found ${launchEventsFound} launch events ---`,
+	);
+
+	// Start real-time listener after debug completion
+	console.log(
+		"Starting real-time listener for VIRTUALS Protocol (Base) after debug completion",
+	);
+	await startVirtualsBaseListener();
 }
 
 // --- How to run the debug function ---

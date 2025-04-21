@@ -10,9 +10,12 @@ import type {
 	// Need these types for getTransaction response
 	VersionedTransactionResponse,
 } from "@solana/web3.js";
+import { eq } from "drizzle-orm";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
+import { db } from "~/server/db";
+import { launches } from "~/server/db/schema";
 import { fetchAdditionalContent } from "~/server/lib/common-utils";
 import { getConnection } from "~/server/lib/svm-client";
 import {
@@ -758,206 +761,137 @@ export function startVirtualsSolanaListener(retryCount = 0) {
  * Fetches and processes historical launch events using paginated getSignatures + getTransaction + inner ix parsing.
  */
 export async function debugFetchHistoricalEvents(
-	fromSlot?: bigint,
+	fromSlot: bigint,
 	toSlot?: bigint,
+	overwriteExisting = false,
 ) {
 	console.log(
-		`Attempting to debug ${LAUNCHPAD_NAME} historical events using paginated getSignatures + getTransaction...`,
+		`--- Debugging [VIRTUALS Protocol (Solana)]: Fetching signatures for program ${VIRTUALS_PROGRAM_ID} from slot ${fromSlot} to ${toSlot ?? "latest"} ---`,
 	);
 
 	const connection = getConnection();
-	let startSlotNum: number;
-	let endSlotNum: number;
-
-	try {
-		startSlotNum = Number(fromSlot || 0n);
-		if (toSlot) {
-			endSlotNum = Number(toSlot);
-		} else {
-			endSlotNum = await connection.getSlot("finalized");
-		}
-		console.log(
-			`--- Debugging [${LAUNCHPAD_NAME}]: Fetching signatures for program ${VIRTUALS_PROGRAM_ID.toString()} from slot ${startSlotNum} to ${endSlotNum} ---`,
-		);
-	} catch (e) {
-		console.error("Error determining slot range:", e);
-		return;
-	}
-
-	const allSignaturesInRange: string[] = [];
-	let lastSignatureFetched: string | undefined = undefined;
-	let fetchMoreSignatures = true;
-	const signaturesLimit = 1000;
-	let totalSignaturesFetched = 0;
-
-	console.log("Starting signature pagination...");
-	while (fetchMoreSignatures) {
-		try {
-			const signaturesInfo = await connection.getSignaturesForAddress(
-				VIRTUALS_PROGRAM_ID,
-				{ limit: signaturesLimit, before: lastSignatureFetched },
-				"confirmed",
-			);
-			totalSignaturesFetched += signaturesInfo.length;
-
-			if (signaturesInfo.length === 0) {
-				fetchMoreSignatures = false;
-				break;
-			}
-			lastSignatureFetched =
-				signaturesInfo[signaturesInfo.length - 1]?.signature;
-
-			let oldestSlotInBatch: number | null = null;
-			for (const sigInfo of signaturesInfo) {
-				if (
-					!sigInfo.err &&
-					sigInfo.slot !== null &&
-					sigInfo.slot >= startSlotNum &&
-					sigInfo.slot <= endSlotNum
-				) {
-					allSignaturesInRange.push(sigInfo.signature);
-				}
-				if (sigInfo.slot !== null) {
-					oldestSlotInBatch = Math.min(
-						oldestSlotInBatch ?? Number.POSITIVE_INFINITY,
-						sigInfo.slot,
-					);
-				}
-			}
-			console.log(
-				`Fetched batch of ${signaturesInfo.length}. Oldest: ${oldestSlotInBatch ?? "N/A"}. In range so far: ${allSignaturesInRange.length}`,
-			);
-
-			if (oldestSlotInBatch !== null && oldestSlotInBatch < startSlotNum) {
-				fetchMoreSignatures = false;
-			}
-			if (signaturesInfo.length < signaturesLimit) {
-				fetchMoreSignatures = false;
-			}
-			if (fetchMoreSignatures)
-				await new Promise((resolve) => setTimeout(resolve, 50));
-		} catch (error) {
-			console.error(
-				`Error fetching signature batch before ${lastSignatureFetched}:`,
-				error,
-			);
-			fetchMoreSignatures = false;
-		}
-	} // End while loop for signature fetching
-
-	console.log(
-		`Finished fetching signatures. Total fetched: ${totalSignaturesFetched}. Found ${allSignaturesInRange.length} unique successful signatures within slot range [${startSlotNum}, ${endSlotNum}].`,
+	const signatures = await connection.getSignaturesForAddress(
+		new PublicKey(VIRTUALS_PROGRAM_ID),
+		{
+			limit: 1000,
+		},
 	);
 
-	const processedSignatures = new Set<string>();
+	// Filter signatures by slot range
+	const filteredSignatures = signatures.filter((sig) => {
+		const slot = sig.slot;
+		if (!slot) return false;
+		if (toSlot) {
+			return slot >= Number(fromSlot) && slot <= Number(toSlot);
+		}
+		return slot >= Number(fromSlot);
+	});
+
+	console.log(
+		`Found ${filteredSignatures.length} unique successful signatures within slot range [${fromSlot}, ${toSlot ?? "latest"}].`,
+	);
+
+	console.log(`Processing ${filteredSignatures.length} unique signatures...`);
+
 	let launchEventsFound = 0;
 
-	if (allSignaturesInRange.length === 0) {
-		console.log("No signatures to process.");
-	} else {
-		// Remove potential duplicates from pagination overlaps before processing
-		const uniqueSignaturesToProcess = [...new Set(allSignaturesInRange)];
-		console.log(
-			`Processing ${uniqueSignaturesToProcess.length} unique signatures...`,
-		);
+	// Process each signature
+	for (const signatureInfo of filteredSignatures) {
+		try {
+			const tx = await connection.getTransaction(signatureInfo.signature, {
+				maxSupportedTransactionVersion: 0,
+			});
 
-		for (const signature of uniqueSignaturesToProcess) {
-			if (processedSignatures.has(signature)) continue; // Should not happen with Set, but safety check
+			if (!tx) {
+				console.log(
+					`[${signatureInfo.signature}] Transaction not found (Slot: ${signatureInfo.slot})`,
+				);
+				continue;
+			}
 
-			let slot: number | null = null; // Store slot for logging context
+			// Process the transaction
+			const message = tx.transaction.message;
+			const accountKeys = message.getAccountKeys({
+				accountKeysFromLookups: tx.meta?.loadedAddresses,
+			});
 
-			try {
-				const txResponse = await connection.getTransaction(signature, {
-					maxSupportedTransactionVersion: 0,
-					commitment: "confirmed",
-				});
+			if (!accountKeys) {
+				console.error(
+					`[${signatureInfo.signature}] Failed to resolve account keys (Slot: ${signatureInfo.slot}).`,
+				);
+				continue;
+			}
 
-				if (!txResponse) {
-					console.warn(`[${signature}] Failed to fetch transaction details.`);
-					processedSignatures.add(signature); // Mark as processed even if failed
-					continue;
-				}
-				slot = txResponse.slot; // Get slot from response
-				processedSignatures.add(signature); // Mark as processed
+			let launchInfo: ParsedLaunchInfo | null = null;
 
-				const { transaction, blockTime, meta } = txResponse;
-				const message = transaction.message as VersionedMessage;
-				const loadedAddresses = meta?.loadedAddresses ?? null;
-				const accountKeys = message.getAccountKeys({
-					accountKeysFromLookups: loadedAddresses,
-				});
+			// 1. Check top-level instructions
+			for (const instruction of message.compiledInstructions) {
+				launchInfo = findLaunchInInstruction(
+					instruction,
+					message,
+					accountKeys,
+					signatureInfo.signature,
+					signatureInfo.slot,
+				);
+				if (launchInfo) break;
+			}
 
-				if (!accountKeys) {
-					console.error(
-						`[${signature}] Failed to resolve account keys (Slot: ${slot}).`,
-					);
-					continue;
-				}
-
-				const eventTimestamp = blockTime ?? Math.floor(Date.now() / 1000);
-				let launchInfo: ParsedLaunchInfo | null = null;
-
-				// 1. Check top-level instructions
-				for (const instruction of message.compiledInstructions) {
-					launchInfo = findLaunchInInstruction(
-						instruction,
-						message,
-						accountKeys,
-						signature,
-						slot,
-					);
-					if (launchInfo) break;
-				}
-
-				// 2. Check inner instructions if not found in top-level
-				if (!launchInfo && meta?.innerInstructions) {
-					for (const innerIxSet of meta.innerInstructions) {
-						// console.log(`[${signature}] Checking inner instructions for index ${innerIxSet.index}`);
-						// Let TypeScript infer the type of 'instruction' here
-						for (const instruction of innerIxSet.instructions) {
-							// Inner instructions might not have 'accounts', only 'accountKeyIndexes'
-							// findLaunchInInstruction is designed to handle this union type now
-							launchInfo = findLaunchInInstruction(
-								instruction,
-								message,
-								accountKeys,
-								signature,
-								slot,
-							);
-							if (launchInfo) break;
-						}
+			// 2. Check inner instructions if not found in top-level
+			if (!launchInfo && tx.meta?.innerInstructions) {
+				for (const innerIxSet of tx.meta.innerInstructions) {
+					for (const instruction of innerIxSet.instructions) {
+						launchInfo = findLaunchInInstruction(
+							instruction,
+							message,
+							accountKeys,
+							signatureInfo.signature,
+							signatureInfo.slot,
+						);
 						if (launchInfo) break;
 					}
-				}
-
-				if (launchInfo) {
-					// Fill in the correct timestamp
-					launchInfo.eventTimestamp = eventTimestamp;
-					await processLaunchEvent(launchInfo);
-					launchEventsFound++;
-				}
-			} catch (error) {
-				console.error(
-					`[${signature}] Error processing transaction (Slot: ${slot ?? "N/A"}):`,
-					error,
-				);
-				// Ensure signature is marked processed even on error
-				if (!processedSignatures.has(signature)) {
-					processedSignatures.add(signature);
+					if (launchInfo) break;
 				}
 			}
-			await new Promise((resolve) => setTimeout(resolve, 50)); // Delay between transactions
-		} // End loop through signatures
+
+			if (!launchInfo) {
+				console.log(
+					`[${signatureInfo.signature}] No launch instruction found (Slot: ${signatureInfo.slot})`,
+				);
+				continue;
+			}
+
+			// Check if launch already exists and we're not overwriting
+			if (!overwriteExisting) {
+				const existingLaunch = await db.query.launches.findFirst({
+					where: eq(launches.tokenAddress, launchInfo.launchData.tokenMint),
+				});
+
+				if (existingLaunch) {
+					console.log(
+						`[${signatureInfo.signature}] Launch already exists for token ${launchInfo.launchData.tokenMint}, skipping (overwrite=false)`,
+					);
+					continue;
+				}
+			}
+
+			// Process the launch event
+			await processLaunchEvent(launchInfo);
+			launchEventsFound++;
+		} catch (error) {
+			console.log(
+				`[${signatureInfo.signature}] Error decoding instruction data (Slot: ${signatureInfo.slot}): ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
 	}
 
 	console.log(
-		`--- Debugging [${LAUNCHPAD_NAME}]: Finished processing. Processed ${processedSignatures.size} unique signatures, Found ${launchEventsFound} launch events. ---`,
+		`--- Debugging [VIRTUALS Protocol (Solana)]: Finished processing. Processed ${filteredSignatures.length} unique signatures, Found ${launchEventsFound} launch events. ---`,
 	);
 
-	// Start the real-time listener after debugging is complete
+	// Start real-time listener after debug completion
 	console.log(
-		`Starting real-time listener for ${LAUNCHPAD_NAME} after debug completion`,
+		"Starting real-time listener for VIRTUALS Protocol (Solana) after debug completion",
 	);
-	startVirtualsSolanaListener(); // This still uses Helius for real-time parsing, which might be fine.
+	await startVirtualsSolanaListener();
 }
 // How to run: Set DEBUG_VIRTUALS_SOLANA=true and optionally DEBUG_SLOT_FROM/DEBUG_SLOT_TO

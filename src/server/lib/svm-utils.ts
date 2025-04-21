@@ -750,7 +750,7 @@ export async function updateSolanaTokenStatistics(
 				// Check if destination is a burn address
 				if (destination === "11111111111111111111111111111111") {
 					sentToZeroAddress = true;
-					creatorTokenMovementDetails += `\n- Burned ${difference.toFixed(2)} tokens`;
+					creatorTokenMovementDetails += `\n- Burned ${Math.round(difference)} tokens`;
 				} else {
 					try {
 						// Check if destination is a known contract
@@ -758,13 +758,13 @@ export async function updateSolanaTokenStatistics(
 							new PublicKey(destination),
 						);
 						if (destinationInfo?.executable) {
-							creatorTokenMovementDetails += `\n- Sent ${difference.toFixed(2)} tokens to a program (${destination})`;
+							creatorTokenMovementDetails += `\n- Sent ${Math.round(difference)} tokens to a program (${destination})`;
 						} else {
-							creatorTokenMovementDetails += `\n- Sold ${difference.toFixed(2)} tokens`;
+							creatorTokenMovementDetails += `\n- Sold ${Math.round(difference)} tokens`;
 						}
 					} catch (error) {
 						console.error(`Error checking destination account: ${error}`);
-						creatorTokenMovementDetails += `\n- Transferred ${difference.toFixed(2)} tokens to unknown destination`;
+						creatorTokenMovementDetails += `\n- Transferred ${Math.round(difference)} tokens to unknown destination`;
 					}
 				}
 			}

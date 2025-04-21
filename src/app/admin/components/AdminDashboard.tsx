@@ -43,6 +43,7 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 	const [debugTo, setDebugTo] = useState<string>("");
 	const [debugResult, setDebugResult] = useState<string>("");
 	const [debugLoading, setDebugLoading] = useState(false);
+	const [overwriteExisting, setOverwriteExisting] = useState(false);
 
 	const handleDelete = async (id: number) => {
 		if (!confirm("Are you sure you want to delete this launch?")) {
@@ -157,13 +158,19 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 	};
 
 	const handleDebug = async () => {
+		if (!debugFrom.trim()) {
+			setDebugResult("Error: From block/slot is required");
+			return;
+		}
+
 		setDebugLoading(true);
 		setDebugResult("");
 		try {
 			const res = await debugLaunchpadHistoricalEvents({
 				launchpad: debugLaunchpad,
-				from: debugFrom.trim() || undefined,
+				from: debugFrom.trim(),
 				to: debugTo.trim() || undefined,
+				overwriteExisting,
 			});
 			setDebugResult(res.message);
 		} catch (e) {
@@ -201,7 +208,7 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 							</label>
 							<select
 								id="debug-launchpad-select"
-								className="rounded bg-gray-800 px-3 py-2 text-white"
+								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
 								value={debugLaunchpad}
 								onChange={(e) => setDebugLaunchpad(e.target.value)}
 							>
@@ -214,36 +221,41 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 							</select>
 						</div>
 						<div>
-							<label
-								htmlFor="debug-from-input"
-								className="mb-1 block font-medium"
-							>
-								From (block/slot)
+							<label htmlFor="debug-from" className="mb-1 block font-medium">
+								From Block/Slot (required)
 							</label>
 							<input
-								id="debug-from-input"
+								id="debug-from"
 								type="text"
-								className="w-40 rounded bg-gray-800 px-3 py-2 text-white"
-								placeholder="Optional"
+								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
 								value={debugFrom}
 								onChange={(e) => setDebugFrom(e.target.value)}
+								required
 							/>
 						</div>
 						<div>
-							<label
-								htmlFor="debug-to-input"
-								className="mb-1 block font-medium"
-							>
-								To (block/slot)
+							<label htmlFor="debug-to" className="mb-1 block font-medium">
+								To Block/Slot (optional)
 							</label>
 							<input
-								id="debug-to-input"
+								id="debug-to"
 								type="text"
-								className="w-40 rounded bg-gray-800 px-3 py-2 text-white"
-								placeholder="Optional"
+								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
 								value={debugTo}
 								onChange={(e) => setDebugTo(e.target.value)}
 							/>
+						</div>
+						<div className="flex items-center gap-2">
+							<input
+								id="overwrite-existing"
+								type="checkbox"
+								className="h-4 w-4 rounded border-gray-300 bg-gray-800 text-purple-600 focus:ring-purple-500"
+								checked={overwriteExisting}
+								onChange={(e) => setOverwriteExisting(e.target.checked)}
+							/>
+							<label htmlFor="overwrite-existing" className="font-medium">
+								Overwrite Existing Launches
+							</label>
 						</div>
 						<div>
 							<button

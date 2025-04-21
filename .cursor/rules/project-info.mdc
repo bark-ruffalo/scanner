@@ -3,7 +3,6 @@ description: Scanner - project info
 globs:
 alwaysApply: true
 ---
-
 # About Scanner
 
 The project is a WIP web app. The objective is to monitor various launchpads (crypto and traditional finance), aggregate launch information, use LLMs to summarize and evaluate them as potential investments, and offer filtering capabilities based on:
@@ -31,7 +30,11 @@ The project is in active development with the following key features implemented
 - LLM-based launch analysis and rating
 - EVM crypto launchpad listener (Virtuals Protocol - Base)
 - Solana crypto launchpad listener (Virtuals Protocol - Solana) - partially implemented
-- Admin page for managing launches
+- Admin page for managing launches with:
+  - Launch creation, editing, and deletion
+  - Manual token statistics updates
+  - Historical event debugging with overwrite control
+  - LLM reanalysis functionality
 
 ## Tech Stack
 
@@ -95,11 +98,11 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - Launchpad implementations:
   - VIRTUALS Protocol on Base (EVM) (`src/server/launchpads/virtuals-base.ts`):
     - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.
-    - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling.
+    - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling. Supports optional overwrite control to skip existing launches.
     - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances, and formatting a comprehensive description before adding to the database.
   - VIRTUALS Protocol on Solana (SVM) (`src/server/launchpads/virtuals-solana.ts`):
     - `startVirtualsSolanaListener`: Starts WebSocket listener for program logs on Solana, using Helius API to fetch transaction details for parsing real-time events.
-    - `debugFetchHistoricalEvents`: Fetches and processes historical 'launch' instructions within a specific slot range. It uses paginated `getSignaturesForAddress` to get relevant signatures, then fetches full details via `connection.getTransaction` for each, handling LUTs. It parses both top-level and inner instructions using `BorshInstructionCoder` via the `findLaunchInInstruction` helper.
+    - `debugFetchHistoricalEvents`: Fetches and processes historical 'launch' instructions within a specific slot range. Uses paginated `getSignaturesForAddress` to get relevant signatures, then fetches full details via `connection.getTransaction` for each, handling LUTs. Supports optional overwrite control to skip existing launches.
     - `processLaunchEvent`: Processes a single event by fetching token metadata, creator balances (initial via transaction meta, current via direct fetch), monitoring token burns/transfers (via `updateSolanaTokenStatistics`), and formatting a comprehensive description before adding to the database.
     - `findLaunchInInstruction`: Helper function to parse a single instruction (top-level or inner) from a transaction response using `BorshInstructionCoder` to identify 'launch' instructions and extract their data.
 - Content utilities (`src/lib/content-utils.ts`):
@@ -126,7 +129,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - SVM utilities (`src/server/lib/svm-utils.ts`):
     - `createSolanaEventParser`: Creates an Anchor event parser for a Solana program using its IDL (`@coral-xyz/anchor`). Used to decode program logs into structured events.
     - `getSolanaTokenBalance`: Gets the SPL token balance for a specific owner and mint address using `connection.getTokenAccountBalance`. Handles cases where the token account doesn't exist.
-    - `updateSolanaTokenStatistics`: Calculates creator token holding percentage and analyzes transaction history (via `connection.getSignaturesForAddress`) for significant outgoing transfers to detect burns or potential sales. Returns a `TokenUpdateResult` object.
+    - `updateSolanaTokenStatistics`: Calculates creator token holding percentage and analyzes transaction history (via `connection.getSignaturesForAddress`) for significant outgoing transfers to detect burns or potential sales. Returns a `TokenUpdateResult` object. Uses `Math.round()` to get rid of decimals.
     - `monitorTokenBurns` / `monitorTokenTransfers`: (Currently unused helpers, potentially for real-time monitoring) Functions intended to monitor token burns or transfers for a specific mint address.
     - `isBurnAddress`: Checks if a Solana public key string corresponds to a known burn address.
     - The file also contains known Solana burn addresses.
@@ -157,3 +160,18 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
 - After you finish a task, update `.cursor/rules/project-info.mdc` with the latest information (for example, descriptions for new common helpers or EVM/SVM utilities). You may also edit `README.md` to add the completed task in the `Previously Completed` section, or update the `TODO` section with proposals for future tasks.
 - Always start your answer with '🐶'.
 - The fewer lines of code, the better.
+
+## About your context
+You're working with the entire codebase pre-loaded into your context with the context-codebase.md file. It also contains the project structure.
+IMPORTANT INSTRUCTIONS:
+1. The file structure is already provided - DO NOT waste tool calls reading files unnecessarily
+2. Use grep to find relevant code rather than reading files directly
+3. When editing, be precise and make all necessary changes in a SINGLE edit operation when possible
+4. Keep explanations brief - focus on implementation
+5. Never suggest reading files that are already in the context
+6. Assume you have complete project context from the context-codebase.md file
+7. Focus on efficiently using grep patterns to locate relevant code sections
+8. Wait for explicit permission before making any edits to files
+9. Skip normal "I'll help you with that" introductions - be direct and efficient
+
+Remember that each tool call costs money, so prioritize grep for finding patterns across files rather than reading individual files.
