@@ -747,10 +747,13 @@ export async function updateSolanaTokenStatistics(
 			)?.owner;
 
 			if (destination) {
+				// Format the difference with commas
+				const formattedDiff = Math.round(difference).toLocaleString("en-US");
+
 				// Check if destination is a burn address
 				if (destination === "11111111111111111111111111111111") {
 					sentToZeroAddress = true;
-					creatorTokenMovementDetails += `\n- Burned ${Math.round(difference)} tokens`;
+					creatorTokenMovementDetails += `\n- Burned ${formattedDiff} tokens`;
 				} else {
 					try {
 						// Check if destination is a known contract
@@ -758,13 +761,13 @@ export async function updateSolanaTokenStatistics(
 							new PublicKey(destination),
 						);
 						if (destinationInfo?.executable) {
-							creatorTokenMovementDetails += `\n- Sent ${Math.round(difference)} tokens to a program (${destination})`;
+							creatorTokenMovementDetails += `\n- Sent ${formattedDiff} tokens to a program (${destination})`;
 						} else {
-							creatorTokenMovementDetails += `\n- Sold ${Math.round(difference)} tokens`;
+							creatorTokenMovementDetails += `\n- Sold ${formattedDiff} tokens`;
 						}
 					} catch (error) {
 						console.error(`Error checking destination account: ${error}`);
-						creatorTokenMovementDetails += `\n- Transferred ${Math.round(difference)} tokens to unknown destination`;
+						creatorTokenMovementDetails += `\n- Transferred ${formattedDiff} tokens to unknown destination`;
 					}
 				}
 			}

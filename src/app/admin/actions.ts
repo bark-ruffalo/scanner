@@ -12,6 +12,7 @@ import {
 	updateLaunchAnalysis,
 	updateTokenStatisticsInDb,
 } from "~/server/queries";
+import { PublicKey } from "@solana/web3.js";
 
 /**
  * Deletes a launch from the database
@@ -37,9 +38,9 @@ export async function deleteLaunch(id: number) {
  */
 export async function updateLaunchTokenStats(
 	launchId: number,
-	tokenAddress: string,
-	creatorAddress: string,
-	creatorInitialTokens: string,
+	tokenAddress?: string,
+	creatorAddress?: string,
+	creatorInitialTokens?: string,
 ) {
 	try {
 		const launch = await getLaunchById(launchId);
@@ -47,17 +48,52 @@ export async function updateLaunchTokenStats(
 			throw new Error(`Launch with ID ${launchId} not found`);
 		}
 
-		// Register the main selling address if it exists
-		const tokenStats = await updateEvmTokenStatistics(
-			publicClient,
-			tokenAddress as `0x${string}`,
-			creatorAddress as `0x${string}`,
-			creatorInitialTokens,
-			undefined,
-			launch.mainSellingAddress as `0x${string}` | undefined,
-		);
+		// Get token info from the launch record itself
+		const {
+			tokenAddress: launchTokenAddress,
+			creatorAddress: launchCreatorAddress,
+			creatorInitialTokensHeld,
+		} = launch;
+		if (
+			!launchTokenAddress ||
+			!launchCreatorAddress ||
+			!creatorInitialTokensHeld
+		) {
+			throw new Error("Launch is missing required token information");
+		}
 
-		await updateTokenStatisticsInDb(launchId, tokenStats);
+		if (launch.launchpad === "VIRTUALS Protocol (Base)") {
+			// For Base launches, update using EVM utilities
+			const tokenStats = await updateEvmTokenStatistics(
+				publicClient,
+				launchTokenAddress as `0x${string}`,
+				launchCreatorAddress as `0x${string}`,
+				creatorInitialTokensHeld,
+				undefined,
+				launch.mainSellingAddress as `0x${string}` | undefined,
+			);
+
+			await updateTokenStatisticsInDb(launchId, tokenStats);
+		} else if (launch.launchpad === "VIRTUALS Protocol (Solana)") {
+			// For Solana launches, update using Solana utilities
+			const { getConnection } = await import("~/server/lib/svm-client");
+			const { updateSolanaTokenStatistics } = await import(
+				"~/server/lib/svm-utils"
+			);
+
+			const connection = getConnection();
+			const tokenStats = await updateSolanaTokenStatistics(
+				connection,
+				new PublicKey(launchTokenAddress),
+				new PublicKey(launchCreatorAddress),
+				creatorInitialTokensHeld,
+			);
+
+			await updateTokenStatisticsInDb(launchId, tokenStats);
+		} else {
+			throw new Error(`Unsupported launchpad: ${launch.launchpad}`);
+		}
+
 		revalidatePath(`/launch/${launchId}`);
 		revalidatePath("/admin");
 		revalidatePath("/");
@@ -80,35 +116,7 @@ export async function updateAllTokenStats() {
 
 	for (const launch of allLaunches) {
 		try {
-			// Extract token info from description
-			const tokenAddressMatch = launch.description.match(
-				/Token address: (0x[a-fA-F0-9]{40})/,
-			);
-			const creatorMatch = launch.description.match(
-				/Creator address: (0x[a-fA-F0-9]{40})/,
-			);
-			const initialTokensMatch = launch.description.match(
-				/Creator initial number of tokens: ([\d,]+)/,
-			);
-
-			if (
-				!tokenAddressMatch?.[1] ||
-				!creatorMatch?.[1] ||
-				!initialTokensMatch?.[1]
-			) {
-				console.log(
-					`Skipping launch ${launch.id}: Could not extract token info from description`,
-				);
-				results.failed++;
-				continue;
-			}
-
-			await updateLaunchTokenStats(
-				launch.id,
-				tokenAddressMatch[1],
-				creatorMatch[1],
-				initialTokensMatch[1].replace(/,/g, ""),
-			);
+			await updateLaunchTokenStats(launch.id);
 			results.success++;
 		} catch (error) {
 			console.error(

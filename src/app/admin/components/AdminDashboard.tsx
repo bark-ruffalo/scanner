@@ -85,12 +85,12 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 				});
 			} else {
 				// Extract token info from description
-				const tokenAddressMatch = description.match(
-					/Token address: (0x[a-fA-F0-9]{40})/,
-				);
-				const creatorMatch = description.match(
-					/Creator address: (0x[a-fA-F0-9]{40})/,
-				);
+				const tokenAddressMatch =
+					description.match(/Token address: (0x[a-fA-F0-9]{40})/) || // EVM
+					description.match(/Token address: ([1-9A-HJ-NP-Za-km-z]{32,44})/); // Solana
+				const creatorMatch =
+					description.match(/Creator address: (0x[a-fA-F0-9]{40})/) || // EVM
+					description.match(/Creator address: ([1-9A-HJ-NP-Za-km-z]{32,44})/); // Solana
 				const initialTokensMatch = description.match(
 					/Creator initial number of tokens: ([\d,]+)/,
 				);
