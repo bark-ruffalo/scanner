@@ -429,10 +429,7 @@ export function getSolanaConnection(
 	launchpadName?: string,
 ): Connection {
 	// Get RPC URL from override, environment, or use a default
-	const rpcUrl =
-		rpcUrlOverride ||
-		env.SOLANA_RPC_URL ||
-		"https://api.mainnet-beta.solana.com";
+	const rpcUrl = rpcUrlOverride || "https://mainnet.helius-rpc.com";
 
 	// Create rate-limited connection with commitment level
 	const connection = new RateLimitedConnection(rpcUrl, "confirmed");
