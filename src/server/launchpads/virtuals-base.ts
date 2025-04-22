@@ -15,7 +15,11 @@ import {
 import { base } from "viem/chains";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
-import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
+import {
+	calculateBigIntPercentage,
+	formatTokenBalance,
+	EVM_DECIMALS,
+} from "~/lib/utils";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
 import { fetchAdditionalContent } from "~/server/lib/common-utils";
@@ -275,8 +279,19 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		);
 
 		// Format token balances for display using the utility function
-		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
-		const displayCurrentBalance = formatTokenBalance(finalCurrentBalance);
+		// Get the rounded string representation for the description/DB
+		const roundedInitialBalance = Math.round(
+			Number(formatUnits(creatorInitialBalance, EVM_DECIMALS)),
+		);
+		const roundedCurrentBalance = Math.round(
+			Number(formatUnits(finalCurrentBalance, EVM_DECIMALS)),
+		);
+		const displayInitialBalance = formatTokenBalance(
+			roundedInitialBalance.toString(),
+		);
+		const displayCurrentBalance = formatTokenBalance(
+			roundedCurrentBalance.toString(),
+		);
 
 		// Calculate initial creator allocation percentage out of the total supply
 		let creatorAllocationPercent = 0;
@@ -296,7 +311,7 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Calculate what percentage of their initial balance the creator still holds
 		// Only calculate for historical events where current balance differs from initial
-		let creatorHoldingPercent = 0;
+		let creatorHoldingPercent = 100; // Assume 100% initially
 		if (isHistoricalEvent && finalCurrentBalance !== creatorInitialBalance) {
 			const holdingResult = calculateBigIntPercentage(
 				finalCurrentBalance,
@@ -309,11 +324,16 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Calculate tokens for sale (Total Supply - Creator Initial Balance)
 		// Virtuals Protocol total supply is always 1 billion.
-		const fixedTotalSupply = 1000000000n * 10n ** 18n; // 1 billion with 18 decimals
+		const fixedTotalSupply = 1000000000n * 10n ** BigInt(EVM_DECIMALS); // Use constant
 		const tokensForSaleCalc = fixedTotalSupply - creatorInitialBalance;
 		// Ensure it's not negative, although unlikely for this launchpad
-		const tokensForSaleBigInt = tokensForSaleCalc > 0n ? tokensForSaleCalc : 0n;
-		const tokensForSaleString = tokensForSaleBigInt.toString();
+		const tokensForSaleBigIntRaw =
+			tokensForSaleCalc > 0n ? tokensForSaleCalc : 0n;
+		// Round the tokens for sale for storage
+		const roundedTokensForSale = Math.round(
+			Number(formatUnits(tokensForSaleBigIntRaw, EVM_DECIMALS)),
+		);
+		const tokensForSaleString = roundedTokensForSale.toString();
 
 		// Convert the BigInt timestamp (Unix seconds) to a JavaScript Date object.
 		const launchedAtDate = new Date(Number(timestamp * 1000n));
@@ -323,16 +343,17 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 
 		// Calculate the formatted initial balance for token statistics
 		const formattedInitialBalance = Math.round(
-			Number(formatUnits(creatorInitialBalance, 18)),
+			Number(formatUnits(creatorInitialBalance, EVM_DECIMALS)),
 		).toString();
 
 		// Get token statistics from updateEvmTokenStatistics
+		// It now expects the initial balance as a rounded string and returns rounded current balance string
 		const tokenStats = await updateEvmTokenStatistics(
 			publicClient,
 			token,
 			creator,
-			formattedInitialBalance,
-			finalCurrentBalance, // Pass the current balance we already fetched
+			formattedInitialBalance, // Pass rounded string
+			finalCurrentBalance, // Pass the raw current balance
 			pair, // Pass the pair address as the launch-specific selling address
 		);
 
@@ -340,20 +361,16 @@ async function processLaunchedEvent(log: LaunchedEventLog) {
 		// Determine the display text for recent developments based on the burn flag
 		let recentDevelopmentsText = "";
 		if (tokenStats.sentToZeroAddress) {
-			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: unknown${
-				tokenStats.creatorTokenMovementDetails
-					? `\n${tokenStats.creatorTokenMovementDetails}`
-					: ""
-			}`;
+			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: unknown${tokenStats.creatorTokenMovementDetails ? `\n${tokenStats.creatorTokenMovementDetails}` : ""}`;
 		} else if (
 			finalCurrentBalance !== creatorInitialBalance &&
 			isHistoricalEvent
 		) {
-			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${
-				tokenStats.creatorTokenMovementDetails
-					? `\n${tokenStats.creatorTokenMovementDetails}`
-					: ""
-			}`;
+			// Use the rounded current balance from tokenStats for display
+			const displayRoundedCurrent = formatTokenBalance(
+				tokenStats.creatorTokensHeld,
+			);
+			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayRoundedCurrent} (${Number(creatorHoldingPercent.toFixed(2)).toString()}% of initial allocation)${tokenStats.creatorTokenMovementDetails ? `\n${tokenStats.creatorTokenMovementDetails}` : ""}`;
 		}
 
 		// Check if creator has sold tokens (potential rug pull)
@@ -419,13 +436,13 @@ YouTube: ${youtube || "N/A"}
 			basicInfoUpdatedAt: new Date(), // Set basic info timestamp for initial creation
 			// Store the pair address for future token movement detection
 			mainSellingAddress: getAddress(pair),
-			// Add total token supply (always 1 billion for Virtuals Protocol)
+			// Add total token supply (always 1 billion for Virtuals Protocol - rounded)
 			totalTokenSupply: "1000000000",
-			// Add the initial creator balance
-			creatorInitialTokensHeld: creatorInitialBalance.toString(),
-			// Add the calculated tokens available for sale
+			// Add the initial creator balance (rounded string)
+			creatorInitialTokensHeld: formattedInitialBalance,
+			// Add the calculated tokens available for sale (rounded string)
 			tokensForSale: tokensForSaleString,
-			// Use the token stats we already have
+			// Use the token stats we already have (these are already rounded strings)
 			...tokenStats,
 			// Explicitly include sentToZeroAddress flag from tokenStats
 			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,

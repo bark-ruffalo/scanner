@@ -45,31 +45,34 @@ export function linkify(
 	return parts;
 }
 
-import { formatUnits } from "viem";
+// Standard decimals for different chains
+export const EVM_DECIMALS = 18;
+export const SVM_DECIMALS = 6; // Typical for Solana SPL
 
 /**
- * Formats a token balance from a raw BigInt value to a human-readable string with commas.
- * @param amount The raw token balance as a BigInt.
- * @param decimals The number of decimal places the token uses (default is 18 for most ERC20 tokens).
- * @returns A formatted string with commas as thousand separators and appropriate decimal places.
+ * Formats a pre-rounded token amount (string or BigInt) into a human-readable string with commas.
+ * Assumes the input amount already has decimals removed.
+ * @param amount The pre-rounded token balance as a string or BigInt.
+ * @returns A formatted string with commas as thousand separators. Returns "0" if the amount is 0 or invalid.
  */
-export function formatTokenBalance(amount: bigint, decimals = 18): string {
-	// Convert the raw amount to a decimal string
-	const formattedAmount = formatUnits(amount, decimals);
+export function formatTokenBalance(amount: string | bigint): string {
+	try {
+		// Convert string amount to BigInt, handle potential commas
+		const amountBigInt =
+			typeof amount === "string" ? BigInt(amount.replace(/,/g, "")) : amount;
 
-	// Convert to a number and round it
-	const numberAmount = Math.round(Number(formattedAmount));
+		// If the value is 0, return "0"
+		if (amountBigInt === 0n) {
+			return "0";
+		}
 
-	// If the value is 0, return "0" without decimal places
-	if (numberAmount === 0) {
+		// Format with commas
+		return amountBigInt.toLocaleString("en-US");
+	} catch (error) {
+		console.error("Error formatting token balance:", error, "Input:", amount);
+		// Return "0" or some error indicator if conversion fails
 		return "0";
 	}
-
-	// Format with commas and no decimal places
-	return numberAmount.toLocaleString("en-US", {
-		minimumFractionDigits: 0,
-		maximumFractionDigits: 0,
-	});
 }
 
 /**

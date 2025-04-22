@@ -15,6 +15,7 @@ import {
 } from "@solana/web3.js";
 import "server-only";
 import { env } from "~/env";
+import { formatTokenBalance, SVM_DECIMALS } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
 
 // --- Rate Limiter ---
@@ -675,33 +676,42 @@ export async function updateSolanaTokenStatistics(
 		`Updating Solana token statistics for token ${tokenMint.toString()}:`,
 	);
 	console.log(`- Creator address: ${creator.toString()}`);
-	console.log(`- Initial tokens: ${creatorInitialTokens}`);
+	console.log(`- Initial tokens (rounded): ${creatorInitialTokens}`);
 
 	// Get token metadata including decimals
 	const metadata = await getSolanaTokenMetadata(connection, tokenMint);
+	const decimals = metadata.decimals;
 
 	// Get current balance from blockchain if not provided
-	const currentBalance =
+	const currentBalanceRaw =
 		currentBalanceLamports !== undefined
 			? currentBalanceLamports
 			: await getSolanaTokenBalance(connection, tokenMint, creator);
 
 	console.log(
-		`- Current balance from blockchain: ${currentBalance.toString()}`,
+		`- Current balance from blockchain (raw): ${currentBalanceRaw.toString()}`,
 	);
 
-	// Convert to human-readable format
-	const divisor = 10n ** BigInt(metadata.decimals);
-	const currentTokensHeld = Number(currentBalance) / Number(divisor);
-	const initialTokensNum = Number(creatorInitialTokens);
-	const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
+	// Calculate rounded current tokens held
+	const divisor = 10n ** BigInt(decimals);
+	const currentTokensRounded = currentBalanceRaw / divisor;
+	const roundedCurrentTokensString = currentTokensRounded.toString();
 
-	console.log(`- Current tokens held by creator: ${roundedCurrentTokens}`);
-	console.log(`- Initial token allocation: ${Math.round(initialTokensNum)}`);
+	// Convert initial tokens (rounded string) to number for percentage calculation
+	const initialTokensNum = Number(creatorInitialTokens);
+
+	console.log(
+		`- Current tokens held by creator (rounded): ${roundedCurrentTokensString}`,
+	);
+	console.log(
+		`- Initial token allocation (rounded): ${Math.round(initialTokensNum)}`,
+	);
 
 	// Calculate what percentage of initial allocation is still held
 	const percentageOfInitialHeld =
-		initialTokensNum > 0 ? (currentTokensHeld / initialTokensNum) * 100 : 0;
+		initialTokensNum > 0
+			? (Number(roundedCurrentTokensString) / initialTokensNum) * 100
+			: 0;
 
 	console.log(
 		`- Percentage of initial allocation still held: ${percentageOfInitialHeld.toFixed(2)}%`,
@@ -712,8 +722,8 @@ export async function updateSolanaTokenStatistics(
 	let sentToZeroAddress = false;
 
 	// Get recent token transfers
-	const signatures = await connection.getSignaturesForAddress(tokenMint, {
-		limit: 100, // Adjust as needed
+	const signatures = await connection.getSignaturesForAddress(creator, {
+		limit: 50,
 	});
 
 	// Process each transaction to look for token movements
@@ -724,59 +734,78 @@ export async function updateSolanaTokenStatistics(
 
 		if (!tx || !tx.meta) continue;
 
-		// Look for token program instructions
-		const postTokenBalances = tx.meta.postTokenBalances || [];
-		const preTokenBalances = tx.meta.preTokenBalances || [];
+		// Check pre and post balances for the specific token mint
+		const preBalance = tx.meta.preTokenBalances?.find(
+			(b) => b.owner === creator.toString() && b.mint === tokenMint.toString(),
+		)?.uiTokenAmount.amount;
+		const postBalance = tx.meta.postTokenBalances?.find(
+			(b) => b.owner === creator.toString() && b.mint === tokenMint.toString(),
+		)?.uiTokenAmount.amount;
 
-		// Find creator's balance changes
-		const preBalance =
-			preTokenBalances.find((b) => b.owner === creator.toString())
-				?.uiTokenAmount.uiAmount ?? 0;
-		const postBalance =
-			postTokenBalances.find((b) => b.owner === creator.toString())
-				?.uiTokenAmount.uiAmount ?? 0;
+		// If balances exist, calculate the difference
+		if (preBalance !== undefined && postBalance !== undefined) {
+			const preBalanceBigInt = BigInt(preBalance);
+			const postBalanceBigInt = BigInt(postBalance);
+			const differenceRaw = preBalanceBigInt - postBalanceBigInt;
 
-		const difference = preBalance - postBalance;
-		if (difference > 0) {
-			// Token transfer out detected
-			const destination = postTokenBalances.find(
-				(b) => b.owner !== creator.toString(),
-			)?.owner;
+			// If difference is positive, it's an outgoing transfer
+			if (differenceRaw > 0n) {
+				// Find the destination owner
+				const destinationBalance = tx.meta.postTokenBalances?.find(
+					(b) =>
+						b.mint === tokenMint.toString() && // Same token
+						b.owner !== creator.toString() && // Different owner
+						BigInt(b.uiTokenAmount.amount) >=
+							BigInt(
+								tx.meta?.preTokenBalances?.find(
+									(pre) => pre.accountIndex === b.accountIndex,
+								)?.uiTokenAmount.amount ?? "0",
+							),
+				);
 
-			if (destination) {
-				// Format the difference with commas
-				const formattedDiff = Math.round(difference).toLocaleString("en-US");
+				const destinationOwner = destinationBalance?.owner;
+				const differenceRounded = differenceRaw / divisor;
+				const formattedDiff = formatTokenBalance(differenceRounded.toString());
 
-				// Check if destination is a burn address
-				if (destination === "11111111111111111111111111111111") {
-					sentToZeroAddress = true;
-					creatorTokenMovementDetails += `\n- Burned ${formattedDiff} tokens`;
-				} else {
-					try {
-						// Check if destination is a known contract
-						const destinationInfo = await connection.getAccountInfo(
-							new PublicKey(destination),
-						);
-						if (destinationInfo?.executable) {
-							creatorTokenMovementDetails += `\n- Sent ${formattedDiff} tokens to a program (${destination})`;
-						} else {
-							creatorTokenMovementDetails += `\n- Sold ${formattedDiff} tokens`;
+				if (destinationOwner) {
+					// Check if destination is a burn address
+					if (isBurnAddress(new PublicKey(destinationOwner))) {
+						sentToZeroAddress = true;
+						creatorTokenMovementDetails += `\n- Burned ${formattedDiff} tokens`;
+					} else {
+						try {
+							// Check if destination is a program (executable account)
+							const destinationInfo = await connection.getAccountInfo(
+								new PublicKey(destinationOwner),
+							);
+							if (destinationInfo?.executable) {
+								creatorTokenMovementDetails += `\n- Sent ${formattedDiff} tokens to a program (${destinationOwner.substring(0, 4)}...)`;
+							} else {
+								// Assume sale if not a program or burn address
+								creatorTokenMovementDetails += `\n- Sold ${formattedDiff} tokens`;
+							}
+						} catch (error) {
+							console.error(
+								`Error checking destination account ${destinationOwner}: ${error}`,
+							);
+							creatorTokenMovementDetails += `\n- Transferred ${formattedDiff} tokens to unknown destination`;
 						}
-					} catch (error) {
-						console.error(`Error checking destination account: ${error}`);
-						creatorTokenMovementDetails += `\n- Transferred ${formattedDiff} tokens to unknown destination`;
 					}
+				} else {
+					// If destination couldn't be identified (e.g., closed account)
+					creatorTokenMovementDetails += `\n- Transferred out ${formattedDiff} tokens (destination unclear)`;
 				}
 			}
 		}
 	}
 
-	// Default result with token movement details
+	// Return the result with rounded token amounts as strings
 	const result: TokenUpdateResult = {
-		creatorTokensHeld: roundedCurrentTokens,
+		creatorTokensHeld: roundedCurrentTokensString,
 		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
 		tokenStatsUpdatedAt: new Date(),
-		creatorTokenMovementDetails: creatorTokenMovementDetails || undefined,
+		creatorTokenMovementDetails:
+			creatorTokenMovementDetails.trim() || undefined,
 		sentToZeroAddress,
 	};
 

@@ -11,7 +11,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import { formatTokenBalance } from "~/lib/utils";
+import { formatTokenBalance, EVM_DECIMALS } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
@@ -153,7 +153,9 @@ export async function updateEvmTokenStatistics(
 	);
 
 	// Convert wei to eth for current balance
-	const currentTokensHeld = Number(formatUnits(currentBalanceWei, 18));
+	const currentTokensHeld = Number(
+		formatUnits(currentBalanceWei, EVM_DECIMALS),
+	);
 	const initialTokensNum = Number(creatorInitialTokens);
 	const roundedCurrentTokens = Math.round(currentTokensHeld).toString();
 
@@ -403,7 +405,10 @@ export async function updateEvmTokenStatistics(
 			) => {
 				if (!transfer) return "";
 				const { value, transactionHash, destinationType } = transfer;
-				const formattedValue = formatTokenBalance(value);
+				const roundedValue = Math.round(
+					Number(formatUnits(value, EVM_DECIMALS)),
+				);
+				const formattedValue = formatTokenBalance(roundedValue.toString());
 				const destinationInfo = destinationType
 					? ` via ${destinationType}`
 					: "";
@@ -417,7 +422,10 @@ export async function updateEvmTokenStatistics(
 					(total, t) => total + (t?.value || 0n),
 					0n,
 				);
-				const formattedBurned = formatTokenBalance(burnedTokens);
+				const roundedBurned = Math.round(
+					Number(formatUnits(burnedTokens, EVM_DECIMALS)),
+				);
+				const formattedBurned = formatTokenBalance(roundedBurned.toString());
 
 				movementDetails.push(
 					`Burned ${formattedBurned} tokens (sent to address 0x0). This is not a red flag! Almost certainly, it indicates that the launch graduated its initial investment phase and is now trading on a DEX with a new token address. The creator might still hold the new token; investors should check!`,
@@ -433,7 +441,10 @@ export async function updateEvmTokenStatistics(
 					(total, t) => total + (t?.value || 0n),
 					0n,
 				);
-				const formattedLocked = formatTokenBalance(lockedTokens);
+				const roundedLocked = Math.round(
+					Number(formatUnits(lockedTokens, EVM_DECIMALS)),
+				);
+				const formattedLocked = formatTokenBalance(roundedLocked.toString());
 
 				// Group by lock platform
 				const lockPlatforms = transferGroups.locked.reduce<
@@ -446,10 +457,12 @@ export async function updateEvmTokenStatistics(
 
 				// Format the lock details
 				const lockDetails = Object.entries(lockPlatforms)
-					.map(
-						([platform, amount]) =>
-							`${formatTokenBalance(amount)} in ${platform}`,
-					)
+					.map(([platform, amount]) => {
+						const roundedAmount = Math.round(
+							Number(formatUnits(amount, EVM_DECIMALS)),
+						);
+						return `${formatTokenBalance(roundedAmount.toString())} in ${platform}`;
+					})
 					.join(", ");
 
 				movementDetails.push(
@@ -463,12 +476,17 @@ export async function updateEvmTokenStatistics(
 					(total, t) => total + (t?.value || 0n),
 					0n,
 				);
-				const formattedSold = formatTokenBalance(soldTokens);
+				const roundedSold = Math.round(
+					Number(formatUnits(soldTokens, EVM_DECIMALS)),
+				);
+				const formattedSold = formatTokenBalance(roundedSold.toString());
 
 				// Calculate percentage of initial allocation that was sold
 				const percentageSold =
 					initialTokensNum > 0
-						? (Number(formatUnits(soldTokens, 18)) / initialTokensNum) * 100
+						? (Number(formatUnits(soldTokens, EVM_DECIMALS)) /
+								initialTokensNum) *
+							100
 						: 0;
 
 				// Group by DEX/selling platform
@@ -482,10 +500,12 @@ export async function updateEvmTokenStatistics(
 
 				// Format the selling details
 				const sellingDetails = Object.entries(sellingPlatforms)
-					.map(
-						([platform, amount]) =>
-							`Sold ${formatTokenBalance(amount)} tokens through ${platform}.`,
-					)
+					.map(([platform, amount]) => {
+						const roundedAmount = Math.round(
+							Number(formatUnits(amount, EVM_DECIMALS)),
+						);
+						return `Sold ${formatTokenBalance(roundedAmount.toString())} tokens through ${platform}.`;
+					})
 					.join(" ");
 
 				movementDetails.push(sellingDetails);
@@ -495,7 +515,10 @@ export async function updateEvmTokenStatistics(
 			if (transferGroups.unknown.length > 0) {
 				const unknownTransferDetails = transferGroups.unknown
 					.map((transfer) => {
-						const formattedValue = formatTokenBalance(transfer.value);
+						const roundedValue = Math.round(
+							Number(formatUnits(transfer.value, EVM_DECIMALS)),
+						);
+						const formattedValue = formatTokenBalance(roundedValue.toString());
 						const destinationType =
 							transfer.destinationType || "unknown destination";
 
@@ -587,7 +610,7 @@ export async function getEvmErc20BalanceAtBlock(
 		if (typeof balance === "bigint") {
 			// Log both WEI and ETH values with block number
 			console.log(
-				`Balance fetched at block ${blockNumber || "latest"}: ${balance} WEI (${formatUnits(balance, 18)} ETH)`,
+				`Balance fetched at block ${blockNumber || "latest"}: ${balance} WEI (${formatUnits(balance, EVM_DECIMALS)} ETH)`,
 			);
 			return balance;
 		}
@@ -597,7 +620,7 @@ export async function getEvmErc20BalanceAtBlock(
 			const balanceBigInt = BigInt(balance);
 			// Log both WEI and ETH values with block number
 			console.log(
-				`Balance fetched at block ${blockNumber || "latest"}: ${balanceBigInt} WEI (${formatUnits(balanceBigInt, 18)} ETH)`,
+				`Balance fetched at block ${blockNumber || "latest"}: ${balanceBigInt} WEI (${formatUnits(balanceBigInt, EVM_DECIMALS)} ETH)`,
 			);
 			return balanceBigInt;
 		}

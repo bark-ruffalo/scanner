@@ -13,7 +13,11 @@ import type {
 import { eq } from "drizzle-orm";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
-import { calculateBigIntPercentage, formatTokenBalance } from "~/lib/utils";
+import {
+	calculateBigIntPercentage,
+	formatTokenBalance,
+	SVM_DECIMALS,
+} from "~/lib/utils";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
 import { fetchAdditionalContent } from "~/server/lib/common-utils";
@@ -147,7 +151,7 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 
 		// For Virtuals Protocol, the token supply is fixed at 1 billion
 		const TOTAL_SUPPLY = 1_000_000_000n;
-		let decimals = 9; // Default decimals for Solana SPL tokens
+		let decimals = SVM_DECIMALS; // Use constant as default
 
 		// Try to get token decimals from mint info
 		try {
@@ -185,9 +189,13 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 					) {
 						// Found the creator's token balance right after the transaction
 						const rawAmount = balance.uiTokenAmount.amount;
-						creatorInitialBalance = BigInt(rawAmount);
+						const preBalanceBigInt = BigInt(rawAmount);
+						const divisor = 10n ** BigInt(decimals);
+						const preBalanceRounded = preBalanceBigInt / divisor;
+						const postBalanceRounded = preBalanceBigInt / divisor;
+						creatorInitialBalance = preBalanceRounded; // Store rounded initial balance
 						console.log(
-							`Found initial balance directly in transaction: ${rawAmount} (${balance.uiTokenAmount.uiAmount} ${balance.uiTokenAmount.uiAmountString})`,
+							`Found initial balance (rounded) directly in transaction: ${preBalanceRounded}`,
 						);
 						break;
 					}
@@ -196,16 +204,20 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 
 			// If we still don't have a balance, try getting current balance as last resort
 			if (creatorInitialBalance === 0n) {
-				console.log("No balance found in transaction, using current balance");
-				creatorInitialBalance = await getSolanaTokenBalance(
+				console.log(
+					"No balance found in transaction, getting current balance and rounding...",
+				);
+				const rawCurrentBalance = await getSolanaTokenBalance(
 					getConnection(),
 					tokenMintPubkey,
 					creator,
 				);
+				// Round the fetched balance
+				creatorInitialBalance = rawCurrentBalance / 10n ** BigInt(decimals);
 			}
 
 			console.log(
-				`Creator initial balance: ${creatorInitialBalance.toString()}`,
+				`Creator initial balance (rounded): ${creatorInitialBalance.toString()}`,
 			);
 		} catch (error) {
 			console.warn("Error getting creator's initial token balance:", error);
@@ -218,40 +230,42 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 		}
 
 		// Then get current balance for historical events
-		let creatorCurrentBalance = creatorInitialBalance; // Default to initial for new launches
+		let creatorCurrentBalanceRaw =
+			creatorInitialBalance * 10n ** BigInt(decimals); // Default to initial raw balance
 		if (isHistoricalEvent) {
 			try {
-				// For historical events, get the current balance
-				creatorCurrentBalance = await getSolanaTokenBalance(
+				// For historical events, get the current raw balance
+				creatorCurrentBalanceRaw = await getSolanaTokenBalance(
 					getConnection(),
 					tokenMintPubkey,
 					creator,
 				);
 				console.log(
-					`Creator current balance: ${creatorCurrentBalance.toString()}`,
+					`Creator current balance (raw): ${creatorCurrentBalanceRaw.toString()}`,
 				);
 			} catch (error) {
 				console.warn("Error getting creator's current token balance:", error);
-				// Keep initial balance as fallback
+				// Keep initial raw balance as fallback
 			}
 		}
 
-		// Format token balances for display
-		const displayInitialBalance = formatTokenBalance(
-			creatorInitialBalance,
-			decimals,
-		);
+		// Calculate rounded current balance
+		const creatorCurrentBalanceRounded =
+			creatorCurrentBalanceRaw / 10n ** BigInt(decimals);
+
+		// Format token balances for display using the rounded values
+		const displayInitialBalance = formatTokenBalance(creatorInitialBalance);
 		const displayCurrentBalance = formatTokenBalance(
-			creatorCurrentBalance,
-			decimals,
+			creatorCurrentBalanceRounded,
 		);
 
 		console.log(`Display initial balance: ${displayInitialBalance}`);
 
-		// Calculate initial creator allocation percentage
+		// Calculate initial creator allocation percentage using rounded initial balance
+		const totalSupplyRounded = TOTAL_SUPPLY; // Already rounded
 		const allocationResult = calculateBigIntPercentage(
 			creatorInitialBalance,
-			totalSupplyWithDecimals,
+			totalSupplyRounded,
 		);
 
 		let formattedAllocation = "N/A";
@@ -264,11 +278,11 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 			formattedAllocation = "Error calculating";
 		}
 
-		// Calculate tokens for sale (Total Supply - Creator Initial Balance)
-		const tokensForSaleCalc = totalSupplyWithDecimals - creatorInitialBalance;
+		// Calculate tokens for sale (Total Supply - Creator Initial Balance, both rounded)
+		const tokensForSaleCalc = totalSupplyRounded - creatorInitialBalance;
 		const tokensForSaleBigInt = tokensForSaleCalc > 0n ? tokensForSaleCalc : 0n;
 		const tokensForSaleString = tokensForSaleBigInt.toString();
-		console.log(`Tokens for sale: ${tokensForSaleString}`);
+		console.log(`Tokens for sale (rounded): ${tokensForSaleString}`);
 
 		// Convert the timestamp to a JavaScript Date object
 		const launchedAtDate = new Date(eventTimestamp * 1000);
@@ -320,17 +334,18 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 		}
 
 		// Get token statistics
-		const formattedInitialBalance = formatTokenBalance(
-			creatorInitialBalance,
-			decimals,
-		).replace(/,/g, "");
+		const formattedInitialBalanceString = creatorInitialBalance.toString();
 
 		// Calculate what percentage of their initial balance the creator still holds
 		// Only calculate for historical events where current balance differs from initial
-		let creatorHoldingPercent = 0;
-		if (isHistoricalEvent && creatorCurrentBalance !== creatorInitialBalance) {
+		let creatorHoldingPercent = 100;
+		if (
+			isHistoricalEvent &&
+			creatorCurrentBalanceRounded !== creatorInitialBalance
+		) {
+			// Use rounded values for percentage calculation
 			const holdingResult = calculateBigIntPercentage(
-				creatorCurrentBalance,
+				creatorCurrentBalanceRounded,
 				creatorInitialBalance,
 			);
 			if (holdingResult) {
@@ -342,8 +357,8 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 			getConnection(),
 			tokenMintPubkey,
 			creator,
-			formattedInitialBalance,
-			creatorCurrentBalance,
+			formattedInitialBalanceString, // Pass rounded string
+			creatorCurrentBalanceRaw, // Pass raw lamports
 		);
 
 		// Build launchpad URL
@@ -370,14 +385,14 @@ async function processLaunchEvent(parsedInfo: ParsedLaunchInfo) {
 					: ""
 			}`;
 		} else if (
-			creatorCurrentBalance !== creatorInitialBalance &&
+			creatorCurrentBalanceRounded !== creatorInitialBalance &&
 			isHistoricalEvent
 		) {
-			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayCurrentBalance} (${Number(creatorHoldingPercent).toFixed(2)}% of initial allocation)${
-				tokenStats.creatorTokenMovementDetails
-					? `\n${tokenStats.creatorTokenMovementDetails}`
-					: ""
-			}`;
+			// Use the rounded current balance from tokenStats for display
+			const displayRoundedCurrent = formatTokenBalance(
+				tokenStats.creatorTokensHeld,
+			);
+			recentDevelopmentsText = `\n### Recent developments\nNumber of tokens held as of ${new Date().toUTCString().replace(/:\d\d GMT/, " GMT")}: ${displayRoundedCurrent} (${Number(creatorHoldingPercent).toFixed(2)}% of initial allocation)${tokenStats.creatorTokenMovementDetails ? `\n${tokenStats.creatorTokenMovementDetails}` : ""}`;
 		}
 
 		// --- Construct Comprehensive Description ---
@@ -416,10 +431,10 @@ ${virtualsInfoContent ? `${virtualsInfoContent}` : ""}${additionalContent ? `\n\
 			imageUrl,
 			basicInfoUpdatedAt: new Date(),
 			mainSellingAddress: launchData.tokenMint, // Use token mint as the selling address equivalent
-			totalTokenSupply: TOTAL_SUPPLY.toString(),
-			creatorInitialTokensHeld: creatorInitialBalance.toString(),
-			tokensForSale: tokensForSaleString,
-			...tokenStats, // Include token stats like holding percentage
+			totalTokenSupply: TOTAL_SUPPLY.toString(), // Store rounded total supply
+			creatorInitialTokensHeld: formattedInitialBalanceString, // Store rounded initial balance
+			tokensForSale: tokensForSaleString, // Store rounded tokens for sale
+			...tokenStats, // Include token stats (already rounded strings)
 			sentToZeroAddress: tokenStats.sentToZeroAddress ?? false,
 		};
 
@@ -431,7 +446,9 @@ ${virtualsInfoContent ? `${virtualsInfoContent}` : ""}${additionalContent ? `\n\
 					title: dbLaunchData.title,
 					url: dbLaunchData.url,
 					tokenAddress: dbLaunchData.tokenAddress,
-					totalTokenSupply: dbLaunchData.totalTokenSupply,
+					totalTokenSupply: dbLaunchData.totalTokenSupply, // Log rounded
+					creatorInitialTokensHeld: dbLaunchData.creatorInitialTokensHeld, // Log rounded
+					tokensForSale: dbLaunchData.tokensForSale, // Log rounded
 				},
 				null,
 				2,

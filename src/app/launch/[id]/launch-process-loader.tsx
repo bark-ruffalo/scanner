@@ -11,7 +11,7 @@ interface LaunchProcessLoaderProps {
 	needsTokenUpdate: boolean;
 	tokenAddress?: string;
 	creatorAddress?: string;
-	creatorInitialTokens?: string;
+	creatorInitialTokens: string;
 }
 
 export function LaunchProcessLoader({

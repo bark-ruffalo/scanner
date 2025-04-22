@@ -101,7 +101,7 @@ export async function getDistinctLaunchpads() {
  * for the homepage ('/') to ensure the UI reflects the new data.
  * @param launchData An object conforming to the NewLaunchData type, which includes:
  *   - Required fields: launchpad, title, url, description
- *   - Optional fields: imageUrl, creatorTokenHoldingPercentage, creatorTokensHeld, totalTokenSupply
+ *   - Optional fields: imageUrl, creatorTokenHoldingPercentage, creatorTokensHeld (string), totalTokenSupply (string)
  */
 export async function addLaunch(launchData: NewLaunchData) {
 	console.log(
@@ -332,6 +332,7 @@ export async function updateTokenStatisticsInDb(
 	await db
 		.update(launches)
 		.set({
+			// Ensure these are treated as strings for the numeric type
 			creatorTokensHeld: tokenStats.creatorTokensHeld,
 			creatorTokenHoldingPercentage: tokenStats.creatorTokenHoldingPercentage,
 			creatorTokenMovementDetails: tokenStats.creatorTokenMovementDetails,
