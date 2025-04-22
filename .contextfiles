@@ -1,0 +1,12 @@
+src/**/*
+templates/**/*
+render.yaml
+middleware.ts
+package.json
+biome.jsonc
+drizzle.config.ts
+next.config.js
+postcss.config.js
+tsconfig.json
+.env
+.env.example
