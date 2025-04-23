@@ -16,9 +16,9 @@ import { base } from "viem/chains";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import {
+	EVM_DECIMALS,
 	calculateBigIntPercentage,
 	formatTokenBalance,
-	EVM_DECIMALS,
 } from "~/lib/utils";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";

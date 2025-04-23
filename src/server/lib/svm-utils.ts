@@ -15,7 +15,7 @@ import {
 } from "@solana/web3.js";
 import "server-only";
 import { env } from "~/env";
-import { formatTokenBalance, SVM_DECIMALS } from "~/lib/utils";
+import { SVM_DECIMALS, formatTokenBalance } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
 
 // --- Rate Limiter ---

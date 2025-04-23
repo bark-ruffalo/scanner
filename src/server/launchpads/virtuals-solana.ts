@@ -14,9 +14,9 @@ import { eq } from "drizzle-orm";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
 import {
+	SVM_DECIMALS,
 	calculateBigIntPercentage,
 	formatTokenBalance,
-	SVM_DECIMALS,
 } from "~/lib/utils";
 import { db } from "~/server/db";
 import { launches } from "~/server/db/schema";
@@ -578,10 +578,13 @@ function findLaunchInInstruction(
 					`[${signature}] Found 'launch' via Instruction Parsing in Slot ${slot ?? "N/A"}: ${args.name} (${args.symbol}) Token: ${tokenMintAddress.toString()}`,
 				);
 
+				// Get current timestamp if this is a historical event
+				const currentTimestamp = Math.floor(Date.now() / 1000);
+
 				return {
 					launchData,
 					creator,
-					eventTimestamp: 0,
+					eventTimestamp: currentTimestamp,
 					txSignature: signature,
 				};
 			}
@@ -730,7 +733,7 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 					);
 					// --- Reconnection logic for handler errors ---
 					const delay =
-						retryCount === 0 ? 500 : Math.min(30000, 5000 * retryCount);
+						retryCount === 0 ? 3000 : Math.min(30000, 5000 * retryCount);
 					console.log(
 						`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after handler error...`,
 					);
@@ -764,7 +767,7 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 			);
 		}
 		// --- Reconnection logic for setup errors ---
-		const delay = retryCount === 0 ? 500 : Math.min(30000, 5000 * retryCount);
+		const delay = retryCount === 0 ? 3000 : Math.min(30000, 5000 * retryCount);
 		console.log(
 			`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after critical error...`,
 		);
@@ -875,6 +878,15 @@ export async function debugFetchHistoricalEvents(
 					`[${signatureInfo.signature}] No launch instruction found (Slot: ${signatureInfo.slot})`,
 				);
 				continue;
+			}
+
+			// Get the actual timestamp from the transaction if available
+			if (tx.blockTime) {
+				// BlockTime is in seconds, which is what we want
+				launchInfo.eventTimestamp = tx.blockTime;
+				console.log(
+					`Using actual blockTime for historical event: ${new Date(tx.blockTime * 1000).toISOString()}`,
+				);
 			}
 
 			// Check if launch already exists and we're not overwriting

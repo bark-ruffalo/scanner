@@ -1,5 +1,6 @@
 "use server";
 
+import { PublicKey } from "@solana/web3.js";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "~/server/db";
@@ -12,7 +13,6 @@ import {
 	updateLaunchAnalysis,
 	updateTokenStatisticsInDb,
 } from "~/server/queries";
-import { PublicKey } from "@solana/web3.js";
 
 /**
  * Deletes a launch from the database

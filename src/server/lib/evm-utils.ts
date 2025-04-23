@@ -11,7 +11,7 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import { formatTokenBalance, EVM_DECIMALS } from "~/lib/utils";
+import { EVM_DECIMALS, formatTokenBalance } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
