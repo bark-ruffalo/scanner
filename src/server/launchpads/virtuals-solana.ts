@@ -82,6 +82,25 @@ interface HeliusParsedTransaction {
 // Constant string identifying the launchpad for database storage and display purposes
 const LAUNCHPAD_NAME = "VIRTUALS Protocol (Solana)";
 
+// Rate limiting configuration
+const RATE_LIMIT_CONFIG = {
+	// Initial delay between API calls in milliseconds (5 seconds)
+	initialDelay: 5000,
+	// Maximum delay between API calls (30 seconds)
+	maxDelay: 30000,
+	// Backoff factor for exponential backoff
+	backoffFactor: 1.5,
+	// Number of retries before giving up
+	maxRetries: 5,
+	// In-memory transaction queue to process
+	pendingTransactions: new Map<
+		string,
+		{ signature: string; attempts: number; nextRetryTime: number }
+	>(),
+	// Last API call timestamp
+	lastApiCallTime: 0,
+};
+
 // Create the instruction coder using the imported IDL
 const instructionCoder = new BorshInstructionCoder(IDL);
 
@@ -600,6 +619,195 @@ function findLaunchInInstruction(
 }
 
 /**
+ * Helper function to fetch transaction details from Helius with rate limiting and retries
+ */
+async function fetchTransactionFromHelius(
+	signature: string,
+	retryCount = 0,
+): Promise<HeliusParsedTransaction | null> {
+	const now = Date.now();
+	const timeSinceLastCall = now - RATE_LIMIT_CONFIG.lastApiCallTime;
+
+	// Ensure we're respecting rate limits
+	if (
+		timeSinceLastCall < RATE_LIMIT_CONFIG.initialDelay &&
+		RATE_LIMIT_CONFIG.lastApiCallTime > 0
+	) {
+		const waitTime = RATE_LIMIT_CONFIG.initialDelay - timeSinceLastCall;
+		console.log(
+			`[${signature}] Rate limiting - waiting ${waitTime}ms before next Helius API call`,
+		);
+		await new Promise((resolve) => setTimeout(resolve, waitTime));
+	}
+
+	RATE_LIMIT_CONFIG.lastApiCallTime = Date.now();
+
+	const HELIUS_API_KEY = env.HELIUS_API_KEY;
+	if (!HELIUS_API_KEY) {
+		console.error(
+			`[${signature}] HELIUS_API_KEY not set, cannot parse event via Helius.`,
+		);
+		return null;
+	}
+
+	const url = `https://api.helius.xyz/v0/transactions/?api-key=${HELIUS_API_KEY}`;
+	console.log(
+		`[${signature}] Processing event using Helius single tx endpoint...`,
+	);
+
+	try {
+		const response = await fetch(url, {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ transactions: [signature] }),
+		});
+
+		if (!response.ok) {
+			// Handle rate limiting specifically
+			if (response.status === 429) {
+				if (retryCount >= RATE_LIMIT_CONFIG.maxRetries) {
+					console.error(
+						`[${signature}] Exceeded maximum retries (${RATE_LIMIT_CONFIG.maxRetries}) for Helius API call.`,
+					);
+					return null;
+				}
+
+				// Calculate exponential backoff delay
+				const delay = Math.min(
+					RATE_LIMIT_CONFIG.maxDelay,
+					RATE_LIMIT_CONFIG.initialDelay *
+						RATE_LIMIT_CONFIG.backoffFactor ** retryCount,
+				);
+
+				console.log(
+					`[${signature}] Helius API rate limited (429). Retrying after ${delay}ms delay (attempt ${retryCount + 1}/${RATE_LIMIT_CONFIG.maxRetries})...`,
+				);
+				await new Promise((resolve) => setTimeout(resolve, delay));
+
+				// Try again with increased retry count
+				return fetchTransactionFromHelius(signature, retryCount + 1);
+			}
+
+			// Handle other errors
+			const errorText = await response.text();
+			throw new Error(
+				`Helius API request failed: ${response.status} ${response.statusText} - ${errorText}`,
+			);
+		}
+
+		const txDetails: HeliusParsedTransaction[] = await response.json();
+		return txDetails[0] || null;
+	} catch (error) {
+		if (retryCount < RATE_LIMIT_CONFIG.maxRetries) {
+			const delay = Math.min(
+				RATE_LIMIT_CONFIG.maxDelay,
+				RATE_LIMIT_CONFIG.initialDelay *
+					RATE_LIMIT_CONFIG.backoffFactor ** retryCount,
+			);
+
+			console.log(
+				`[${signature}] Error fetching from Helius: ${error instanceof Error ? error.message : String(error)}. Retrying after ${delay}ms delay (attempt ${retryCount + 1}/${RATE_LIMIT_CONFIG.maxRetries})...`,
+			);
+			await new Promise((resolve) => setTimeout(resolve, delay));
+
+			return fetchTransactionFromHelius(signature, retryCount + 1);
+		}
+
+		console.error(
+			`[${signature}] Failed to fetch transaction after ${RATE_LIMIT_CONFIG.maxRetries} attempts:`,
+			error,
+		);
+		return null;
+	}
+}
+
+/**
+ * Process a single transaction signature by checking the pending queue
+ */
+async function processTransactionSignature(signature: string) {
+	try {
+		// Fetch transaction details with retries and rate limiting
+		const tx = await fetchTransactionFromHelius(signature);
+
+		if (!tx) {
+			console.warn(
+				`[${signature}] Helius did not return details for this transaction.`,
+			);
+			return;
+		}
+
+		// Parse the transaction for launch events
+		let parsedInfo: ParsedLaunchInfo | null = null;
+		try {
+			const creator = new PublicKey(tx.feePayer);
+			const eventTimestamp = tx.timestamp;
+
+			for (const instruction of tx.instructions) {
+				if (instruction.programId === VIRTUALS_PROGRAM_ID.toString()) {
+					try {
+						const dataBuffer = Buffer.from(instruction.data, "base64");
+						const decodedIx = instructionCoder.decode(dataBuffer);
+
+						if (decodedIx?.name === "launch") {
+							const args = decodedIx.data as {
+								symbol: string;
+								name: string;
+								uri: string;
+							};
+							const tokenMintAddress = instruction.accounts[2];
+							if (!tokenMintAddress) {
+								console.error(
+									`[${tx.signature}] Could not find token mint account in Helius instruction`,
+								);
+								continue;
+							}
+
+							const launchData: LaunchEventData = {
+								tokenMint: tokenMintAddress,
+								name: args.name,
+								symbol: args.symbol,
+								uri: args.uri,
+							};
+							console.log(
+								`[${tx.signature}] Found launch via Helius: ${args.name} (${args.symbol})`,
+							);
+							parsedInfo = {
+								launchData,
+								creator,
+								eventTimestamp,
+								txSignature: signature,
+							};
+							break;
+						}
+					} catch (decodeError) {
+						if (
+							decodeError instanceof Error &&
+							!decodeError.message.includes("unknown instruction")
+						) {
+							console.warn(
+								`[${tx.signature}] Error decoding instruction:`,
+								decodeError.message,
+							);
+						}
+					}
+				}
+			}
+		} catch (parseError) {
+			console.error(
+				`[${tx.signature}] Error parsing Helius transaction:`,
+				parseError,
+			);
+		}
+
+		if (parsedInfo) {
+			await processLaunchEvent(parsedInfo);
+		}
+	} catch (error) {
+		console.error(`[${signature}] Error processing transaction:`, error);
+	}
+}
+
+/**
  * Starts the WebSocket listener for Launch events from the Virtuals Protocol program.
  */
 export function startVirtualsSolanaListener(retryCount = 0) {
@@ -611,142 +819,65 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 		// Use getConnection for both HTTP and WebSocket subscriptions
 		const connection = getConnection();
 
-		connection.onLogs(
-			VIRTUALS_PROGRAM_ID,
-			async (logs: SolanaLogInfo) => {
-				let signature: string | undefined = undefined;
-				try {
-					signature = logs.signature;
-					if (!signature) {
-						console.error("[SVM Listener] No signature in logs");
-						return;
-					}
+		// Set a more aggressive initial delay for the first connection to reduce likelihood of rate limits
+		const initialConnectDelay =
+			retryCount === 0 ? 5000 : Math.min(60000, 5000 * retryCount);
+		if (retryCount > 0) {
+			console.log(
+				`[${LAUNCHPAD_NAME}] Applying initial delay of ${initialConnectDelay / 1000}s before starting listener...`,
+			);
+		}
 
-					// Use Helius for real-time parsing as well for consistency
-					const HELIUS_API_KEY = env.HELIUS_API_KEY;
-					if (!HELIUS_API_KEY) {
-						console.error(
-							`[${signature}] HELIUS_API_KEY not set, cannot parse real-time event via Helius.`,
-						);
-						return; // Cannot parse without API key
-					}
+		// Apply initial delay only if this is a retry
+		setTimeout(
+			() => {
+				connection.onLogs(
+					VIRTUALS_PROGRAM_ID,
+					async (logs: SolanaLogInfo) => {
+						let signature: string | undefined = undefined;
+						try {
+							signature = logs.signature;
+							if (!signature) {
+								console.error("[SVM Listener] No signature in logs");
+								return;
+							}
 
-					const url = `https://api.helius.xyz/v0/transactions/?api-key=${HELIUS_API_KEY}`;
-					console.log(
-						`[${signature}] Processing real-time event using Helius single tx endpoint...`,
-					);
-
-					const response = await fetch(url, {
-						method: "POST",
-						headers: { "Content-Type": "application/json" },
-						body: JSON.stringify({ transactions: [signature] }),
-					});
-
-					if (!response.ok) {
-						throw new Error(
-							`Helius single tx API request failed: ${response.status} ${response.statusText} - ${await response.text()}`,
-						);
-					}
-
-					const txDetails: HeliusParsedTransaction[] = await response.json();
-					const tx = txDetails[0]; // Get the first (and only) transaction
-
-					if (!tx) {
-						console.warn(
-							`[${signature}] Helius did not return details for this transaction.`,
-						);
-						return;
-					}
-
-					// --- Inline Parsing Logic for Real-time Events ---
-					let parsedInfo: ParsedLaunchInfo | null = null;
-					try {
-						const creator = new PublicKey(tx.feePayer);
-						const eventTimestamp = tx.timestamp;
-
-						for (const instruction of tx.instructions) {
-							if (instruction.programId === VIRTUALS_PROGRAM_ID.toString()) {
-								try {
-									const dataBuffer = Buffer.from(instruction.data, "base64");
-									const decodedIx = instructionCoder.decode(dataBuffer);
-
-									if (decodedIx?.name === "launch") {
-										const args = decodedIx.data as {
-											symbol: string;
-											name: string;
-											uri: string;
-										};
-										const tokenMintAddress = instruction.accounts[2];
-										if (!tokenMintAddress) {
-											console.error(
-												`[${tx.signature}] Could not find token mint account in Helius instruction (real-time)`,
-											);
-											continue;
-										}
-
-										const launchData: LaunchEventData = {
-											tokenMint: tokenMintAddress,
-											name: args.name,
-											symbol: args.symbol,
-											uri: args.uri,
-										};
-										console.log(
-											`[${tx.signature}] Found real-time launch via Helius: ${args.name} (${args.symbol})`,
-										);
-										parsedInfo = {
-											launchData,
-											creator,
-											eventTimestamp,
-											txSignature: signature,
-										};
-										break;
-									}
-								} catch (decodeError) {
-									if (
-										decodeError instanceof Error &&
-										!decodeError.message.includes("unknown instruction")
-									) {
-										console.warn(
-											`[${tx.signature}] Error decoding instruction (real-time):`,
-											decodeError.message,
-										);
-									}
-								}
+							// Add to processing queue rather than processing immediately
+							processTransactionSignature(signature).catch((error) => {
+								console.error(
+									`[${signature}] Unhandled error processing transaction: ${error}`,
+								);
+							});
+						} catch (error) {
+							console.error(
+								`[${signature ?? "unknown"}] Error in log handler:`,
+								error,
+							);
+							// Don't reconnect on every error, only if it's a critical connection issue
+							if (
+								error instanceof Error &&
+								(error.message.includes("connection") ||
+									error.message.includes("network"))
+							) {
+								const delay =
+									retryCount === 0 ? 5000 : Math.min(60000, 10000 * retryCount);
+								console.log(
+									`[${LAUNCHPAD_NAME}] Critical error - reconnecting Solana listener in ${delay / 1000}s...`,
+								);
+								setTimeout(() => {
+									startVirtualsSolanaListener(retryCount + 1);
+								}, delay);
 							}
 						}
-					} catch (parseError) {
-						console.error(
-							`[${tx.signature}] Error parsing Helius transaction (real-time):`,
-							parseError,
-						);
-					}
+					},
+					"confirmed",
+				);
 
-					if (parsedInfo) {
-						await processLaunchEvent(parsedInfo);
-					} else {
-						// console.log(`[${signature}] No relevant launch instruction found in real-time event.`);
-					}
-				} catch (error) {
-					console.error(
-						`[${signature ?? "unknown"}] Error processing real-time event via Helius:`,
-						error,
-					);
-					// --- Reconnection logic for handler errors ---
-					const delay =
-						retryCount === 0 ? 3000 : Math.min(30000, 5000 * retryCount);
-					console.log(
-						`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after handler error...`,
-					);
-					setTimeout(() => {
-						startVirtualsSolanaListener(retryCount + 1);
-					}, delay);
-				}
+				console.log(
+					`[${LAUNCHPAD_NAME}] Listener started successfully, watching program logs and using Helius for parsing.`,
+				);
 			},
-			"confirmed",
-		);
-
-		console.log(
-			`[${LAUNCHPAD_NAME}] Listener started successfully, watching program logs and using Helius for parsing.`,
+			retryCount === 0 ? 0 : initialConnectDelay,
 		);
 	} catch (error) {
 		console.error(
@@ -767,7 +898,7 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 			);
 		}
 		// --- Reconnection logic for setup errors ---
-		const delay = retryCount === 0 ? 3000 : Math.min(30000, 5000 * retryCount);
+		const delay = retryCount === 0 ? 5000 : Math.min(60000, 10000 * retryCount);
 		console.log(
 			`[${LAUNCHPAD_NAME}] Attempting to reconnect Solana listener in ${delay / 1000}s after critical error...`,
 		);
@@ -788,6 +919,9 @@ export async function debugFetchHistoricalEvents(
 	console.log(
 		`--- Debugging [VIRTUALS Protocol (Solana)]: Fetching signatures for program ${VIRTUALS_PROGRAM_ID} from slot ${fromSlot} to ${toSlot ?? "latest"} ---`,
 	);
+
+	// Add delay before starting historical fetch to ensure we're not rate limited
+	await new Promise((resolve) => setTimeout(resolve, 2000));
 
 	const connection = getConnection();
 	const signatures = await connection.getSignaturesForAddress(
@@ -815,8 +949,21 @@ export async function debugFetchHistoricalEvents(
 
 	let launchEventsFound = 0;
 
-	// Process each signature
-	for (const signatureInfo of filteredSignatures) {
+	// Process each signature with a delay between calls to avoid rate limiting
+	for (let i = 0; i < filteredSignatures.length; i++) {
+		const signatureInfo = filteredSignatures[i];
+
+		// Skip if signatureInfo is undefined
+		if (!signatureInfo) {
+			console.warn(`Undefined signature info at index ${i}, skipping`);
+			continue;
+		}
+
+		// Add delay between transactions to avoid rate limiting
+		if (i > 0) {
+			await new Promise((resolve) => setTimeout(resolve, 2000));
+		}
+
 		try {
 			const tx = await connection.getTransaction(signatureInfo.signature, {
 				maxSupportedTransactionVersion: 0,
@@ -917,10 +1064,12 @@ export async function debugFetchHistoricalEvents(
 		`--- Debugging [VIRTUALS Protocol (Solana)]: Finished processing. Processed ${filteredSignatures.length} unique signatures, Found ${launchEventsFound} launch events. ---`,
 	);
 
-	// Start real-time listener after debug completion
+	// Start real-time listener after debug completion, with a small delay
 	console.log(
 		"Starting real-time listener for VIRTUALS Protocol (Solana) after debug completion",
 	);
-	await startVirtualsSolanaListener();
+	setTimeout(() => {
+		startVirtualsSolanaListener();
+	}, 3000);
 }
 // How to run: Set DEBUG_VIRTUALS_SOLANA=true and optionally DEBUG_SLOT_FROM/DEBUG_SLOT_TO
