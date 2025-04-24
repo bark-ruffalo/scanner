@@ -4,6 +4,11 @@ import "server-only";
 import { db } from "./db";
 import { launches } from "./db/schema";
 import { analyzeLaunch } from "./lib/ai-utils";
+import {
+	formatLaunchNotification,
+	sendTelegramMessage,
+} from "./lib/telegram-utils";
+import { env } from "~/env";
 
 // --- Configuration ---
 // Set to true to overwrite existing launches with the same title and launchpad,
@@ -242,45 +247,46 @@ export async function addLaunch(launchData: NewLaunchData) {
 			console.log(
 				`"${launchData.title}" not found. Proceeding with insertion...`,
 			);
-			await db.insert(launches).values(enhancedData);
-			console.log(
-				`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
-			);
-			actionTaken = "inserted";
-		}
+			const [insertedLaunch] = await db
+				.insert(launches)
+				.values({
+					...enhancedData,
+					basicInfoUpdatedAt: new Date(),
+					llmAnalysisUpdatedAt: new Date(),
+				})
+				.returning();
 
-		// Only revalidate if data was actually changed (inserted or updated)
-		if (actionTaken === "inserted" || actionTaken === "updated") {
-			// Revalidate the cache for the specified path.
-			// Wrapped in try-catch to handle "static generation store missing" error during direct script execution
-			try {
-				console.log("Attempting to revalidate Next.js cache for path: /");
-				// Check if we're in a Next.js rendering context before attempting to revalidate
-				// The headers() function from next/headers is only available in a Next.js rendering context
-				// If this is imported outside a rendering context, it will throw an error
-				if (
-					typeof globalThis.Headers !== "undefined" &&
-					typeof process !== "undefined" &&
-					process.env.NEXT_RUNTIME === "nodejs"
-				) {
-					revalidatePath("/");
-					console.log("Cache revalidation triggered for /.");
-				} else {
-					console.log(
-						"Cache revalidation skipped: not in a Next.js rendering context.",
+			if (insertedLaunch) {
+				// Send Telegram notification for new launches only
+				try {
+					const message = formatLaunchNotification(
+						insertedLaunch.title,
+						insertedLaunch.url,
+						insertedLaunch.summary,
+						insertedLaunch.analysis,
+						insertedLaunch.rating,
 					);
+					await sendTelegramMessage(
+						message,
+						env.TELEGRAM_GROUP_ID,
+						env.TELEGRAM_TOPIC_ID,
+					);
+				} catch (error) {
+					console.error("Failed to send Telegram notification:", error);
+					// Don't throw - we don't want to fail the launch addition if notification fails
 				}
-			} catch (revalidateError) {
-				console.warn(
-					// Use warn for expected scenarios
-					"Cache revalidation skipped: not in a Next.js rendering context.",
-					revalidateError instanceof Error
-						? revalidateError.message
-						: revalidateError,
+
+				console.log(
+					`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
 				);
-				// This is expected when running outside of Next.js rendering context (like in direct script execution)
+				actionTaken = "inserted";
 			}
 		}
+
+		// Revalidate the homepage to reflect the new data
+		revalidatePath("/");
+
+		return actionTaken;
 	} catch (error) {
 		actionTaken = "error";
 		// Log any errors that occur during the database check, insertion or update process.
@@ -290,9 +296,8 @@ export async function addLaunch(launchData: NewLaunchData) {
 		);
 		// Consider re-throwing the error if needed by the caller
 		// throw error;
+		return actionTaken;
 	}
-	// Optionally return the action taken
-	// return actionTaken;
 }
 
 export async function getLaunchById(id: number) {

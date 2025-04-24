@@ -39,6 +39,9 @@ export const env = createEnv({
 			.string()
 			.min(10, "A valid FIRECRAWL_API_KEY has to be added to the environment")
 			.startsWith("fc-", "FIRECRAWL_API_KEY must start with fc-"),
+		TELEGRAM_BOT_TOKEN: z.string(),
+		TELEGRAM_GROUP_ID: z.string(),
+		TELEGRAM_TOPIC_ID: z.string(),
 	},
 
 	/**
@@ -66,6 +69,9 @@ export const env = createEnv({
 		OPENROUTER_API_HOST: process.env.OPENROUTER_API_HOST,
 		ADMIN_PASSWORD: process.env.ADMIN_PASSWORD,
 		FIRECRAWL_API_KEY: process.env.FIRECRAWL_API_KEY,
+		TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
+		TELEGRAM_GROUP_ID: process.env.TELEGRAM_GROUP_ID,
+		TELEGRAM_TOPIC_ID: process.env.TELEGRAM_TOPIC_ID,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR, // Ensure client vars are mapped if added to the 'client' schema
 	},
 	/**
