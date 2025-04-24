@@ -3,6 +3,8 @@ import { getMint } from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
 import type {
 	CompiledInstruction,
+	ConfirmedSignatureInfo,
+	Connection,
 	LoadedAddresses,
 	Message,
 	MessageCompiledInstruction,
@@ -33,6 +35,7 @@ import {
 } from "~/server/lib/virtuals-utils";
 import { addLaunch } from "~/server/queries";
 import { IDL, VIRTUALS_PROGRAM_ID } from "./needed/virtuals-solana-idl";
+import { PublicKey as SolanaPublicKey } from "@solana/web3.js";
 
 // --- Logging IDL during import ---
 console.log(
@@ -115,6 +118,17 @@ console.log(
 	"Instructions count:",
 	IDL?.instructions?.length ?? "N/A",
 );
+
+// Validate IDL has launch instruction
+const launchInstruction = IDL.instructions.find((ix) => ix.name === "launch");
+if (!launchInstruction) {
+	console.error("FATAL: IDL is missing the 'launch' instruction!");
+	console.log(
+		"Available instructions:",
+		IDL.instructions.map((ix) => ix.name),
+	);
+	throw new Error("IDL is missing the 'launch' instruction");
+}
 
 let instructionCoder: BorshInstructionCoder;
 try {
@@ -569,8 +583,30 @@ function findLaunchInInstruction(
 	if (programId?.equals(VIRTUALS_PROGRAM_ID)) {
 		try {
 			const dataBuffer = Buffer.from(instruction.data as Uint8Array);
+			// Add detailed logging
+			console.log(
+				`[${signature}] Attempting to decode instruction:`,
+				"\nBuffer length:",
+				dataBuffer.length,
+				"\nInstructionCoder type:",
+				typeof instructionCoder,
+				"\nInstructionCoder methods:",
+				Object.getOwnPropertyNames(Object.getPrototypeOf(instructionCoder)),
+				"\nIDL instructions:",
+				IDL.instructions.map((ix) => ix.name),
+			);
+
 			// Now decode using the checked instructionCoder
 			const decodedIx = instructionCoder.decode(dataBuffer);
+
+			// Log successful decode
+			console.log(
+				`[${signature}] Successfully decoded instruction:`,
+				"\nName:",
+				decodedIx?.name,
+				"\nData:",
+				decodedIx?.data,
+			);
 
 			if (decodedIx?.name === "launch") {
 				const args = decodedIx.data as {
@@ -783,7 +819,31 @@ async function processTransactionSignature(signature: string) {
 				if (instruction.programId === VIRTUALS_PROGRAM_ID.toString()) {
 					try {
 						const dataBuffer = Buffer.from(instruction.data, "base64");
+						// Add detailed logging
+						console.log(
+							`[${tx.signature}] Attempting to decode Helius instruction:`,
+							"\nBuffer length:",
+							dataBuffer.length,
+							"\nInstructionCoder type:",
+							typeof instructionCoder,
+							"\nInstructionCoder methods:",
+							Object.getOwnPropertyNames(
+								Object.getPrototypeOf(instructionCoder),
+							),
+							"\nIDL instructions:",
+							IDL.instructions.map((ix) => ix.name),
+						);
+
 						const decodedIx = instructionCoder.decode(dataBuffer);
+
+						// Log successful decode
+						console.log(
+							`[${tx.signature}] Successfully decoded Helius instruction:`,
+							"\nName:",
+							decodedIx?.name,
+							"\nData:",
+							decodedIx?.data,
+						);
 
 						if (decodedIx?.name === "launch") {
 							const args = decodedIx.data as {
@@ -946,6 +1006,57 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 }
 
 /**
+ * Helper function to fetch signatures with retry logic
+ */
+async function fetchSignaturesWithRetry(
+	connection: Connection,
+	programId: PublicKey,
+	options: {
+		before?: string;
+		until?: string;
+		limit?: number;
+	},
+	retryCount = 0,
+): Promise<ConfirmedSignatureInfo[]> {
+	const MAX_RETRIES = 3;
+	const RETRY_DELAY = 2000; // 2 seconds base delay
+
+	try {
+		return await connection.getSignaturesForAddress(
+			programId,
+			options,
+			"confirmed",
+		);
+	} catch (error) {
+		if (retryCount >= MAX_RETRIES) {
+			throw error;
+		}
+
+		// Check if it's a long-term storage error
+		if (
+			error instanceof Error &&
+			error.message.includes("Failed to query long-term storage")
+		) {
+			console.log(
+				`Long-term storage error, reducing query window and retrying in ${RETRY_DELAY * (retryCount + 1)}ms...`,
+			);
+			// Reduce the limit to query less data
+			options.limit = Math.floor((options.limit || 1000) / 2);
+		}
+
+		await new Promise((resolve) =>
+			setTimeout(resolve, RETRY_DELAY * 2 ** retryCount),
+		);
+		return fetchSignaturesWithRetry(
+			connection,
+			programId,
+			options,
+			retryCount + 1,
+		);
+	}
+}
+
+/**
  * Fetches and processes historical launch events using paginated getSignatures + getTransaction + inner ix parsing.
  */
 export async function debugFetchHistoricalEvents(
@@ -961,152 +1072,190 @@ export async function debugFetchHistoricalEvents(
 	await new Promise((resolve) => setTimeout(resolve, 2000));
 
 	const connection = getConnection();
-	const signatures = await connection.getSignaturesForAddress(
-		new PublicKey(VIRTUALS_PROGRAM_ID),
-		{
-			limit: 1000,
-		},
-	);
+	let allSignatures: ConfirmedSignatureInfo[] = [];
+	let lastSignature: string | undefined;
+	const CHUNK_SIZE = 100; // Reduced from 1000 to handle RPC limitations better
 
-	// Filter signatures by slot range
-	const filteredSignatures = signatures.filter((sig) => {
-		const slot = sig.slot;
-		if (!slot) return false;
-		if (toSlot) {
-			return slot >= Number(fromSlot) && slot <= Number(toSlot);
-		}
-		return slot >= Number(fromSlot);
-	});
+	try {
+		// Fetch signatures in chunks
+		while (true) {
+			const options = {
+				limit: CHUNK_SIZE,
+				before: lastSignature,
+			};
 
-	console.log(
-		`Found ${filteredSignatures.length} unique successful signatures within slot range [${fromSlot}, ${toSlot ?? "latest"}].`,
-	);
+			const signatures = await fetchSignaturesWithRetry(
+				connection,
+				new SolanaPublicKey(VIRTUALS_PROGRAM_ID),
+				options,
+			);
 
-	console.log(`Processing ${filteredSignatures.length} unique signatures...`);
+			if (signatures.length === 0) break;
 
-	let launchEventsFound = 0;
-
-	// Process each signature with a delay between calls to avoid rate limiting
-	for (let i = 0; i < filteredSignatures.length; i++) {
-		const signatureInfo = filteredSignatures[i];
-
-		// Skip if signatureInfo is undefined
-		if (!signatureInfo) {
-			console.warn(`Undefined signature info at index ${i}, skipping`);
-			continue;
-		}
-
-		// Add delay between transactions to avoid rate limiting
-		if (i > 0) {
-			await new Promise((resolve) => setTimeout(resolve, 2000));
-		}
-
-		try {
-			const tx = await connection.getTransaction(signatureInfo.signature, {
-				maxSupportedTransactionVersion: 0,
-			});
-
-			if (!tx) {
-				console.log(
-					`[${signatureInfo.signature}] Transaction not found (Slot: ${signatureInfo.slot})`,
-				);
-				continue;
-			}
-
-			// Process the transaction
-			const message = tx.transaction.message;
-			const accountKeys = message.getAccountKeys({
-				accountKeysFromLookups: tx.meta?.loadedAddresses,
-			});
-
-			if (!accountKeys) {
-				console.error(
-					`[${signatureInfo.signature}] Failed to resolve account keys (Slot: ${signatureInfo.slot}).`,
-				);
-				continue;
-			}
-
-			let launchInfo: ParsedLaunchInfo | null = null;
-
-			// 1. Check top-level instructions
-			for (const instruction of message.compiledInstructions) {
-				launchInfo = findLaunchInInstruction(
-					instruction,
-					message,
-					accountKeys,
-					signatureInfo.signature,
-					signatureInfo.slot,
-				);
-				if (launchInfo) break;
-			}
-
-			// 2. Check inner instructions if not found in top-level
-			if (!launchInfo && tx.meta?.innerInstructions) {
-				for (const innerIxSet of tx.meta.innerInstructions) {
-					for (const instruction of innerIxSet.instructions) {
-						launchInfo = findLaunchInInstruction(
-							instruction,
-							message,
-							accountKeys,
-							signatureInfo.signature,
-							signatureInfo.slot,
-						);
-						if (launchInfo) break;
-					}
-					if (launchInfo) break;
+			// Filter signatures by slot range
+			const filteredChunk = signatures.filter((sig) => {
+				const slot = sig.slot;
+				if (!slot) return false;
+				if (toSlot) {
+					return slot >= Number(fromSlot) && slot <= Number(toSlot);
 				}
+				return slot >= Number(fromSlot);
+			});
+
+			// If we've gone past our fromSlot, we can stop
+			const lastSig = signatures[signatures.length - 1];
+			if (
+				filteredChunk.length === 0 &&
+				lastSig?.slot &&
+				lastSig.slot < Number(fromSlot)
+			) {
+				break;
 			}
 
-			if (!launchInfo) {
-				console.log(
-					`[${signatureInfo.signature}] No launch instruction found (Slot: ${signatureInfo.slot})`,
-				);
+			allSignatures = [...allSignatures, ...filteredChunk];
+			if (lastSig) {
+				lastSignature = lastSig.signature;
+			}
+
+			// Add a small delay between chunks to avoid rate limiting
+			await new Promise((resolve) => setTimeout(resolve, 500));
+		}
+
+		console.log(
+			`Found ${allSignatures.length} unique successful signatures within slot range [${fromSlot}, ${toSlot ?? "latest"}].`,
+		);
+
+		console.log(`Processing ${allSignatures.length} unique signatures...`);
+
+		let launchEventsFound = 0;
+
+		// Process each signature with a delay between calls to avoid rate limiting
+		for (let i = 0; i < allSignatures.length; i++) {
+			const signatureInfo = allSignatures[i];
+
+			// Skip if signatureInfo is undefined
+			if (!signatureInfo) {
+				console.warn(`Undefined signature info at index ${i}, skipping`);
 				continue;
 			}
 
-			// Get the actual timestamp from the transaction if available
-			if (tx.blockTime) {
-				// BlockTime is in seconds, which is what we want
-				launchInfo.eventTimestamp = tx.blockTime;
-				console.log(
-					`Using actual blockTime for historical event: ${new Date(tx.blockTime * 1000).toISOString()}`,
-				);
+			// Add delay between transactions to avoid rate limiting
+			if (i > 0) {
+				await new Promise((resolve) => setTimeout(resolve, 2000));
 			}
 
-			// Check if launch already exists and we're not overwriting
-			if (!overwriteExisting) {
-				const existingLaunch = await db.query.launches.findFirst({
-					where: eq(launches.tokenAddress, launchInfo.launchData.tokenMint),
+			try {
+				const tx = await connection.getTransaction(signatureInfo.signature, {
+					maxSupportedTransactionVersion: 0,
 				});
 
-				if (existingLaunch) {
+				if (!tx) {
 					console.log(
-						`[${signatureInfo.signature}] Launch already exists for token ${launchInfo.launchData.tokenMint}, skipping (overwrite=false)`,
+						`[${signatureInfo.signature}] Transaction not found (Slot: ${signatureInfo.slot})`,
 					);
 					continue;
 				}
+
+				// Process the transaction
+				const message = tx.transaction.message;
+				const accountKeys = message.getAccountKeys({
+					accountKeysFromLookups: tx.meta?.loadedAddresses,
+				});
+
+				if (!accountKeys) {
+					console.error(
+						`[${signatureInfo.signature}] Failed to resolve account keys (Slot: ${signatureInfo.slot}).`,
+					);
+					continue;
+				}
+
+				let launchInfo: ParsedLaunchInfo | null = null;
+
+				// 1. Check top-level instructions
+				for (const instruction of message.compiledInstructions) {
+					launchInfo = findLaunchInInstruction(
+						instruction,
+						message,
+						accountKeys,
+						signatureInfo.signature,
+						signatureInfo.slot,
+					);
+					if (launchInfo) break;
+				}
+
+				// 2. Check inner instructions if not found in top-level
+				if (!launchInfo && tx.meta?.innerInstructions) {
+					for (const innerIxSet of tx.meta.innerInstructions) {
+						for (const instruction of innerIxSet.instructions) {
+							launchInfo = findLaunchInInstruction(
+								instruction,
+								message,
+								accountKeys,
+								signatureInfo.signature,
+								signatureInfo.slot,
+							);
+							if (launchInfo) break;
+						}
+						if (launchInfo) break;
+					}
+				}
+
+				if (!launchInfo) {
+					console.log(
+						`[${signatureInfo.signature}] No launch instruction found (Slot: ${signatureInfo.slot})`,
+					);
+					continue;
+				}
+
+				// Get the actual timestamp from the transaction if available
+				if (tx.blockTime) {
+					// BlockTime is in seconds, which is what we want
+					launchInfo.eventTimestamp = tx.blockTime;
+					console.log(
+						`Using actual blockTime for historical event: ${new Date(tx.blockTime * 1000).toISOString()}`,
+					);
+				}
+
+				// Check if launch already exists and we're not overwriting
+				if (!overwriteExisting) {
+					const existingLaunch = await db.query.launches.findFirst({
+						where: eq(launches.tokenAddress, launchInfo.launchData.tokenMint),
+					});
+
+					if (existingLaunch) {
+						console.log(
+							`[${signatureInfo.signature}] Launch already exists for token ${launchInfo.launchData.tokenMint}, skipping (overwrite=false)`,
+						);
+						continue;
+					}
+				}
+
+				// Process the launch event
+				await processLaunchEvent(launchInfo);
+				launchEventsFound++;
+			} catch (error) {
+				console.log(
+					`[${signatureInfo.signature}] Error decoding instruction data (Slot: ${signatureInfo.slot}): ${error instanceof Error ? error.message : String(error)}`,
+				);
 			}
-
-			// Process the launch event
-			await processLaunchEvent(launchInfo);
-			launchEventsFound++;
-		} catch (error) {
-			console.log(
-				`[${signatureInfo.signature}] Error decoding instruction data (Slot: ${signatureInfo.slot}): ${error instanceof Error ? error.message : String(error)}`,
-			);
 		}
+
+		console.log(
+			`--- Debugging [VIRTUALS Protocol (Solana)]: Finished processing. Processed ${allSignatures.length} unique signatures, Found ${launchEventsFound} launch events. ---`,
+		);
+
+		// Start real-time listener after debug completion, with a small delay
+		console.log(
+			"Starting real-time listener for VIRTUALS Protocol (Solana) after debug completion",
+		);
+		setTimeout(() => {
+			startVirtualsSolanaListener();
+		}, 3000);
+	} catch (error) {
+		console.error(
+			"--- Debugging [VIRTUALS Protocol (Solana)]: Error processing historical events:",
+			error,
+		);
 	}
-
-	console.log(
-		`--- Debugging [VIRTUALS Protocol (Solana)]: Finished processing. Processed ${filteredSignatures.length} unique signatures, Found ${launchEventsFound} launch events. ---`,
-	);
-
-	// Start real-time listener after debug completion, with a small delay
-	console.log(
-		"Starting real-time listener for VIRTUALS Protocol (Solana) after debug completion",
-	);
-	setTimeout(() => {
-		startVirtualsSolanaListener();
-	}, 3000);
 }
 // How to run: Set DEBUG_VIRTUALS_SOLANA=true and optionally DEBUG_SLOT_FROM/DEBUG_SLOT_TO

@@ -12,6 +12,25 @@ const config = {
 	eslint: {
 		ignoreDuringBuilds: true,
 	},
+	webpack: (config, { isServer }) => {
+		// Prevent minification of @coral-xyz/anchor
+		for (const minimizer of config.optimization.minimizer) {
+			if (minimizer?.constructor?.name === "TerserPlugin") {
+				minimizer.options = minimizer.options || {};
+				minimizer.options.terserOptions = {
+					...minimizer.options.terserOptions,
+					keep_classnames: true,
+					keep_fnames: true,
+					mangle: {
+						...minimizer.options.terserOptions?.mangle,
+						keep_classnames: true,
+						keep_fnames: true,
+					},
+				};
+			}
+		}
+		return config;
+	},
 };
 
 import { withSentryConfig } from "@sentry/nextjs";
