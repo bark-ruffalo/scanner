@@ -8,13 +8,14 @@ import type {
 	LoadedAddresses,
 	Message,
 	MessageCompiledInstruction,
-	ParsedInstruction,
 	ParsedInnerInstruction,
+	ParsedInstruction,
 	TransactionInstruction,
 	VersionedMessage,
 	// Need these types for getTransaction response
 	VersionedTransactionResponse,
 } from "@solana/web3.js";
+import { PublicKey as SolanaPublicKey } from "@solana/web3.js";
 import { eq } from "drizzle-orm";
 import { env } from "~/env";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils";
@@ -38,7 +39,6 @@ import {
 } from "~/server/lib/virtuals-utils";
 import { addLaunch } from "~/server/queries";
 import { IDL, VIRTUALS_PROGRAM_ID } from "./needed/virtuals-solana-idl";
-import { PublicKey as SolanaPublicKey } from "@solana/web3.js";
 
 // Initialize the instruction coder at the top level
 const instructionCoder = new BorshInstructionCoder(IDL);
@@ -142,6 +142,9 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 		return links;
 	},
 };
+
+// Track the active listener to prevent duplicates
+let activeListener: number | null = null;
 
 /**
  * Processes a launch event from the Solana Virtuals Protocol.
@@ -804,7 +807,7 @@ async function processTransactionSignature(signature: string) {
 }
 
 /**
- * Starts the WebSocket listener for Launch events from the Virtuals Protocol program.
+ * Starts the WebSocket listener for program logs from the Virtuals Protocol program.
  */
 export function startVirtualsSolanaListener(retryCount = 0) {
 	console.log(
@@ -812,6 +815,16 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 	);
 
 	try {
+		// Clean up any existing listener before starting a new one
+		if (activeListener !== null) {
+			console.log(
+				`[${LAUNCHPAD_NAME}] Cleaning up existing listener before restart.`,
+			);
+			const connection = getConnection();
+			connection.removeOnLogsListener(activeListener);
+			activeListener = null;
+		}
+
 		// Use getConnection for both HTTP and WebSocket subscriptions
 		const connection = getConnection();
 
@@ -827,7 +840,7 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 		// Apply initial delay only if this is a retry
 		setTimeout(
 			() => {
-				connection.onLogs(
+				const subscriptionId = connection.onLogs(
 					VIRTUALS_PROGRAM_ID,
 					async (logs: SolanaLogInfo) => {
 						let signature: string | undefined = undefined;
@@ -855,6 +868,12 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 								(error.message.includes("connection") ||
 									error.message.includes("network"))
 							) {
+								// Clean up current listener before reconnecting
+								if (activeListener !== null) {
+									connection.removeOnLogsListener(activeListener);
+									activeListener = null;
+								}
+
 								const delay =
 									retryCount === 0 ? 5000 : Math.min(60000, 10000 * retryCount);
 								console.log(
@@ -869,8 +888,11 @@ export function startVirtualsSolanaListener(retryCount = 0) {
 					"confirmed",
 				);
 
+				// Store the new active listener
+				activeListener = subscriptionId;
+
 				console.log(
-					`[${LAUNCHPAD_NAME}] Listener started successfully, watching program logs and using Helius for parsing.`,
+					`[${LAUNCHPAD_NAME}] Listener started successfully (ID: ${subscriptionId}), watching program logs and using Helius for parsing.`,
 				);
 			},
 			retryCount === 0 ? 0 : initialConnectDelay,
