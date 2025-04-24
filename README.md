@@ -49,14 +49,12 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 ## TODO
 
 ### High Priority
-- [ ] Complete the Solana launchpad implementation (Virtuals Protocol - Solana):
 - [ ] Add a traditional VC investing launchpad listener (e.g., scraping a website like AngelList or Republic).
 - [ ] Refine and test the Admin page functionality (add/edit/delete launches).
 - [ ] Research other launchpads to integrated with.
 - [ ] Integrate Sentry.
 
 ### Medium Priority
-- [ ] Enhance LLM analysis to access and incorporate information from external links found in launch descriptions (socials, websites, docs) or custom launchpad-specific URLs. Two common functions will be available for this, one that does simple fetching and another that uses the Firecrawl API.
 - [ ] Allow users to submit a URL for a launch to be analyzed and potentially added.
 - [ ] Implement a comment section for each launch (consider a simple backend or a third-party service).
 - [ ] Add like/dislike functionality for launches.
@@ -89,14 +87,8 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - Ensure new launches are detected via WebSocket listener
 - Show unrated launches when rating filter is set to 0
 - Use different LLMs in prod/dev
-- Improve error handling and user feedback for background processes (LLM analysis, token stats updates).
+- Improve error handling and user feedback for background processes (LLM analysis, token stats updates)
 - Fixed bugs: middleware wrong location, not adding total token supply to DB, etc.
-- Completed implementation of Solana launchpad (Virtuals Protocol - Solana):
-  - Added Solana dependencies (@coral-xyz/anchor, @solana/web3.js, etc.)
-  - Added Solana RPC URL and program ID configuration
-  - Created launchpad implementation with WebSocket event listening (using Helius for parsing)
-  - Implemented robust historical fetching (`debugFetchHistoricalEvents`) using paginated `getSignaturesForAddress` and `getTransaction`, parsing instructions (including inner instructions) with Anchor's `BorshInstructionCoder`
-  - Added Solana utilities for token monitoring and statistics
-  - Implemented token burn and transfer monitoring
-  - Added support for fetching token metadata and balances
-- etc.
+- Completed implementation of Solana launchpad (Virtuals Protocol - Solana)
+- Enhanced LLM analysis to access and incorporate information from external links found in launch descriptions (socials, websites, docs) using both simple fetching and Firecrawl API
+- Implemented automatic reanalysis of launches when significant token movements are detected

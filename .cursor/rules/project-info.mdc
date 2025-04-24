@@ -99,7 +99,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
   - VIRTUALS Protocol on Base (EVM) (`src/server/launchpads/virtuals-base.ts`):
     - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.
     - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling. Supports optional overwrite control to skip existing launches.
-    - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances, and formatting a comprehensive description before adding to the database.
+    - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances, and formatting a comprehensive description before adding to the database. Includes automatic token movement monitoring and LLM analysis.
   - VIRTUALS Protocol on Solana (SVM) (`src/server/launchpads/virtuals-solana.ts`):
     - `startVirtualsSolanaListener`: Starts WebSocket listener for program logs on Solana, using Helius API to fetch transaction details for parsing real-time events.
     - `debugFetchHistoricalEvents`: Fetches and processes historical 'launch' instructions within a specific slot range. Uses paginated `getSignaturesForAddress` to get relevant signatures, then fetches full details via `connection.getTransaction` for each, handling LUTs. Supports optional overwrite control to skip existing launches.
@@ -140,7 +140,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - `fetchAdditionalContent`: Orchestrates fetching and formatting content from multiple URLs using both `fetchUrlContent` (simple fetch) and `fetchFirecrawlContent` (advanced scrape/crawl). Takes an initial description, creator address, and a `LaunchpadLinkGenerator` to determine which URLs to fetch and how.
 - AI utilities (`src/server/lib/ai-utils.ts`):
     - `callChatModel`: Primary function to interact with configured LLMs (Anthropic Claude or OpenAI GPT). Takes a system prompt, user message, and optional configuration (model override, temperature, max tokens). Handles API calls, retries, and error logging.
-    - `analyzeLaunch`: Uses `callChatModel` with a specific prompt (`templates/analyze-launch.txt`) to generate a summary, analysis, and rating for a given launch description.
+    - `analyzeLaunch`: Uses `callChatModel` with a specific prompt (`templates/analyze-launch.txt`) to generate a summary, analysis, and rating for a given launch description. Automatically triggered for new launches and when significant token movements are detected.
     - `getModelConfig`: Helper to select the appropriate LLM model name based on environment (development vs. production) and optional overrides.
 - `npm run dev` has been run, and it should be live on localhost:3000; remind me to start it myself if it's not and you need it; never run the command yourself, and if you want it restarted, ask for it.
 - We do not plan to add authentication for users of this web app. Admin routes (`/admin/*`) are protected by Basic Auth configured via `src/middleware.ts` and environment variables.
