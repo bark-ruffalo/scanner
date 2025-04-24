@@ -33,10 +33,12 @@ export async function sendTelegramMessage(
 		text: string;
 		parse_mode: string;
 		message_thread_id?: string;
+		disable_web_page_preview: boolean;
 	} = {
 		chat_id: formattedGroupId,
 		text: message,
 		parse_mode: "MarkdownV2",
+		disable_web_page_preview: true,
 	};
 
 	// Only add topic_id in production mode
