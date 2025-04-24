@@ -1,10 +1,13 @@
 import { env } from "~/env";
 
+// Debug mode Telegram group ID
+const DEBUG_GROUP_ID = "-1002485551643";
+
 /**
  * Sends a formatted message to a specific Telegram topic in a group
  * @param message The message to send (supports MarkdownV2 formatting)
- * @param groupId The Telegram group ID
- * @param topicId Optional topic ID within the group
+ * @param groupId The Telegram group ID (overridden in debug mode)
+ * @param topicId Optional topic ID within the group (ignored in debug mode)
  * @returns Promise that resolves when message is sent
  */
 export async function sendTelegramMessage(
@@ -14,12 +17,16 @@ export async function sendTelegramMessage(
 ) {
 	const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
 
+	// In debug/development mode, use the debug group and ignore topic
+	const isDebug = env.NODE_ENV === "development";
+	const targetGroupId = isDebug ? DEBUG_GROUP_ID : groupId;
+
 	// Format group ID to include -100 prefix if needed
-	const formattedGroupId = String(groupId).startsWith("-100")
-		? groupId
-		: String(groupId).startsWith("-")
-			? `-100${groupId.toString().substring(1)}`
-			: `-100${groupId}`;
+	const formattedGroupId = String(targetGroupId).startsWith("-100")
+		? targetGroupId
+		: String(targetGroupId).startsWith("-")
+			? `-100${targetGroupId.toString().substring(1)}`
+			: `-100${targetGroupId}`;
 
 	const messageData: {
 		chat_id: string | number;
@@ -32,7 +39,8 @@ export async function sendTelegramMessage(
 		parse_mode: "MarkdownV2",
 	};
 
-	if (topicId) {
+	// Only add topic_id in production mode
+	if (!isDebug && topicId) {
 		messageData.message_thread_id = topicId;
 	}
 
@@ -49,6 +57,11 @@ export async function sendTelegramMessage(
 		console.error("Failed to send Telegram message:", data);
 		throw new Error(`Telegram API error: ${data.description}`);
 	}
+
+	// Log where the message was sent
+	console.log(
+		`Sent Telegram notification to ${isDebug ? "debug" : "production"} group (${formattedGroupId})${isDebug ? "" : ` topic ${topicId ?? "N/A"}`}`,
+	);
 
 	return data.result;
 }
