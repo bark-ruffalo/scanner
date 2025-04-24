@@ -8,6 +8,9 @@ import type {
 	LoadedAddresses,
 	Message,
 	MessageCompiledInstruction,
+	ParsedInstruction,
+	ParsedInnerInstruction,
+	TransactionInstruction,
 	VersionedMessage,
 	// Need these types for getTransaction response
 	VersionedTransactionResponse,
@@ -37,15 +40,8 @@ import { addLaunch } from "~/server/queries";
 import { IDL, VIRTUALS_PROGRAM_ID } from "./needed/virtuals-solana-idl";
 import { PublicKey as SolanaPublicKey } from "@solana/web3.js";
 
-// --- Logging IDL during import ---
-console.log(
-	"--- virtuals-solana.ts: Checking IDL import ---",
-	typeof IDL === "object" && IDL !== null
-		? "IDL object loaded"
-		: "IDL is NOT loaded correctly",
-	IDL?.version ? `Version: ${IDL.version}` : "",
-);
-// --- End Logging ---
+// Initialize the instruction coder at the top level
+const instructionCoder = new BorshInstructionCoder(IDL);
 
 // --- Types and Configuration ---
 
@@ -63,6 +59,13 @@ interface ParsedLaunchInfo {
 	creator: PublicKey;
 	eventTimestamp: number;
 	txSignature: string;
+}
+
+// Define the launch instruction data structure
+interface LaunchInstructionData {
+	symbol: string;
+	name: string;
+	uri: string;
 }
 
 // Define types for the expected Helius API response structure
@@ -104,66 +107,11 @@ const RATE_LIMIT_CONFIG = {
 	lastApiCallTime: 0,
 };
 
-// Create the instruction coder using the imported IDL
-console.log(
-	"--- virtuals-solana.ts: Detailed IDL check ---",
-	"IDL type:",
-	typeof IDL,
-	"IDL null?:",
-	IDL === null,
-	"IDL keys:",
-	IDL ? Object.keys(IDL) : "N/A",
-	"IDL version:",
-	IDL?.version,
-	"Instructions count:",
-	IDL?.instructions?.length ?? "N/A",
-);
-
 // Validate IDL has launch instruction
 const launchInstruction = IDL.instructions.find((ix) => ix.name === "launch");
 if (!launchInstruction) {
-	console.error("FATAL: IDL is missing the 'launch' instruction!");
-	console.log(
-		"Available instructions:",
-		IDL.instructions.map((ix) => ix.name),
-	);
 	throw new Error("IDL is missing the 'launch' instruction");
 }
-
-let instructionCoder: BorshInstructionCoder;
-try {
-	instructionCoder = new BorshInstructionCoder(IDL);
-} catch (error: unknown) {
-	const err = error as Error;
-	console.error(
-		"--- virtuals-solana.ts: Error initializing BorshInstructionCoder ---",
-		"\nError:",
-		err,
-		"\nError name:",
-		err.name,
-		"\nError message:",
-		err.message,
-		"\nError stack:",
-		err.stack,
-	);
-	// Re-throw to maintain existing behavior
-	throw error;
-}
-
-// --- Logging instructionCoder after initialization ---
-console.log(
-	"--- virtuals-solana.ts: Checking instructionCoder init ---",
-	typeof instructionCoder === "object" && instructionCoder !== null
-		? "instructionCoder initialized"
-		: "instructionCoder FAILED initialization",
-	instructionCoder?.constructor?.name ?? "N/A", // Log constructor name
-	"\nInstructionCoder details:",
-	"Type:",
-	typeof instructionCoder,
-	"Methods:",
-	Object.getOwnPropertyNames(Object.getPrototypeOf(instructionCoder)),
-);
-// --- End Logging ---
 
 // Add the custom link generator for Virtuals Protocol on Solana
 const virtualsLinkGenerator: LaunchpadLinkGenerator = {
@@ -542,7 +490,6 @@ ${virtualsInfoContent ? `${virtualsInfoContent}` : ""}${additionalContent ? `\n\
  * Parses a single instruction to find a 'launch' event.
  */
 function findLaunchInInstruction(
-	// Type instruction more generically, let caller handle specifics
 	instruction: Readonly<{
 		programIdIndex: number;
 		accounts?: readonly number[];
@@ -557,15 +504,6 @@ function findLaunchInInstruction(
 	// Ensure accountKeys is resolved
 	if (!accountKeys) return null;
 
-	// --- Add check inside function ---
-	if (!instructionCoder) {
-		console.error(
-			`[${signature}] FATAL: instructionCoder is undefined inside findLaunchInInstruction! (Slot: ${slot ?? "N/A"})`,
-		);
-		return null; // Cannot proceed
-	}
-	// --- End check ---
-
 	const programIdIndex = instruction.programIdIndex;
 	// Add check for index validity
 	if (
@@ -573,9 +511,7 @@ function findLaunchInInstruction(
 		programIdIndex < 0 ||
 		programIdIndex >= accountKeys.length
 	) {
-		console.error(
-			`[${signature}] Invalid programIdIndex ${programIdIndex} in instruction.`,
-		);
+		console.warn(`Invalid programIdIndex ${programIdIndex} in instruction.`);
 		return null;
 	}
 	const programId = accountKeys.get(programIdIndex);
@@ -583,37 +519,10 @@ function findLaunchInInstruction(
 	if (programId?.equals(VIRTUALS_PROGRAM_ID)) {
 		try {
 			const dataBuffer = Buffer.from(instruction.data as Uint8Array);
-			// Add detailed logging
-			console.log(
-				`[${signature}] Attempting to decode instruction:`,
-				"\nBuffer length:",
-				dataBuffer.length,
-				"\nInstructionCoder type:",
-				typeof instructionCoder,
-				"\nInstructionCoder methods:",
-				Object.getOwnPropertyNames(Object.getPrototypeOf(instructionCoder)),
-				"\nIDL instructions:",
-				IDL.instructions.map((ix) => ix.name),
-			);
-
-			// Now decode using the checked instructionCoder
 			const decodedIx = instructionCoder.decode(dataBuffer);
 
-			// Log successful decode
-			console.log(
-				`[${signature}] Successfully decoded instruction:`,
-				"\nName:",
-				decodedIx?.name,
-				"\nData:",
-				decodedIx?.data,
-			);
-
 			if (decodedIx?.name === "launch") {
-				const args = decodedIx.data as {
-					symbol: string;
-					name: string;
-					uri: string;
-				};
+				const args = decodedIx.data as LaunchInstructionData;
 
 				// Safely get account indexes
 				let accountsIndexes: readonly number[] | undefined;
@@ -627,8 +536,8 @@ function findLaunchInInstruction(
 				}
 
 				if (!accountsIndexes) {
-					console.error(
-						`[${signature}] Could not find account indexes for 'launch' instruction.`,
+					console.warn(
+						"Could not find account indexes for 'launch' instruction.",
 					);
 					return null;
 				}
@@ -639,23 +548,21 @@ function findLaunchInInstruction(
 					tokenMintAccIndex < 0 ||
 					tokenMintAccIndex >= accountKeys.length
 				) {
-					console.error(
-						`[${signature}] Invalid token mint account index ${tokenMintAccIndex} for 'launch' instruction.`,
+					console.warn(
+						"Invalid token mint account index for 'launch' instruction.",
 					);
 					return null;
 				}
 				const tokenMintAddress = accountKeys.get(tokenMintAccIndex);
 
 				if (!tokenMintAddress) {
-					console.error(
-						`[${signature}] Could not get token mint PublicKey using index ${tokenMintAccIndex}.`,
-					);
+					console.warn("Could not get token mint PublicKey.");
 					return null;
 				}
 
 				const creator = accountKeys.get(0);
 				if (!creator) {
-					console.error(`[${signature}] Could not get creator (fee payer).`);
+					console.warn("Could not get creator (fee payer).");
 					return null;
 				}
 
@@ -665,10 +572,6 @@ function findLaunchInInstruction(
 					symbol: args.symbol,
 					uri: args.uri,
 				};
-
-				console.log(
-					`[${signature}] Found 'launch' via Instruction Parsing in Slot ${slot ?? "N/A"}: ${args.name} (${args.symbol}) Token: ${tokenMintAddress.toString()}`,
-				);
 
 				// Get current timestamp if this is a historical event
 				const currentTimestamp = Math.floor(Date.now() / 1000);
@@ -681,11 +584,7 @@ function findLaunchInInstruction(
 				};
 			}
 		} catch (error) {
-			if (error instanceof Error && !error.message.includes("unknown")) {
-				console.warn(
-					`[${signature}] Error decoding instruction data (Slot: ${slot ?? "N/A"}): ${error.message}`,
-				);
-			}
+			console.warn("Error decoding instruction:", error);
 		}
 	}
 	return null;
