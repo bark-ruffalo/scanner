@@ -102,7 +102,39 @@ const RATE_LIMIT_CONFIG = {
 };
 
 // Create the instruction coder using the imported IDL
-const instructionCoder = new BorshInstructionCoder(IDL);
+console.log(
+	"--- virtuals-solana.ts: Detailed IDL check ---",
+	"IDL type:",
+	typeof IDL,
+	"IDL null?:",
+	IDL === null,
+	"IDL keys:",
+	IDL ? Object.keys(IDL) : "N/A",
+	"IDL version:",
+	IDL?.version,
+	"Instructions count:",
+	IDL?.instructions?.length ?? "N/A",
+);
+
+let instructionCoder: BorshInstructionCoder;
+try {
+	instructionCoder = new BorshInstructionCoder(IDL);
+} catch (error: unknown) {
+	const err = error as Error;
+	console.error(
+		"--- virtuals-solana.ts: Error initializing BorshInstructionCoder ---",
+		"\nError:",
+		err,
+		"\nError name:",
+		err.name,
+		"\nError message:",
+		err.message,
+		"\nError stack:",
+		err.stack,
+	);
+	// Re-throw to maintain existing behavior
+	throw error;
+}
 
 // --- Logging instructionCoder after initialization ---
 console.log(
@@ -111,6 +143,11 @@ console.log(
 		? "instructionCoder initialized"
 		: "instructionCoder FAILED initialization",
 	instructionCoder?.constructor?.name ?? "N/A", // Log constructor name
+	"\nInstructionCoder details:",
+	"Type:",
+	typeof instructionCoder,
+	"Methods:",
+	Object.getOwnPropertyNames(Object.getPrototypeOf(instructionCoder)),
 );
 // --- End Logging ---
 
