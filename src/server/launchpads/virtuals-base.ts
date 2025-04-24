@@ -465,6 +465,9 @@ YouTube: ${youtube || "N/A"}
 	}
 }
 
+// Track the active listener to prevent duplicates
+let activeListener: (() => void) | null = null;
+
 /**
  * Starts the WebSocket listener for 'Launched' events from the Virtuals Factory contract.
  */
@@ -477,6 +480,15 @@ export function startVirtualsBaseListener(retryCount = 0) {
 			`[${LAUNCHPAD_NAME}] Failed to create WebSocket transport. Listener cannot start. Ensure BASE_RPC_URL (wss://) is set or check network configuration.`,
 		);
 		return; // Stop execution if transport is not available.
+	}
+
+	// Clean up any existing listener before starting a new one
+	if (activeListener) {
+		console.log(
+			`[${LAUNCHPAD_NAME}] Cleaning up existing listener before restart.`,
+		);
+		activeListener();
+		activeListener = null;
 	}
 
 	try {
@@ -504,6 +516,9 @@ export function startVirtualsBaseListener(retryCount = 0) {
 				console.log(
 					`[${LAUNCHPAD_NAME}] Attempting to reconnect listener in ${delay / 1000}s...`,
 				);
+				if (activeListener === unwatch) {
+					activeListener = null;
+				}
 				unwatch(); // Stop the current watcher
 				setTimeout(() => {
 					startVirtualsBaseListener(retryCount + 1);
@@ -511,6 +526,9 @@ export function startVirtualsBaseListener(retryCount = 0) {
 			},
 			// strict: true // Consider adding strict: true for stricter ABI parsing/matching
 		});
+
+		// Store the new active listener
+		activeListener = unwatch;
 
 		console.log(
 			`[${LAUNCHPAD_NAME}] Listener started successfully, watching for 'Launched' events at ${VIRTUALS_FACTORY_ADDRESS}.`,
