@@ -206,10 +206,42 @@ export async function addLaunch(launchData: NewLaunchData) {
 					tokenAddress:
 						enhancedData.tokenAddress ?? existingLaunch.tokenAddress,
 				};
-				await db
+
+				const [updatedLaunch] = await db
 					.update(launches)
 					.set(updateData)
-					.where(eq(launches.id, existingLaunch.id));
+					.where(eq(launches.id, existingLaunch.id))
+					.returning();
+
+				if (updatedLaunch) {
+					// Send Telegram notification if there are significant changes
+					const hasSignificantChanges =
+						enhancedData.creatorTokenMovementDetails || // New token movements
+						enhancedData.creatorTokenHoldingPercentage !==
+							existingLaunch.creatorTokenHoldingPercentage || // Token holding changes
+						needsAnalysis; // New analysis
+
+					if (hasSignificantChanges) {
+						try {
+							const message = formatLaunchNotification(
+								updatedLaunch.title,
+								updatedLaunch.url,
+								updatedLaunch.summary,
+								updatedLaunch.analysis,
+								updatedLaunch.rating,
+							);
+							await sendTelegramMessage(
+								message,
+								env.TELEGRAM_GROUP_ID,
+								env.TELEGRAM_TOPIC_ID,
+							);
+						} catch (error) {
+							console.error("Failed to send Telegram notification:", error);
+							// Don't throw - we don't want to fail the update if notification fails
+						}
+					}
+				}
+
 				console.log(
 					`Successfully updated launch: ${launchData.title} from ${launchData.launchpad}`,
 				);
