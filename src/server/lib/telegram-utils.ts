@@ -78,16 +78,22 @@ export function formatLaunchNotification(
 	summary: string,
 	analysis: string,
 	rating: number,
+	launchId: number,
+	launchpad: string,
 ) {
 	// Escape special characters for MarkdownV2
 	const escapeMarkdown = (text: string) =>
 		text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
 
+	// No point in using "http://localhost:3000/launch/" for the development environment because it gets stripped out by Telegram
+	const scannerUrl = `https://scanner.trulyadog.com/launch/${launchId}`;
+
 	return `🚀 *New Launch Detected\\!*
 
 *${escapeMarkdown(title)}*
 
-🔗 [View Launch](${escapeMarkdown(url)})
+🔗 View launch on [${escapeMarkdown(launchpad)}](${escapeMarkdown(url)})
+🔍 View launch on [Scanner](${escapeMarkdown(scannerUrl)})
 
 📝 *Summary:*
 ${escapeMarkdown(summary)}

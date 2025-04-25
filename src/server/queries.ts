@@ -229,6 +229,8 @@ export async function addLaunch(launchData: NewLaunchData) {
 								updatedLaunch.summary,
 								updatedLaunch.analysis,
 								updatedLaunch.rating,
+								updatedLaunch.id,
+								updatedLaunch.launchpad,
 							);
 							await sendTelegramMessage(
 								message,
@@ -297,6 +299,8 @@ export async function addLaunch(launchData: NewLaunchData) {
 						insertedLaunch.summary,
 						insertedLaunch.analysis,
 						insertedLaunch.rating,
+						insertedLaunch.id,
+						insertedLaunch.launchpad,
 					);
 					await sendTelegramMessage(
 						message,
