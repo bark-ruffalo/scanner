@@ -41,6 +41,7 @@ Consider the launchpad information provided in the "launchpad_info" section when
 
 # Rules for rating
 - the rating is based mainly on the analysis
+- if there's little information available about the launch, rate it lower
 - if there's not enough information for a proper rating, return 0
 - if it's a memecoin, be much more likely to rate it lower, and never higher than 2
 - if the creator's allocation is less than 10% or more than 50% of the total supply, you should rate it much lower unless the tokenomics explains why it's reasonable
