@@ -353,7 +353,7 @@ export async function getLaunchMetadata(id: number) {
 
 export interface TokenUpdateResult {
 	creatorTokensHeld: string;
-	creatorTokenHoldingPercentage: string;
+	creatorTokenHoldingPercentage: string | null;
 	tokenStatsUpdatedAt: Date;
 	creatorTokenMovementDetails?: string;
 	mainSellingAddress?: string;
