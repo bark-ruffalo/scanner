@@ -868,7 +868,9 @@ export async function updateSolanaTokenStatistics(
 		// Return the results
 		return {
 			creatorTokensHeld: currentBalanceRounded.toString(),
-			creatorTokenHoldingPercentage: holdingResult?.formatted ?? "N/A",
+			creatorTokenHoldingPercentage: holdingResult
+				? holdingResult.percent.toFixed(2)
+				: null,
 			creatorTokenMovementDetails: movementDetails,
 			sentToZeroAddress: sentToZero,
 			mainSellingAddress: mainSeller, // Include if detected
@@ -881,7 +883,7 @@ export async function updateSolanaTokenStatistics(
 		);
 		return {
 			creatorTokensHeld: currentBalanceRaw.toString(), // Return raw if rounding failed
-			creatorTokenHoldingPercentage: "N/A",
+			creatorTokenHoldingPercentage: null, // Changed from "N/A" to null
 			creatorTokenMovementDetails:
 				"An error occurred while updating token statistics.",
 			sentToZeroAddress: false,

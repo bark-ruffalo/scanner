@@ -129,11 +129,13 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - `isDestinationContract`: Helper function to check if a given address corresponds to a deployed contract on the EVM chain using `client.getBytecode`.
     - The file also contains standard ERC20 ABIs, known lock contract addresses (e.g., Unicrypt, Pinksale), and DEX router/pair addresses for token movement analysis.
 - SVM client (`src/server/lib/svm-client.ts`):
-    - Exports `getConnection` and `createWebSocketConnection` functions to create Solana `@solana/web3.js` `Connection` objects (one for standard RPC, one for WebSocket subscriptions) using environment variables (`SOLANA_RPC_URL`, `HELIUS_RPC_URL`). Includes logic to derive WebSocket URL from HTTP URL if necessary. Prefers Helius RPC if available.
+    - Exports `getConnection` to create a standard `@solana/web3.js` `Connection` object using the Helius HTTPS RPC endpoint.
+    - Exports `getHeliusClient` to create a singleton `Helius` SDK client instance for advanced parsing and data fetching.
+    - Exports `getHeliusWebSocketUrl` to provide the correct WSS URL for Helius API key usage (not used by the standard `Connection` object).
 - SVM utilities (`src/server/lib/svm-utils.ts`):
     - `createSolanaEventParser`: Creates an Anchor event parser for a Solana program using its IDL (`@coral-xyz/anchor`). Used to decode program logs into structured events.
     - `getSolanaTokenBalance`: Gets the SPL token balance for a specific owner and mint address using `connection.getTokenAccountBalance`. Handles cases where the token account doesn't exist, returning 0n.
-    - `updateSolanaTokenStatistics`: Calculates creator token holding percentage (**NOTE: currently uses inaccurate Number conversion/division instead of `calculateBigIntPercentage`**) and analyzes transaction history (via `connection.getSignaturesForAddress`) for significant outgoing transfers to detect burns or potential sales. Returns a `TokenUpdateResult` object. Uses `formatTokenBalance` for display.
+    - `updateSolanaTokenStatistics`: Calculates creator token holding percentage (returns a numeric string like "87.50" or null) and analyzes transaction history (via `connection.getSignaturesForAddress`) for significant outgoing transfers to detect burns or potential sales. Returns a `TokenUpdateResult` object. Uses `formatTokenBalance` for display.
     - `monitorTokenBurns` / `monitorTokenTransfers`: (Currently unused helpers) Functions intended to monitor token burns or transfers for a specific mint address.
     - `isBurnAddress`: Checks if a Solana public key string corresponds to a known burn address.
     - The file also contains known Solana burn addresses.
