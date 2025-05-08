@@ -6,7 +6,12 @@ import {
 } from "@metaplex-foundation/mpl-token-metadata";
 import { publicKey } from "@metaplex-foundation/umi";
 import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { TOKEN_PROGRAM_ID, getAccount, getMint } from "@solana/spl-token";
+import {
+	TOKEN_PROGRAM_ID,
+	getAccount,
+	getMint,
+	getAssociatedTokenAddressSync, // Import ATA function
+} from "@solana/spl-token";
 import {
 	type Commitment,
 	type ConfirmedSignatureInfo,
@@ -15,7 +20,9 @@ import {
 	PublicKey,
 } from "@solana/web3.js";
 import "server-only";
+// Removed Helius import as it's not used in this function anymore
 import { env } from "~/env";
+// Removed getHeliusClient import
 import {
 	SVM_DECIMALS,
 	calculateBigIntPercentage,
@@ -554,7 +561,10 @@ export async function getSolanaTokenBalance(
 				typeof blockNumber === "bigint" ? Number(blockNumber) : blockNumber;
 
 			console.log(
-				`Attempting to get historical balance at block ${blockNum} for token ${tokenMint.toString()}`,
+				`[${tokenMint.toString()}] Attempting to get historical balance at block ${blockNum}...`,
+			);
+			console.warn(
+				`[${tokenMint.toString()}] Historical balance lookup using getAccountInfo/getSignaturesForAddress can be inefficient and may rely on node archival capabilities.`,
 			);
 
 			// For historical balance, we need a different approach
@@ -634,19 +644,21 @@ export async function getSolanaTokenBalance(
 				}
 
 				// If we can't find the balance in transaction data, use current as fallback
-				console.log(
-					"Balance not found in transaction data, using current balance",
+				console.warn(
+					`[${tokenMint.toString()}] Historical balance not found in transaction data for block ${blockNum}. Falling back to current balance.`,
 				);
 				const tokenAccount = await getAccount(connection, accountInfo.pubkey);
 				return tokenAccount.amount;
 			} catch (error) {
 				console.error(
-					`Error getting historical balance at block ${blockNum}:`,
+					`[${tokenMint.toString()}] Error getting historical balance at block ${blockNum}:`,
 					error,
 				);
 
 				// Fallback to current balance if historical lookup fails
-				console.log("Falling back to current balance due to error");
+				console.warn(
+					`[${tokenMint.toString()}] Falling back to current balance due to error during historical lookup.`,
+				);
 				const tokenAccount = await getAccount(connection, accountInfo.pubkey);
 				return tokenAccount.amount;
 			}
@@ -665,20 +677,26 @@ export async function getSolanaTokenBalance(
 }
 
 /**
- * Updates token statistics for a Solana token, handling RPC limitations gracefully
+ * Updates token statistics for a Solana token using standard web3.js methods.
  */
 export async function updateSolanaTokenStatistics(
 	connection: Connection,
 	tokenMint: PublicKey,
 	creator: PublicKey,
-	initialBalance: string,
-	currentBalanceRaw: bigint,
+	initialBalance: string, // This is the rounded initial balance string
+	currentBalanceRaw: bigint, // This is the raw current balance in lamports
 ): Promise<TokenUpdateResult> {
+	console.log(
+		`[${tokenMint.toString()}] Updating token statistics for creator ${creator.toString()} using standard methods`,
+	);
+
 	try {
-		// Convert balances to BigInt for calculations
+		// Convert initial balance string to BigInt for calculations
 		const initialBalanceBigInt = BigInt(initialBalance);
-		const currentBalanceRounded =
-			currentBalanceRaw / 10n ** BigInt(SVM_DECIMALS);
+		// Calculate rounded current balance from raw value
+		// TODO: Need decimals here. Assume SVM_DECIMALS for now, but ideally fetch from mint if not passed in.
+		const decimals = SVM_DECIMALS; // Assuming default, enhance later if needed
+		const currentBalanceRounded = currentBalanceRaw / 10n ** BigInt(decimals);
 
 		// Calculate percentage of initial allocation still held
 		const holdingResult = calculateBigIntPercentage(
@@ -686,53 +704,174 @@ export async function updateSolanaTokenStatistics(
 			initialBalanceBigInt,
 		);
 
-		// For new launches or if we can't get historical data, return basic stats
-		if (
-			holdingResult?.percent === 100 ||
-			currentBalanceRounded === initialBalanceBigInt
-		) {
-			return {
-				creatorTokensHeld: currentBalanceRounded.toString(),
-				creatorTokenHoldingPercentage: "100.00",
-				creatorTokenMovementDetails: "No token movements detected yet.",
-				sentToZeroAddress: false,
-				tokenStatsUpdatedAt: new Date(),
-			};
-		}
+		// --- Standard Solana History Fetching Logic ---
+		console.log(
+			`[${tokenMint.toString()}] Creator balance changed. Fetching history via standard connection...`,
+		);
+		let movementDetails = "";
+		let sentToZero = false;
+		const mainSeller = undefined; // Keep as const, though not used currently
 
-		// Try to get recent signatures (last 1000 max)
-		let signatures: ConfirmedSignatureInfo[];
 		try {
-			signatures = await connection.getSignaturesForAddress(
+			// 1. Get Creator's Associated Token Account (ATA)
+			const creatorAssociatedTokenAccount = getAssociatedTokenAddressSync(
 				tokenMint,
-				{ limit: 1000 },
+				creator,
+			);
+			console.log(
+				`[${tokenMint.toString()}] Creator ATA: ${creatorAssociatedTokenAccount.toString()}`,
+			);
+
+			// 2. Fetch Signatures for the ATA using standard Connection
+			console.log(
+				`[${tokenMint.toString()}] Fetching signatures for ATA via standard connection...`,
+			);
+			const signatures = await connection.getSignaturesForAddress(
+				creatorAssociatedTokenAccount,
+				{ limit: 1000 }, // Fetch more signatures if possible
 				"confirmed",
 			);
-		} catch (error) {
-			// If we can't get signatures, return what we know
-			console.warn(
-				`[${tokenMint.toString()}] Could not fetch token movement history:`,
-				error instanceof Error ? error.message : String(error),
+			console.log(
+				`[${tokenMint.toString()}] Fetched ${signatures.length} signatures using standard connection.`, // Corrected log message
 			);
 
-			return {
-				creatorTokensHeld: currentBalanceRounded.toString(),
-				creatorTokenHoldingPercentage: holdingResult?.formatted ?? "N/A",
-				creatorTokenMovementDetails: `Creator now holds ${formatTokenBalance(currentBalanceRounded)} tokens (${holdingResult?.formatted ?? "N/A"} of initial allocation). Historical movement data unavailable.`,
-				sentToZeroAddress: false,
-				tokenStatsUpdatedAt: new Date(),
-			};
+			// 3. Process Signatures and Fetch Full Transactions
+			const outgoingTransfers: Array<{
+				to: string;
+				amount: bigint;
+				tx: string;
+			}> = [];
+			let totalSentAmount = 0n;
+
+			// Fetch full transaction details for each signature
+			for (const sigInfo of signatures) {
+				if (!sigInfo?.signature) continue;
+				console.log(
+					`[${tokenMint.toString()}] Fetching transaction details for ${sigInfo.signature}...`,
+				);
+				// Use standard connection.getTransaction
+				const tx = await connection.getTransaction(sigInfo.signature, {
+					maxSupportedTransactionVersion: 0, // Specify version for compatibility
+				});
+
+				if (
+					!tx ||
+					!tx.meta ||
+					!tx.meta.preTokenBalances ||
+					!tx.meta.postTokenBalances
+				) {
+					console.log(
+						`[${tokenMint.toString()}] [${sigInfo.signature}] Transaction meta or token balances missing.`,
+					);
+					continue;
+				}
+
+				// Analyze pre/post balances for the creator's ATA
+				const preBalance = tx.meta.preTokenBalances.find(
+					(b) =>
+						b.mint === tokenMint.toString() &&
+						b.owner === creator.toString() && // Check owner directly
+						b.accountIndex === // Find the index corresponding to the ATA
+							tx.transaction.message.staticAccountKeys.findIndex((key) =>
+								key.equals(creatorAssociatedTokenAccount),
+							),
+				);
+
+				const postBalance = tx.meta.postTokenBalances.find(
+					(b) =>
+						b.mint === tokenMint.toString() &&
+						b.owner === creator.toString() && // Check owner directly
+						b.accountIndex === // Find the index corresponding to the ATA
+							tx.transaction.message.staticAccountKeys.findIndex((key) =>
+								key.equals(creatorAssociatedTokenAccount),
+							),
+				);
+
+				const preAmount = BigInt(preBalance?.uiTokenAmount?.amount ?? "0");
+				const postAmount = BigInt(postBalance?.uiTokenAmount?.amount ?? "0");
+
+				if (preAmount > postAmount) {
+					const sentAmount = preAmount - postAmount;
+					totalSentAmount += sentAmount;
+
+					// Try to find recipient (less precise without parsed data, look for increases)
+					let destination = "Unknown";
+					for (const postB of tx.meta.postTokenBalances) {
+						if (postB.mint === tokenMint.toString()) {
+							const preB = tx.meta.preTokenBalances.find(
+								(pb) =>
+									pb.accountIndex === postB.accountIndex &&
+									pb.mint === tokenMint.toString(),
+							);
+							const preAmt = BigInt(preB?.uiTokenAmount?.amount ?? "0");
+							const postAmt = BigInt(postB.uiTokenAmount.amount);
+							if (postAmt > preAmt && postAmt - preAmt === sentAmount) {
+								// Found a potential recipient based on amount increase
+								destination = postB.owner ?? "Unknown";
+								break;
+							}
+						}
+					}
+
+					outgoingTransfers.push({
+						to: destination,
+						amount: sentAmount,
+						tx: sigInfo.signature,
+					});
+
+					if (isBurnAddress(new PublicKey(destination))) {
+						sentToZero = true;
+					}
+				}
+			}
+
+			// 4. Format Movement Details (remains largely the same)
+			if (outgoingTransfers.length > 0) {
+				const formattedTotalSent = formatTokenBalance(
+					totalSentAmount / 10n ** BigInt(decimals),
+				); // Round for display
+				movementDetails = `Creator sent out ~${formattedTotalSent} tokens. `;
+				const destinations = outgoingTransfers
+					.slice(0, 3) // Show details for top 3 transfers
+					.map(
+						(t) =>
+							`${formatTokenBalance(t.amount / 10n ** BigInt(decimals))} to ${
+								isBurnAddress(new PublicKey(t.to))
+									? "Burn Address"
+									: `${t.to.substring(0, 4)}...${t.to.substring(t.to.length - 4)}`
+							}`,
+					)
+					.join(", ");
+				movementDetails += `Significant transfers include: ${destinations}.`;
+				if (sentToZero) {
+					movementDetails += " Some tokens were sent to a burn address.";
+				}
+			} else {
+				movementDetails = `Creator now holds ${formatTokenBalance(currentBalanceRounded)} tokens (${holdingResult?.formatted ?? "N/A"} of initial). No outgoing transfers found in recent history.`;
+			}
+			console.log(
+				`[${tokenMint.toString()}] Movement details: ${movementDetails}`,
+			);
+		} catch (historyError) {
+			console.warn(
+				`[${tokenMint.toString()}] Error fetching or processing transaction history:`,
+				historyError instanceof Error
+					? historyError.message
+					: String(historyError),
+			);
+			movementDetails = `Creator now holds ${formatTokenBalance(currentBalanceRounded)} tokens (${holdingResult?.formatted ?? "N/A"} of initial). Error fetching detailed history.`;
+			// Keep sentToZero as false if history fetch failed
 		}
 
-		// Process signatures and analyze token movements
-		// ... rest of the existing token movement analysis code ...
+		// --- End Standard Solana History Logic ---
 
-		// Return basic stats if we can't process movements
+		// Return the results
 		return {
 			creatorTokensHeld: currentBalanceRounded.toString(),
 			creatorTokenHoldingPercentage: holdingResult?.formatted ?? "N/A",
-			creatorTokenMovementDetails: `Creator now holds ${formatTokenBalance(currentBalanceRounded)} tokens (${holdingResult?.formatted ?? "N/A"} of initial allocation).`,
-			sentToZeroAddress: false,
+			creatorTokenMovementDetails: movementDetails,
+			sentToZeroAddress: sentToZero,
+			mainSellingAddress: mainSeller, // Include if detected
 			tokenStatsUpdatedAt: new Date(),
 		};
 	} catch (error) {
@@ -741,7 +880,7 @@ export async function updateSolanaTokenStatistics(
 			error,
 		);
 		return {
-			creatorTokensHeld: currentBalanceRaw.toString(),
+			creatorTokensHeld: currentBalanceRaw.toString(), // Return raw if rounding failed
 			creatorTokenHoldingPercentage: "N/A",
 			creatorTokenMovementDetails:
 				"An error occurred while updating token statistics.",
