@@ -15,6 +15,11 @@ export async function sendTelegramMessage(
 	groupId: string | number,
 	topicId?: string,
 ) {
+	if (!env.TELEGRAM_ALERTS_ENABLED) {
+		console.log("Telegram alerts are disabled. Skipping message sending.");
+		return;
+	}
+
 	const url = `https://api.telegram.org/bot${env.TELEGRAM_BOT_TOKEN}/sendMessage`;
 
 	// In debug/development mode, use the debug group and ignore topic

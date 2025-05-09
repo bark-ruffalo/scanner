@@ -42,6 +42,11 @@ export const env = createEnv({
 		TELEGRAM_BOT_TOKEN: z.string(),
 		TELEGRAM_GROUP_ID: z.string(),
 		TELEGRAM_TOPIC_ID: z.string(),
+		TELEGRAM_ALERTS_ENABLED: z
+			.string()
+			.optional()
+			.default("true")
+			.transform((val) => val === "true"),
 	},
 
 	/**
@@ -72,6 +77,7 @@ export const env = createEnv({
 		TELEGRAM_BOT_TOKEN: process.env.TELEGRAM_BOT_TOKEN,
 		TELEGRAM_GROUP_ID: process.env.TELEGRAM_GROUP_ID,
 		TELEGRAM_TOPIC_ID: process.env.TELEGRAM_TOPIC_ID,
+		TELEGRAM_ALERTS_ENABLED: process.env.TELEGRAM_ALERTS_ENABLED,
 		// NEXT_PUBLIC_CLIENTVAR: process.env.NEXT_PUBLIC_CLIENTVAR, // Ensure client vars are mapped if added to the 'client' schema
 	},
 	/**

@@ -154,6 +154,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - Configuration uses `runtimeEnv: process.env` (not `runtimeEnvStrict`) as Next.js provides `process.env` access.
     - `emptyStringAsUndefined: true` is set for better validation handling.
     - Currently, only `server` variables are defined. If client variables are needed, they *must* be prefixed `NEXT_PUBLIC_` (as defined in `src/env.js`) and added to the `client` schema section.
+    - `TELEGRAM_ALERTS_ENABLED`: A server-side environment variable (boolean, defaults to `true`) that controls whether Telegram alert notifications are sent. If set to `false`, calls to `sendTelegramMessage` in `src/server/lib/telegram-utils.ts` will be skipped.
 - After modifying the UI, you may use the `Playwright MCP` to confirm that the changes are as expected. Always close Playwright windows after use.
 - When running in agent mode, after you finish modifying the code, always run the command `pnpm check:write` to improve code formatting and fix linting errors using Biome. Then, if there are still linting errors, fix them manually.
 - Always use the full command specified in [Project Structure](#project-structure) to understand the project organization instead of listing the content of various folders one by one.
