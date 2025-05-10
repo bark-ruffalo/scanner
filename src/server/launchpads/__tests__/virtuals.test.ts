@@ -1,4 +1,4 @@
-import { db } from "~/server/db";
+import { db, conn } from "~/server/db"; // Import conn for closing
 import { launches } from "~/server/db/schema";
 import { eq } from "drizzle-orm";
 import { debugVirtualsLaunchById } from "../virtuals";
@@ -43,7 +43,7 @@ describe("Virtuals Protocol Listener - debugVirtualsLaunchById", () => {
 			"0xfd5d7fa11b86789c3e8e874427896169374bf247".toLowerCase(),
 		);
 		await cleanupLaunch(launchApiId); // Cleanup after test
-	}, 30000); // Increase timeout for API calls and DB operations
+	}, 90000); // Increase timeout for API calls and DB operations for this specific test
 
 	// Test for Undergrad Solana Launch (ID: 21809 - Dolphin Ai)
 	it("should process and store an Undergrad Solana launch (ID: 21809)", async () => {
@@ -115,4 +115,12 @@ describe("Virtuals Protocol Listener - debugVirtualsLaunchById", () => {
 		);
 		await cleanupLaunch(launchApiId);
 	}, 30000);
+
+	afterAll(async () => {
+		// Close the database connection after all tests in this suite are done
+		if (conn) {
+			await conn.end();
+			console.log("Database connection closed after tests.");
+		}
+	});
 });
