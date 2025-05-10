@@ -109,6 +109,10 @@ export async function fetchFirecrawlContent(
 	url: string,
 	options?: FirecrawlOptions,
 ): Promise<string> {
+	// Skip Firecrawl API calls in development mode to save on API costs
+	if (env.NODE_ENV === "development") {
+		return `Skipped Firecrawl fetch in development mode for URL: ${url}`;
+	}
 	try {
 		// Skip URLs that are likely to cause issues
 		if (url.includes("twitter.com") || url.includes("x.com")) {
