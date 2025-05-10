@@ -44,6 +44,9 @@ export const launches = createTable(
 			.notNull(),
 		creatorAddress: varchar("creator_address", { length: 256 }),
 		tokenAddress: varchar("token_address", { length: 256 }),
+		launchpadSpecificId: varchar("launchpad_specific_id", { length: 256 }), // For Virtuals API ID etc.
+		chain: varchar("chain", { length: 50 }), // e.g., BASE, SOLANA
+		status: varchar("status", { length: 50 }), // e.g., UNDERGRAD, GENESIS
 		title: varchar("title", { length: 256 }).notNull(),
 		url: varchar("url", { length: 1024 }).notNull(),
 		description: text("description").notNull(),
@@ -115,6 +118,11 @@ export const launches = createTable(
 		launchpadIdx: index("launchpad_idx").on(table.launchpad),
 		ratingIdx: index("rating_idx").on(table.rating),
 		titleIdx: index("title_idx").on(table.title),
+		launchpadSpecificIdIdx: index("launchpad_specific_id_idx").on(
+			table.launchpadSpecificId,
+		),
+		chainIdx: index("chain_idx").on(table.chain),
+		statusIdx: index("status_idx").on(table.status),
 		// Add indexes for new address fields
 		creatorAddressIdx: index("creator_address_idx").on(table.creatorAddress),
 		tokenAddressIdx: index("token_address_idx").on(table.tokenAddress),

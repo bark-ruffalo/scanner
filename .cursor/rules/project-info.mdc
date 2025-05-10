@@ -28,9 +28,9 @@ The project is in active development with the following key features implemented
 - Database integration with PostgreSQL and Drizzle ORM
 - Launch listing and filtering functionality
 - LLM-based launch analysis and rating
-- EVM crypto launchpad listener (Virtuals Protocol - Base)
-- Solana crypto launchpad listener (Virtuals Protocol - Solana)
+- Consolidated Virtuals Protocol listener (API-based, supporting Base & Solana for Genesis, Undergrad, and Available types)
 - Admin page for managing launches with:
+  - Launch creation, editing, and deletion
   - Launch creation, editing, and deletion
   - Manual token statistics updates
   - Historical event debugging with overwrite control
@@ -100,15 +100,10 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
   - EVM chains: Use `viem`. The public clients (both HTTP for general queries and WebSocket for real-time events) are configured and exported from `src/server/lib/evm-client.ts`.
   - Solana: Use `@solana/web3.js` and `@coral-xyz/anchor`. The connection and utilities are in `src/server/lib/svm-client.ts` and `src/server/lib/svm-utils.ts`.
 - Launchpad implementations:
-  - VIRTUALS Protocol on Base (EVM) (`src/server/launchpads/virtuals-base.ts`):
-    - `startVirtualsBaseListener`: Starts WebSocket listener for 'Launched' events from the Virtuals Protocol factory contract on Base network.
-    - `debugFetchHistoricalEvents`: Fetches and processes historical 'Launched' events within a specific block range for testing or backfilling. Supports optional overwrite control to skip existing launches.
-    - `processLaunchedEvent`: Processes a single event by fetching token details, creator balances (using `getEvmErc20BalanceAtBlock`), analyzing token movements (using `updateEvmTokenStatistics`), formatting a comprehensive description (using `fetchAdditionalContent` and `formatVirtualsInfo`), and adding/updating the launch in the database via `src/server/queries.ts`. Includes triggering LLM analysis via `analyzeLaunch`.
-  - VIRTUALS Protocol on Solana (SVM) (`src/server/launchpads/virtuals-solana.ts`):
-    - `startVirtualsSolanaListener`: Starts WebSocket listener for program logs on Solana, using Helius API (if available) or standard RPC to fetch transaction details for parsing real-time events.
-    - `debugFetchHistoricalEvents`: Fetches and processes historical 'launch' instructions within a specific slot range. Uses paginated `getSignaturesForAddress` to get relevant signatures, then fetches full details via `connection.getTransaction` for each, handling LUTs. Supports optional overwrite control to skip existing launches.
-    - `processLaunchEvent`: Processes a single event by fetching token metadata (via `fetchVirtualsTokenInfo`), creator balances (initial via transaction meta, current via `getSolanaTokenBalance`), analyzing token movements (via `updateSolanaTokenStatistics`), formatting a comprehensive description (using `fetchAdditionalContent` and `formatVirtualsInfo`), and adding/updating the launch in the database via `src/server/queries.ts`. Includes triggering LLM analysis via `analyzeLaunch`.
-    - `findLaunchInInstruction`: Helper function to parse a single instruction (top-level or inner) from a transaction response using `BorshInstructionCoder` to identify 'launch' instructions and extract their data.
+  - Virtuals Protocol (`src/server/launchpads/virtuals.ts`):
+    - `startVirtualsListener`: Periodically fetches the latest launches from the Virtuals Protocol API (covering Base & Solana, and all launch types like Genesis, Undergrad, Available).
+    - `debugVirtualsLaunchById`: Fetches and processes a specific launch by its Virtuals API ID for testing or backfilling.
+    - `processVirtualsLaunch`: Processes a single launch detail fetched from the API. It extracts relevant information (name, symbol, chain, status, description, creator, tokenomics, etc.), fetches additional content from related URLs, formats a comprehensive description, calculates initial token holdings (especially for Genesis and Undergrad types), and adds/updates the launch in the database. It also triggers token statistics updates (EVM or SVM based on chain) and LLM analysis.
 - Content utilities (`src/lib/content-utils.ts`):
     - `extractUrls`: Extracts all URLs from a text string using regex.
     - `fetchUrlContent`: Simple utility to fetch raw content (HTML, text, JSON) from a URL using standard `fetch`.
@@ -139,9 +134,9 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - `monitorTokenBurns` / `monitorTokenTransfers`: (Currently unused helpers) Functions intended to monitor token burns or transfers for a specific mint address.
     - `isBurnAddress`: Checks if a Solana public key string corresponds to a known burn address.
     - The file also contains known Solana burn addresses.
-- Virtuals Protocol utilities (`src/server/lib/virtuals-utils.ts`):
-    - `fetchVirtualsTokenInfo`: Fetches detailed information about a specific Virtuals Protocol token (description, image, socials, creator info) from the Virtuals API using the token mint address. Handles both Base (EVM) and Solana addresses.
-    - `formatVirtualsInfo`: Takes the data fetched by `fetchVirtualsTokenInfo` and formats it into a Markdown string suitable for inclusion in the main launch description. Includes links to social media, websites, and creator profiles if available.
+- Virtuals Protocol utilities (`src/server/lib/virtuals-utils.ts`): (These functions are now largely unused due to the consolidated API-based listener in `virtuals.ts`)
+    - `fetchVirtualsTokenInfo`: (Commented out) Previously fetched detailed information about a specific Virtuals Protocol token.
+    - `formatVirtualsInfo`: (Commented out) Previously formatted data from `fetchVirtualsTokenInfo`.
 - Common Server utilities (`src/server/lib/common-utils.ts`):
     - `fetchAdditionalContent`: Orchestrates fetching and formatting content from multiple URLs using both `fetchUrlContent` (simple fetch) and `fetchFirecrawlContent` (advanced scrape/crawl). Takes an initial description, creator address, optional token address, and a `LaunchpadLinkGenerator` to determine which URLs to fetch and how. Aggregates content and ensures it doesn't exceed length limits.
 - AI utilities (`src/server/lib/ai-utils.ts`):

@@ -37,10 +37,11 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 
 	// --- Debug Launchpad State ---
 	const [debugLaunchpad, setDebugLaunchpad] = useState<string>(
-		"VIRTUALS Protocol (Base)",
+		"Virtuals Protocol", // Default to the new consolidated launchpad
 	);
-	const [debugFrom, setDebugFrom] = useState<string>("");
-	const [debugTo, setDebugTo] = useState<string>("");
+	const [debugFrom, setDebugFrom] = useState<string>(""); // Will be used for API ID for Virtuals
+	const [debugTo, setDebugTo] = useState<string>(""); // Kept for other launchpads, unused for Virtuals API ID debug
+	const [debugVirtualsApiId, setDebugVirtualsApiId] = useState<string>("");
 	const [debugResult, setDebugResult] = useState<string>("");
 	const [debugLoading, setDebugLoading] = useState(false);
 	const [overwriteExisting, setOverwriteExisting] = useState(false);
@@ -158,18 +159,35 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 	};
 
 	const handleDebug = async () => {
-		if (!debugFrom.trim()) {
-			setDebugResult("Error: From block/slot is required");
-			return;
-		}
-
 		setDebugLoading(true);
 		setDebugResult("");
 		try {
+			let fromValue = debugFrom.trim();
+			let toValue = debugTo.trim() || undefined;
+			const launchpadValue = debugLaunchpad;
+
+			if (debugLaunchpad === "Virtuals Protocol") {
+				if (!debugVirtualsApiId.trim()) {
+					setDebugResult("Error: Virtuals Launch API ID is required");
+					setDebugLoading(false);
+					return;
+				}
+				// For Virtuals Protocol, 'from' will be the API ID, 'to' is not used for single ID debug
+				fromValue = debugVirtualsApiId.trim();
+				toValue = undefined; // Explicitly set to undefined
+			} else {
+				// For old launchpads (to be removed)
+				if (!fromValue) {
+					setDebugResult("Error: From block/slot is required");
+					setDebugLoading(false);
+					return;
+				}
+			}
+
 			const res = await debugLaunchpadHistoricalEvents({
-				launchpad: debugLaunchpad,
-				from: debugFrom.trim(),
-				to: debugTo.trim() || undefined,
+				launchpad: launchpadValue,
+				from: fromValue,
+				to: toValue,
 				overwriteExisting,
 			});
 			setDebugResult(res.message);
@@ -210,42 +228,74 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 								id="debug-launchpad-select"
 								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
 								value={debugLaunchpad}
-								onChange={(e) => setDebugLaunchpad(e.target.value)}
+								onChange={(e) => {
+									setDebugLaunchpad(e.target.value);
+									// Reset specific fields when launchpad changes
+									setDebugVirtualsApiId("");
+									setDebugFrom("");
+									setDebugTo("");
+								}}
 							>
+								<option value="Virtuals Protocol">Virtuals Protocol</option>
+								{/* Keep old options for now, will be removed later */}
 								<option value="VIRTUALS Protocol (Base)">
-									VIRTUALS Protocol (Base)
+									VIRTUALS Protocol (Base) - Legacy
 								</option>
 								<option value="VIRTUALS Protocol (Solana)">
-									VIRTUALS Protocol (Solana)
+									VIRTUALS Protocol (Solana) - Legacy
 								</option>
 							</select>
 						</div>
-						<div>
-							<label htmlFor="debug-from" className="mb-1 block font-medium">
-								From Block/Slot (required)
-							</label>
-							<input
-								id="debug-from"
-								type="text"
-								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
-								value={debugFrom}
-								onChange={(e) => setDebugFrom(e.target.value)}
-								required
-							/>
-						</div>
-						<div>
-							<label htmlFor="debug-to" className="mb-1 block font-medium">
-								To Block/Slot (optional)
-							</label>
-							<input
-								id="debug-to"
-								type="text"
-								className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
-								value={debugTo}
-								onChange={(e) => setDebugTo(e.target.value)}
-							/>
-						</div>
-						<div className="flex items-center gap-2">
+						{debugLaunchpad === "Virtuals Protocol" ? (
+							<div>
+								<label
+									htmlFor="debug-virtuals-api-id"
+									className="mb-1 block font-medium"
+								>
+									Virtuals Launch API ID (required)
+								</label>
+								<input
+									id="debug-virtuals-api-id"
+									type="text"
+									className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
+									value={debugVirtualsApiId}
+									onChange={(e) => setDebugVirtualsApiId(e.target.value)}
+									required
+								/>
+							</div>
+						) : (
+							<>
+								<div>
+									<label
+										htmlFor="debug-from"
+										className="mb-1 block font-medium"
+									>
+										From Block/Slot (required)
+									</label>
+									<input
+										id="debug-from"
+										type="text"
+										className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
+										value={debugFrom}
+										onChange={(e) => setDebugFrom(e.target.value)}
+										required
+									/>
+								</div>
+								<div>
+									<label htmlFor="debug-to" className="mb-1 block font-medium">
+										To Block/Slot (optional)
+									</label>
+									<input
+										id="debug-to"
+										type="text"
+										className="w-full rounded-lg bg-gray-800 px-4 py-2 text-white"
+										value={debugTo}
+										onChange={(e) => setDebugTo(e.target.value)}
+									/>
+								</div>
+							</>
+						)}
+						<div className="flex items-center gap-2 pt-5">
 							<input
 								id="overwrite-existing"
 								type="checkbox"

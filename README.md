@@ -41,8 +41,8 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - All database access **must** go through the Data Access Layer (DAL) defined in `src/server/queries.ts`. The database client itself is instantiated globally in `src/server/db/index.ts`.
 - The application requires several environment variables (see `.env.example`). These are strictly validated at runtime using T3 Env (`src/env.js`). Ensure your `.env` file is configured correctly.
 - Shared utility functions (e.g., formatting, URL parsing) reside in `src/lib/utils.ts`. Content fetching utilities (including Firecrawl integration) are in `src/lib/content-utils.ts`.
-- Server-specific utilities, including blockchain client setup (`src/server/lib/evm-client.ts`, `src/server/lib/svm-client.ts`), chain-specific interactions (`src/server/lib/evm-utils.ts`, `src/server/lib/svm-utils.ts`), AI interactions (`src/server/lib/ai-utils.ts`), common server helpers (`src/server/lib/common-utils.ts`), and launchpad-specific helpers (`src/server/lib/virtuals-utils.ts`), are located in `src/server/lib/`.
-- The Solana listener (`src/server/launchpads/virtuals-solana.ts`) uses the Helius SDK (`helius-sdk`) for efficient transaction parsing and data fetching, simplifying the process compared to manual RPC calls and log parsing. Ensure the `HELIUS_API_KEY` environment variable is set.
+- Server-specific utilities, including blockchain client setup (`src/server/lib/evm-client.ts`, `src/server/lib/svm-client.ts`), chain-specific interactions (`src/server/lib/evm-utils.ts`, `src/server/lib/svm-utils.ts`), AI interactions (`src/server/lib/ai-utils.ts`), common server helpers (`src/server/lib/common-utils.ts`), are located in `src/server/lib/`. (Note: `virtuals-utils.ts` was largely made redundant by the consolidated listener).
+- The Virtuals Protocol listener (`src/server/launchpads/virtuals.ts`) now handles launches from both Base and Solana by periodically fetching data from the Virtuals API. It includes a debug function (`debugVirtualsLaunchById`) for processing specific launch IDs.
 - Admin routes (`/admin/*`) are protected by Basic Authentication configured in `middleware.ts`.
 - This project was bootstrapped using the T3 Stack. You might want to read their documentation first:
   - [Create T3 App](https://create.t3.gg/en/introduction)
@@ -91,3 +91,4 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 - Implemented automatic reanalysis of launches when significant token movements are detected
 - Added admin functions for historical event fetching and manual token stats updates
 - Fully integrate and configure Sentry for error monitoring
+- Consolidated Virtuals Protocol listeners (Base & Solana) into a single API-polling listener (`src/server/launchpads/virtuals.ts`) supporting Genesis, Undergrad, and Available launch types. Updated admin interface for debugging specific launch IDs.

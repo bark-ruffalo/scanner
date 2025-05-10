@@ -77,16 +77,26 @@ export async function updateLaunchTokenStats(
 		} else if (launch.launchpad === "VIRTUALS Protocol (Solana)") {
 			// For Solana launches, update using Solana utilities
 			const { getConnection } = await import("~/server/lib/svm-client");
-			const { updateSolanaTokenStatistics } = await import(
-				"~/server/lib/svm-utils"
-			);
+			const { updateSolanaTokenStatistics, getSolanaTokenBalance } =
+				await import("~/server/lib/svm-utils");
 
 			const connection = getConnection();
+			const tokenMintPk = new PublicKey(launchTokenAddress);
+			const creatorPk = new PublicKey(launchCreatorAddress);
+
+			// Fetch the current raw balance before calling updateSolanaTokenStatistics
+			const currentBalanceRaw = await getSolanaTokenBalance(
+				connection,
+				tokenMintPk,
+				creatorPk,
+			);
+
 			const tokenStats = await updateSolanaTokenStatistics(
 				connection,
-				new PublicKey(launchTokenAddress),
-				new PublicKey(launchCreatorAddress),
+				tokenMintPk,
+				creatorPk,
 				creatorInitialTokensHeld,
+				currentBalanceRaw, // Pass the fetched current raw balance
 			);
 
 			await updateTokenStatisticsInDb(launchId, tokenStats);
@@ -205,24 +215,17 @@ export async function debugLaunchpadHistoricalEvents({
 }) {
 	try {
 		let resultMsg = "";
-		if (launchpad === "VIRTUALS Protocol (Base)") {
-			const { debugFetchHistoricalEvents } = await import(
-				"~/server/launchpads/virtuals-base"
+		if (launchpad === "Virtuals Protocol") {
+			const { debugVirtualsLaunchById } = await import(
+				"~/server/launchpads/virtuals"
 			);
-			const fromBlock = BigInt(from);
-			const toBlock = to ? BigInt(to) : undefined;
-			await debugFetchHistoricalEvents(fromBlock, toBlock, overwriteExisting);
-			resultMsg = `Debug completed for VIRTUALS Protocol (Base) from block ${from}${to ? ` to ${to}` : ""}`;
-		} else if (launchpad === "VIRTUALS Protocol (Solana)") {
-			const { debugFetchHistoricalEvents } = await import(
-				"~/server/launchpads/virtuals-solana"
-			);
-			const fromSlot = BigInt(from);
-			const toSlot = to ? BigInt(to) : undefined;
-			await debugFetchHistoricalEvents(fromSlot, toSlot, overwriteExisting);
-			resultMsg = `Debug completed for VIRTUALS Protocol (Solana) from slot ${from}${to ? ` to ${to}` : ""}`;
+			// 'from' is the API ID for Virtuals Protocol
+			const debugResult = await debugVirtualsLaunchById(from);
+			resultMsg = debugResult.message;
 		} else {
-			throw new Error(`Unknown launchpad: ${launchpad}`);
+			throw new Error(
+				`Unknown or unsupported launchpad for debug: ${launchpad}`,
+			);
 		}
 
 		revalidatePath("/admin");
