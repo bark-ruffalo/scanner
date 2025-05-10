@@ -1,13 +1,12 @@
+import { getMint } from "@solana/spl-token"; // For fetching mint info for total supply
+import { PublicKey } from "@solana/web3.js";
 import { eq } from "drizzle-orm";
-import { db } from "~/server/db";
-import { launches } from "~/server/db/schema";
-import type { NewLaunchData } from "~/server/queries"; // type-only import
-import { addLaunch } from "~/server/queries";
+import { getAddress } from "viem";
 import type { LaunchpadLinkGenerator } from "~/lib/content-utils"; // type-only import
 import {
-	fetchUrlContent,
 	extractUrls,
 	fetchFirecrawlContent,
+	fetchUrlContent,
 	formatFetchedContent,
 } from "~/lib/content-utils";
 import {
@@ -16,15 +15,16 @@ import {
 	calculateBigIntPercentage,
 	formatTokenBalance,
 } from "~/lib/utils";
-import { getAddress } from "viem";
-import { PublicKey } from "@solana/web3.js";
-import { publicClient as evmPublicClient } from "~/server/lib/evm-client";
-import { getConnection as getSolanaConnection } from "~/server/lib/svm-client";
-import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
-import { updateSolanaTokenStatistics } from "~/server/lib/svm-utils";
+import { db } from "~/server/db";
+import { launches } from "~/server/db/schema";
 import { fetchAdditionalContent as fetchContentUtil } from "~/server/lib/common-utils";
-import { getMint } from "@solana/spl-token"; // For fetching mint info for total supply
+import { publicClient as evmPublicClient } from "~/server/lib/evm-client";
+import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
+import { getConnection as getSolanaConnection } from "~/server/lib/svm-client";
+import { updateSolanaTokenStatistics } from "~/server/lib/svm-utils";
 import { getSolanaTokenBalance } from "~/server/lib/svm-utils"; // For fetching current balance
+import type { NewLaunchData } from "~/server/queries"; // type-only import
+import { addLaunch } from "~/server/queries";
 
 export const LAUNCHPAD_NAME = "Virtuals Protocol"; // Exported
 const VIRTUALS_API_BASE_URL = "https://api.virtuals.io/api/virtuals";
@@ -486,11 +486,12 @@ export async function debugVirtualsLaunchById(launchApiId: number | string) {
 			});
 			if (existingLaunch) {
 				console.log(
-					`[${LAUNCHPAD_NAME}] Debug: Launch ${numericLaunchId} already exists. Consider deleting if re-processing is intended.`,
+					`[${LAUNCHPAD_NAME}] Debug: Launch ${numericLaunchId} already exists. Skipping re-processing.`,
 				);
-				// Optionally delete for re-processing during debug:
-				// await db.delete(launches).where(eq(launches.launchpadSpecificId, numericLaunchId.toString()));
-				// console.log(`[${LAUNCHPAD_NAME}] Debug: Deleted existing launch ${numericLaunchId} for re-processing.`);
+				return {
+					success: true,
+					message: `Launch ID: ${numericLaunchId} already exists. Skipped re-processing.`,
+				};
 			}
 			await processVirtualsLaunch(launchDetail);
 			console.log(

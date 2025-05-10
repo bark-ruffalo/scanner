@@ -13,7 +13,7 @@ import {
 // --- Configuration ---
 // Set to true to overwrite existing launches with the same title and launchpad,
 // false to skip adding duplicates.
-const OVERWRITE_EXISTING_LAUNCHES = true;
+const OVERWRITE_EXISTING_LAUNCHES = false;
 // Set to true to re-analyze launches that already have analysis, summary, and rating
 const OVERWRITE_LLM_RESPONSES = true;
 // --- End Configuration ---
@@ -320,7 +320,14 @@ export async function addLaunch(launchData: NewLaunchData) {
 		}
 
 		// Revalidate the homepage to reflect the new data
-		revalidatePath("/");
+		// Use absolute URL for Node.js fetch (relative URLs are invalid in Node)
+		try {
+			await fetch("http://localhost:3000/api/revalidate-homepage", {
+				method: "POST",
+			});
+		} catch (e) {
+			console.error("Failed to trigger homepage revalidation via API route", e);
+		}
 
 		return actionTaken;
 	} catch (error) {

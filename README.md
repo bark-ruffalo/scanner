@@ -68,6 +68,11 @@ The project is a WIP web app designed to monitor various launchpads (both crypto
 ### Bugs
 - [ ] The `updateSolanaTokenStatistics` function in `src/server/lib/svm-utils.ts` calculates the creator token holding percentage using standard number division and `Math.round()`, which can lead to precision loss with large token amounts (BigInts) and doesn't align with the `calculateBigIntPercentage` utility used for EVM. It should be refactored to use `calculateBigIntPercentage` from `src/lib/utils.ts` for consistency and accuracy.
 
+## Changelog
+
+- Fixed: Homepage revalidation is now triggered via a POST to /api/revalidate-homepage from background jobs, instead of direct revalidatePath calls, to avoid static generation store errors.
+- Added: /api/revalidate-homepage API route for on-demand homepage revalidation.
+
 ---
 *Previously Completed:*
 - Set up the repo

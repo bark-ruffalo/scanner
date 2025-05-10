@@ -9,8 +9,8 @@ import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
 import {
 	TOKEN_PROGRAM_ID,
 	getAccount,
-	getMint,
 	getAssociatedTokenAddressSync, // Import ATA function
+	getMint,
 } from "@solana/spl-token";
 import {
 	type Commitment,

@@ -177,3 +177,9 @@ IMPORTANT INSTRUCTIONS:
 9. Skip normal "I'll help you with that" introductions - be direct and efficient
 
 Remember that each tool call costs money, so prioritize grep for finding patterns across files rather than reading individual files.
+
+## API Routes
+- `/api/revalidate-homepage` (POST): Triggers homepage revalidation using Next.js revalidatePath. Used by background jobs and server-side scripts because revalidatePath cannot be called outside of a request context.
+
+## Background Job Revalidation
+- Background jobs (e.g., Virtuals Protocol listener) now trigger homepage revalidation by POSTing to `/api/revalidate-homepage` instead of calling revalidatePath directly. This avoids static generation store errors.
