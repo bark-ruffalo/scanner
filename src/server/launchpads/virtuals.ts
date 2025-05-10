@@ -165,17 +165,37 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 
 async function fetchLaunchDetails(
 	launchId: number,
-): Promise<VirtualsLaunchDetail | null> {
+): Promise<VirtualsLaunchDetail | null | "NOT_FOUND"> {
 	try {
 		const url = `${VIRTUALS_API_BASE_URL}/${launchId}?populate[0]=image&populate[1]=tokenomics&populate[2]=creator.userSocials&populate[3]=socials`;
 		console.log(
 			`[${LAUNCHPAD_NAME}] Fetching details for launch ID: ${launchId} from ${url}`,
 		);
 		const responseContent = await fetchUrlContent(url);
-		const parsed = JSON.parse(
-			responseContent,
-		) as VirtualsApiResponse<VirtualsLaunchDetail>;
-		return parsed.data;
+		// Detect 404 error from fetchUrlContent
+		if (
+			responseContent.includes("HTTP error! status: 404") ||
+			responseContent.includes(
+				"Error fetching content: HTTP error! status: 404",
+			)
+		) {
+			// Do not log here; let the caller log a user-facing message for 404
+			return "NOT_FOUND";
+		}
+		try {
+			const parsed = JSON.parse(
+				responseContent,
+			) as VirtualsApiResponse<VirtualsLaunchDetail>;
+			return parsed.data;
+		} catch (jsonError) {
+			console.error(
+				`[${LAUNCHPAD_NAME}] Error parsing JSON for launch ID ${launchId}:`,
+				jsonError,
+				"Raw response:",
+				responseContent,
+			);
+			return null;
+		}
 	} catch (error) {
 		console.error(
 			`[${LAUNCHPAD_NAME}] Error fetching details for launch ID ${launchId}:`,
@@ -191,17 +211,6 @@ async function processVirtualsLaunch(
 	console.log(
 		`[${LAUNCHPAD_NAME}] Processing launch: ${launchDetail.name} (${launchDetail.id})`,
 	);
-
-	const launchpadSpecificId = launchDetail.id.toString();
-
-	const existingLaunch = await db.query.launches.findFirst({
-		where: eq(launches.launchpadSpecificId, launchpadSpecificId),
-	});
-
-	if (existingLaunch) {
-		// console.log(`[${LAUNCHPAD_NAME}] Launch ${launchDetail.name} (${launchpadSpecificId}) already exists. Skipping.`);
-		return;
-	}
 
 	const title = `${launchDetail.name} ($${launchDetail.symbol || "N/A"})`;
 	const launchUrl = `https://app.virtuals.io/virtual/${launchDetail.uid || launchDetail.id}`;
@@ -224,9 +233,6 @@ async function processVirtualsLaunch(
 			? launchDetail.preToken
 			: null;
 
-	// Parameters for the link generator are now implicitly passed via the generator's `params` argument
-	// when `fetchContentUtil` calls `linkGenerator.getCustomLinks(params)`
-	// The `fetchContentUtil` itself only takes 3 arguments.
 	const fetchedInfo = await fetchContentUtil(
 		descriptionContent,
 		creatorAddress || "",
@@ -292,7 +298,7 @@ ${JSON.stringify(launchDetail, null, 2)}
 
 	const launchData: NewLaunchData = {
 		launchpad: LAUNCHPAD_NAME,
-		launchpadSpecificId,
+		launchpadSpecificId: launchDetail.id.toString(),
 		title,
 		url: launchUrl,
 		description: fullDescription,
@@ -361,7 +367,9 @@ ${JSON.stringify(launchDetail, null, 2)}
 							sentToZeroAddress: stats.sentToZeroAddress ?? false,
 							tokenStatsUpdatedAt: new Date(),
 						})
-						.where(eq(launches.launchpadSpecificId, launchpadSpecificId));
+						.where(
+							eq(launches.launchpadSpecificId, launchDetail.id.toString()),
+						);
 				} else if (chain === "SOLANA") {
 					const solanaConnection = getSolanaConnection();
 					const tokenMintPk = new PublicKey(tokenAddress);
@@ -406,7 +414,9 @@ ${JSON.stringify(launchDetail, null, 2)}
 								sentToZeroAddress: stats.sentToZeroAddress ?? false,
 								tokenStatsUpdatedAt: new Date(),
 							})
-							.where(eq(launches.launchpadSpecificId, launchpadSpecificId));
+							.where(
+								eq(launches.launchpadSpecificId, launchDetail.id.toString()),
+							);
 					} else {
 						console.warn(
 							`[${LAUNCHPAD_NAME}] Skipping Solana stats update for ${title} due to missing balance/mint info.`,
@@ -426,7 +436,7 @@ ${JSON.stringify(launchDetail, null, 2)}
 export async function fetchAndProcessVirtualsLaunches() {
 	console.log(`[${LAUNCHPAD_NAME}] Fetching latest launches...`);
 	try {
-		const url = `${VIRTUALS_API_BASE_URL}?filters[status]=3&sort[0]=createdAt%3Adesc&populate[0]=image&pagination[page]=1&pagination[pageSize]=20&isGrouped=1`;
+		const url = `${VIRTUALS_API_BASE_URL}?filters[status]=3&sort[0]=createdAt%3Adesc&populate[0]=image&pagination[page]=1&pagination[pageSize]=2&isGrouped=1`;
 		const responseContent = await fetchUrlContent(url);
 		const parsed = JSON.parse(responseContent) as VirtualsApiResponse<
 			VirtualsLaunchListItem[]
@@ -450,7 +460,7 @@ export async function fetchAndProcessVirtualsLaunches() {
 			}
 
 			const launchDetail = await fetchLaunchDetails(launchItem.id);
-			if (launchDetail) {
+			if (launchDetail && launchDetail !== "NOT_FOUND") {
 				await processVirtualsLaunch(launchDetail);
 			}
 		}
@@ -480,7 +490,16 @@ export async function debugVirtualsLaunchById(launchApiId: number | string) {
 
 	try {
 		const launchDetail = await fetchLaunchDetails(numericLaunchId);
-		if (launchDetail) {
+		if (launchDetail === "NOT_FOUND") {
+			console.warn(
+				`[${LAUNCHPAD_NAME}] Launch ID ${numericLaunchId} not found (404).`,
+			);
+			return {
+				success: false,
+				message: `Launch ID: ${numericLaunchId} was not found (404).`,
+			};
+		}
+		if (launchDetail && typeof launchDetail !== "string") {
 			const existingLaunch = await db.query.launches.findFirst({
 				where: eq(launches.launchpadSpecificId, numericLaunchId.toString()),
 			});

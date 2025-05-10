@@ -100,7 +100,7 @@ export async function getDistinctLaunchpads() {
 
 /**
  * Inserts a new launch record into the database or updates it if it already exists
- * (based on title and launchpad) and OVERWRITE_EXISTING_LAUNCHES is true.
+ * (based on launchpadSpecificId) and OVERWRITE_EXISTING_LAUNCHES is true.
  * Before insertion, it uses LLM to analyze, rate and summarize the launch.
  * After successful insertion or update, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
@@ -109,33 +109,30 @@ export async function getDistinctLaunchpads() {
  *   - Optional fields: imageUrl, creatorTokenHoldingPercentage, creatorTokensHeld (string), totalTokenSupply (string)
  */
 export async function addLaunch(launchData: NewLaunchData) {
+	if (!launchData.launchpadSpecificId) {
+		throw new Error(
+			"addLaunch: launchpadSpecificId is required for all launches. Refusing to insert launch without unique identifier.",
+		);
+	}
 	console.log(
-		`Attempting to add/update launch in DB: ${launchData.title} from ${launchData.launchpad}`,
+		`Attempting to add/update launch in DB: launchpadSpecificId=${launchData.launchpadSpecificId} title=${launchData.title} from ${launchData.launchpad}`,
 	);
 	let actionTaken: "inserted" | "updated" | "skipped" | "error" = "error"; // Track outcome
 
 	try {
-		// Check if a launch with the same title and launchpad already exists
+		// Check if a launch with the same launchpadSpecificId already exists
 		const existingLaunch = await db.query.launches.findFirst({
-			where: and(
-				eq(launches.title, launchData.title),
-				// Make sure launchpad is not undefined by using the default value from the schema if needed
-				eq(launches.launchpad, launchData.launchpad || "added manually"),
-			),
+			where: eq(launches.launchpadSpecificId, launchData.launchpadSpecificId),
 			columns: {
-				// Need the ID to perform an update
 				id: true,
-				// Also get existing analysis data to avoid reanalyzing unnecessarily
 				analysis: true,
 				summary: true,
 				rating: true,
-				// Get existing token data to preserve it if not provided in update
 				creatorTokenHoldingPercentage: true,
 				creatorTokensHeld: true,
 				totalTokenSupply: true,
-				creatorInitialTokensHeld: true, // Get existing value
-				tokensForSale: true, // Get existing value
-				// Get existing addresses
+				creatorInitialTokensHeld: true,
+				tokensForSale: true,
 				creatorAddress: true,
 				tokenAddress: true,
 			},
@@ -180,12 +177,11 @@ export async function addLaunch(launchData: NewLaunchData) {
 			// Launch exists, check if we should overwrite
 			if (OVERWRITE_EXISTING_LAUNCHES) {
 				console.log(
-					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Overwriting...`,
+					`Duplicate launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Overwriting...`,
 				);
 				// Prepare data for update, preserving existing token data if not provided in update
 				const updateData: Partial<typeof launches.$inferInsert> = {
 					...enhancedData,
-					// Preserve existing token data if not provided in update
 					creatorTokenHoldingPercentage:
 						enhancedData.creatorTokenHoldingPercentage ??
 						existingLaunch.creatorTokenHoldingPercentage,
@@ -193,14 +189,12 @@ export async function addLaunch(launchData: NewLaunchData) {
 						enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
 					totalTokenSupply:
 						enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
-					// Preserve new fields if not provided in update
 					creatorInitialTokensHeld:
 						enhancedData.creatorInitialTokensHeld ??
 						existingLaunch.creatorInitialTokensHeld,
 					tokensForSale:
 						enhancedData.tokensForSale ?? existingLaunch.tokensForSale,
-					basicInfoUpdatedAt: new Date(), // Update basic info timestamp
-					// Preserve addresses if not provided in update
+					basicInfoUpdatedAt: new Date(),
 					creatorAddress:
 						enhancedData.creatorAddress ?? existingLaunch.creatorAddress,
 					tokenAddress:
@@ -214,12 +208,11 @@ export async function addLaunch(launchData: NewLaunchData) {
 					.returning();
 
 				if (updatedLaunch) {
-					// Send Telegram notification if there are significant changes
 					const hasSignificantChanges =
-						enhancedData.creatorTokenMovementDetails || // New token movements
+						enhancedData.creatorTokenMovementDetails ||
 						enhancedData.creatorTokenHoldingPercentage !==
-							existingLaunch.creatorTokenHoldingPercentage || // Token holding changes
-						needsAnalysis; // New analysis
+							existingLaunch.creatorTokenHoldingPercentage ||
+						needsAnalysis;
 
 					if (hasSignificantChanges) {
 						try {
@@ -239,47 +232,41 @@ export async function addLaunch(launchData: NewLaunchData) {
 							);
 						} catch (error) {
 							console.error("Failed to send Telegram notification:", error);
-							// Don't throw - we don't want to fail the update if notification fails
 						}
 					}
 				}
 
 				console.log(
-					`Successfully updated launch: ${launchData.title} from ${launchData.launchpad}`,
+					`Successfully updated launch: launchpadSpecificId=${launchData.launchpadSpecificId}`,
 				);
 				actionTaken = "updated";
 			} else if (needsAnalysis) {
-				// If overwrite is disabled but analysis was needed and performed, update only the AI fields
 				console.log(
-					`Existing launch detected: "${launchData.title}" from ${launchData.launchpad}. Updating only AI analysis fields...`,
+					`Existing launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Updating only AI analysis fields...`,
 				);
-				// Only update the AI-generated fields
 				const updateData = {
 					analysis: enhancedData.analysis,
 					summary: enhancedData.summary,
 					rating: enhancedData.rating,
-					llmAnalysisUpdatedAt: new Date(), // Update LLM analysis timestamp
+					llmAnalysisUpdatedAt: new Date(),
 				};
 				await db
 					.update(launches)
 					.set(updateData)
 					.where(eq(launches.id, existingLaunch.id));
 				console.log(
-					`Successfully updated AI analysis for: ${launchData.title} from ${launchData.launchpad}`,
+					`Successfully updated AI analysis for: launchpadSpecificId=${launchData.launchpadSpecificId}`,
 				);
 				actionTaken = "updated";
 			} else {
-				// If overwrite is disabled and no analysis needed, log and skip
 				console.log(
-					`Duplicate launch detected: "${launchData.title}" from ${launchData.launchpad}. Skipping insertion as overwrite is disabled.`,
+					`Duplicate launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Skipping insertion as overwrite is disabled.`,
 				);
 				actionTaken = "skipped";
-				// No 'return' here, proceed to revalidation if needed (though skipping means no change)
 			}
 		} else {
-			// If launch does not exist, proceed with insertion
 			console.log(
-				`"${launchData.title}" not found. Proceeding with insertion...`,
+				`launchpadSpecificId=${launchData.launchpadSpecificId} not found. Proceeding with insertion...`,
 			);
 			const [insertedLaunch] = await db
 				.insert(launches)
@@ -291,7 +278,6 @@ export async function addLaunch(launchData: NewLaunchData) {
 				.returning();
 
 			if (insertedLaunch) {
-				// Send Telegram notification for new launches only
 				try {
 					const message = formatLaunchNotification(
 						insertedLaunch.title,
@@ -309,18 +295,15 @@ export async function addLaunch(launchData: NewLaunchData) {
 					);
 				} catch (error) {
 					console.error("Failed to send Telegram notification:", error);
-					// Don't throw - we don't want to fail the launch addition if notification fails
 				}
 
 				console.log(
-					`Successfully added launch: ${launchData.title} from ${launchData.launchpad}`,
+					`Successfully added launch: launchpadSpecificId=${launchData.launchpadSpecificId}`,
 				);
 				actionTaken = "inserted";
 			}
 		}
 
-		// Revalidate the homepage to reflect the new data
-		// Use absolute URL for Node.js fetch (relative URLs are invalid in Node)
 		try {
 			await fetch("http://localhost:3000/api/revalidate-homepage", {
 				method: "POST",
@@ -332,13 +315,10 @@ export async function addLaunch(launchData: NewLaunchData) {
 		return actionTaken;
 	} catch (error) {
 		actionTaken = "error";
-		// Log any errors that occur during the database check, insertion or update process.
 		console.error(
-			`Error processing launch "${launchData.title}" in database:`, // Updated error message context
+			`Error processing launch launchpadSpecificId=${launchData.launchpadSpecificId} in database:`,
 			error,
 		);
-		// Consider re-throwing the error if needed by the caller
-		// throw error;
 		return actionTaken;
 	}
 }

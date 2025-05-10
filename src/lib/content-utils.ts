@@ -25,8 +25,6 @@ export function extractUrls(text: string): string[] {
  */
 export async function fetchUrlContent(url: string): Promise<string> {
 	try {
-		console.log("Fetching content with simple fetch from:", url);
-
 		const response = await fetch(url, {
 			headers: {
 				Accept: "application/json, text/plain, */*",
@@ -35,7 +33,8 @@ export async function fetchUrlContent(url: string): Promise<string> {
 		});
 
 		if (!response.ok) {
-			throw new Error(`HTTP error! status: ${response.status}`);
+			// Do not log errors for expected HTTP errors (like 404); let the caller handle them
+			return `Error fetching content: HTTP error! status: ${response.status}`;
 		}
 
 		// Try to parse as JSON first
@@ -47,6 +46,7 @@ export async function fetchUrlContent(url: string): Promise<string> {
 			return await response.text();
 		}
 	} catch (error) {
+		// Only log unexpected errors (network, etc.)
 		console.error(`Error fetching ${url}:`, error);
 		return `Error fetching content: ${error instanceof Error ? error.message : String(error)}`;
 	}
