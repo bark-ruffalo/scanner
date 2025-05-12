@@ -10,28 +10,15 @@ export async function register() {
 		await import("../sentry.server.config");
 
 		// Import and start Virtuals listener
-		const { startVirtualsListener, debugVirtualsLaunchById } = await import(
+		const { startVirtualsListener } = await import(
 			"./server/launchpads/virtuals"
 		);
 
-		// Check if a specific Virtuals launch ID is set for debugging
-		const debugLaunchId = process.env.DEBUG_VIRTUALS_ID;
-		if (debugLaunchId) {
-			console.log(
-				`[Instrumentation] Debugging Virtuals Protocol launch ID: ${debugLaunchId}`,
-			);
-			// Example: DEBUG_VIRTUALS_ID=22653 (Genesis on Base)
-			// Example: DEBUG_VIRTUALS_ID=21809 (Undergrad on Solana)
-			// Example: DEBUG_VIRTUALS_ID=12398 (Available on Base)
-			await debugVirtualsLaunchById(debugLaunchId);
-			// The debug function in virtuals.ts should handle whether to start the main listener afterwards if needed.
-		} else {
-			// Start the regular consolidated listener if not debugging a specific ID
-			console.log(
-				"[Instrumentation] Starting consolidated Virtuals Protocol listener.",
-			);
-			startVirtualsListener();
-		}
+		// Always start the regular consolidated listener
+		console.log(
+			"[Instrumentation] Starting consolidated Virtuals Protocol listener.",
+		);
+		startVirtualsListener();
 	}
 
 	if (process.env.NEXT_RUNTIME === "edge") {

@@ -10,14 +10,6 @@ import {
 	sendTelegramMessage,
 } from "./lib/telegram-utils";
 
-// --- Configuration ---
-// Set to true to overwrite existing launches with the same title and launchpad,
-// false to skip adding duplicates.
-const OVERWRITE_EXISTING_LAUNCHES = false;
-// Set to true to re-analyze launches that already have analysis, summary, and rating
-const OVERWRITE_LLM_RESPONSES = true;
-// --- End Configuration ---
-
 // Define the type for data needed to create a new launch record.
 // It uses TypeScript's Omit utility type to take the 'launches' table insert type
 // (inferred by Drizzle as `typeof launches.$inferInsert`) and exclude properties
@@ -100,7 +92,6 @@ export async function getDistinctLaunchpads() {
 
 /**
  * Inserts a new launch record into the database or updates it if it already exists
- * (based on launchpadSpecificId) and OVERWRITE_EXISTING_LAUNCHES is true.
  * Before insertion, it uses LLM to analyze, rate and summarize the launch.
  * After successful insertion or update, it triggers a revalidation of the Next.js cache
  * for the homepage ('/') to ensure the UI reflects the new data.
@@ -138,132 +129,93 @@ export async function addLaunch(launchData: NewLaunchData) {
 			},
 		});
 
-		// Enhanced data with AI analysis - if missing in either new launch or existing launch
+		// Always reanalyze with LLM
 		let enhancedData = { ...launchData };
-		const needsAnalysis =
-			!existingLaunch ||
-			existingLaunch.analysis === "-" ||
-			existingLaunch.summary === "-" ||
-			existingLaunch.rating === -1 ||
-			OVERWRITE_LLM_RESPONSES;
+		try {
+			console.log("Analyzing launch description with AI...");
+			const analysisResult = await analyzeLaunch(
+				launchData.description,
+				launchData.launchpad,
+			);
+			console.log(`Analysis complete! Rating: ${analysisResult.rating}/10`);
 
-		if (needsAnalysis) {
-			try {
-				console.log("Analyzing launch description with AI...");
-				const analysisResult = await analyzeLaunch(
-					launchData.description,
-					launchData.launchpad,
-				);
-				console.log(`Analysis complete! Rating: ${analysisResult.rating}/10`);
-
-				// Enhance the data with AI-generated content
-				enhancedData = {
-					...launchData,
-					analysis: analysisResult.analysis,
-					summary: analysisResult.summary,
-					rating: analysisResult.rating,
-					llmAnalysisUpdatedAt: new Date(), // Set LLM analysis timestamp
-				};
-			} catch (analysisError) {
-				console.error("Error during AI analysis:", analysisError);
-				// Continue with original data if analysis fails
-				console.log("Proceeding with original data (without AI analysis).");
-			}
-		} else {
-			console.log("Skipping AI analysis (already analyzed or not needed).");
+			// Enhance the data with AI-generated content
+			enhancedData = {
+				...launchData,
+				analysis: analysisResult.analysis,
+				summary: analysisResult.summary,
+				rating: analysisResult.rating,
+				llmAnalysisUpdatedAt: new Date(), // Set LLM analysis timestamp
+			};
+		} catch (analysisError) {
+			console.error("Error during AI analysis:", analysisError);
+			// Continue with original data if analysis fails
+			console.log("Proceeding with original data (without AI analysis).");
 		}
 
 		if (existingLaunch) {
-			// Launch exists, check if we should overwrite
-			if (OVERWRITE_EXISTING_LAUNCHES) {
-				console.log(
-					`Duplicate launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Overwriting...`,
-				);
-				// Prepare data for update, preserving existing token data if not provided in update
-				const updateData: Partial<typeof launches.$inferInsert> = {
-					...enhancedData,
-					creatorTokenHoldingPercentage:
-						enhancedData.creatorTokenHoldingPercentage ??
-						existingLaunch.creatorTokenHoldingPercentage,
-					creatorTokensHeld:
-						enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
-					totalTokenSupply:
-						enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
-					creatorInitialTokensHeld:
-						enhancedData.creatorInitialTokensHeld ??
-						existingLaunch.creatorInitialTokensHeld,
-					tokensForSale:
-						enhancedData.tokensForSale ?? existingLaunch.tokensForSale,
-					basicInfoUpdatedAt: new Date(),
-					creatorAddress:
-						enhancedData.creatorAddress ?? existingLaunch.creatorAddress,
-					tokenAddress:
-						enhancedData.tokenAddress ?? existingLaunch.tokenAddress,
-				};
+			console.log(
+				`Duplicate launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Overwriting...`,
+			);
+			// Prepare data for update, preserving existing token data if not provided in update
+			const updateData: Partial<typeof launches.$inferInsert> = {
+				...enhancedData,
+				creatorTokenHoldingPercentage:
+					enhancedData.creatorTokenHoldingPercentage ??
+					existingLaunch.creatorTokenHoldingPercentage,
+				creatorTokensHeld:
+					enhancedData.creatorTokensHeld ?? existingLaunch.creatorTokensHeld,
+				totalTokenSupply:
+					enhancedData.totalTokenSupply ?? existingLaunch.totalTokenSupply,
+				creatorInitialTokensHeld:
+					enhancedData.creatorInitialTokensHeld ??
+					existingLaunch.creatorInitialTokensHeld,
+				tokensForSale:
+					enhancedData.tokensForSale ?? existingLaunch.tokensForSale,
+				basicInfoUpdatedAt: new Date(),
+				creatorAddress:
+					enhancedData.creatorAddress ?? existingLaunch.creatorAddress,
+				tokenAddress: enhancedData.tokenAddress ?? existingLaunch.tokenAddress,
+			};
 
-				const [updatedLaunch] = await db
-					.update(launches)
-					.set(updateData)
-					.where(eq(launches.id, existingLaunch.id))
-					.returning();
+			const [updatedLaunch] = await db
+				.update(launches)
+				.set(updateData)
+				.where(eq(launches.id, existingLaunch.id))
+				.returning();
 
-				if (updatedLaunch) {
-					const hasSignificantChanges =
-						enhancedData.creatorTokenMovementDetails ||
-						enhancedData.creatorTokenHoldingPercentage !==
-							existingLaunch.creatorTokenHoldingPercentage ||
-						needsAnalysis;
+			if (updatedLaunch) {
+				const hasSignificantChanges =
+					enhancedData.creatorTokenMovementDetails ||
+					enhancedData.creatorTokenHoldingPercentage !==
+						existingLaunch.creatorTokenHoldingPercentage;
 
-					if (hasSignificantChanges) {
-						try {
-							const message = formatLaunchNotification(
-								updatedLaunch.title,
-								updatedLaunch.url,
-								updatedLaunch.summary,
-								updatedLaunch.analysis,
-								updatedLaunch.rating,
-								updatedLaunch.id,
-								updatedLaunch.launchpad,
-							);
-							await sendTelegramMessage(
-								message,
-								env.TELEGRAM_GROUP_ID,
-								env.TELEGRAM_TOPIC_ID,
-							);
-						} catch (error) {
-							console.error("Failed to send Telegram notification:", error);
-						}
+				if (hasSignificantChanges) {
+					try {
+						const message = formatLaunchNotification(
+							updatedLaunch.title,
+							updatedLaunch.url,
+							updatedLaunch.summary,
+							updatedLaunch.analysis,
+							updatedLaunch.rating,
+							updatedLaunch.id,
+							updatedLaunch.launchpad,
+						);
+						await sendTelegramMessage(
+							message,
+							env.TELEGRAM_GROUP_ID,
+							env.TELEGRAM_TOPIC_ID,
+						);
+					} catch (error) {
+						console.error("Failed to send Telegram notification:", error);
 					}
 				}
-
-				console.log(
-					`Successfully updated launch: launchpadSpecificId=${launchData.launchpadSpecificId}`,
-				);
-				actionTaken = "updated";
-			} else if (needsAnalysis) {
-				console.log(
-					`Existing launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Updating only AI analysis fields...`,
-				);
-				const updateData = {
-					analysis: enhancedData.analysis,
-					summary: enhancedData.summary,
-					rating: enhancedData.rating,
-					llmAnalysisUpdatedAt: new Date(),
-				};
-				await db
-					.update(launches)
-					.set(updateData)
-					.where(eq(launches.id, existingLaunch.id));
-				console.log(
-					`Successfully updated AI analysis for: launchpadSpecificId=${launchData.launchpadSpecificId}`,
-				);
-				actionTaken = "updated";
-			} else {
-				console.log(
-					`Duplicate launch detected: launchpadSpecificId=${launchData.launchpadSpecificId}. Skipping insertion as overwrite is disabled.`,
-				);
-				actionTaken = "skipped";
 			}
+
+			console.log(
+				`Successfully updated launch: launchpadSpecificId=${launchData.launchpadSpecificId}`,
+			);
+			actionTaken = "updated";
 		} else {
 			console.log(
 				`launchpadSpecificId=${launchData.launchpadSpecificId} not found. Proceeding with insertion...`,
@@ -296,7 +248,6 @@ export async function addLaunch(launchData: NewLaunchData) {
 				} catch (error) {
 					console.error("Failed to send Telegram notification:", error);
 				}
-
 				console.log(
 					`Successfully added launch: launchpadSpecificId=${launchData.launchpadSpecificId}`,
 				);
@@ -305,13 +256,25 @@ export async function addLaunch(launchData: NewLaunchData) {
 		}
 
 		try {
+			// Check if the server is running before attempting to revalidate
+			try {
+				const response = await fetch("http://localhost:3000");
+				if (!response.ok) {
+					console.warn("Homepage revalidation skipped: Server is not running.");
+				}
+			} catch (serverError) {
+				console.warn("Homepage revalidation skipped: Server is not running.");
+			}
+
 			await fetch("http://localhost:3000/api/revalidate-homepage", {
 				method: "POST",
 			});
 		} catch (e) {
-			console.error("Failed to trigger homepage revalidation via API route", e);
+			console.error(
+				"Failed to trigger homepage revalidation via API route:",
+				e,
+			);
 		}
-
 		return actionTaken;
 	} catch (error) {
 		actionTaken = "error";

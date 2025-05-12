@@ -104,6 +104,7 @@ The main data model is defined in `src/server/db/schema.ts` within the `launches
     - `startVirtualsListener`: Periodically fetches the latest launches from the Virtuals Protocol API (covering Base & Solana, and all launch types like Genesis, Undergrad, Available).
     - `debugVirtualsLaunchById`: Fetches and processes a specific launch by its Virtuals API ID for testing or backfilling.
     - `processVirtualsLaunch`: Processes a single launch detail fetched from the API. It extracts relevant information (name, symbol, chain, status, description, creator, tokenomics, etc.), fetches additional content from related URLs, formats a comprehensive description, calculates initial token holdings (especially for Genesis and Undergrad types), and adds/updates the launch in the database. It also triggers token statistics updates (EVM or SVM based on chain) and LLM analysis.
+    - The `templates/launchpads/virtuals-protocol.md` file now contains updated information on Virtuals Protocol's Tokenization Platform, Agent Commerce Protocol (ACP), and Agentic Framework (GAME).
 - Content utilities (`src/lib/content-utils.ts`):
     - `extractUrls`: Extracts all URLs from a text string using regex.
     - `fetchUrlContent`: Simple utility to fetch raw content (HTML, text, JSON) from a URL using standard `fetch`.

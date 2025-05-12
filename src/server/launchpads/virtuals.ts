@@ -62,6 +62,8 @@ interface VirtualsCreator {
 	id?: number;
 	userSocials?: VirtualsCreatorSocial[] | null;
 	avatar?: { url?: string | null } | null;
+	bio?: string | null;
+	walletAddress?: string;
 }
 
 interface VirtualsTokenomicRelease {
@@ -73,6 +75,25 @@ interface VirtualsTokenomicRelease {
 	durationUnit?: string | null;
 	createdAt?: string;
 	updatedAt?: string;
+}
+
+interface VirtualsTokenomicProject {
+	id: number;
+	unlockerAddress: string;
+	futureTokenAddress: string;
+	trackerTokenAddress: string;
+	tokenAddress: string;
+	createdAt: string;
+	updatedAt: string;
+}
+
+interface VirtualsTokenomicRecipient {
+	id: number;
+	recipientAddress: string;
+	amount: string;
+	actualId: string | null;
+	createdAt: string;
+	updatedAt: string;
 }
 
 interface VirtualsTokenomic {
@@ -93,17 +114,46 @@ interface VirtualsTokenomic {
 	depositTx?: string | null;
 	isDefault?: boolean;
 	releases?: VirtualsTokenomicRelease[];
+	project?: VirtualsTokenomicProject | null;
+	recipients?: VirtualsTokenomicRecipient[] | null;
 }
 
 interface VirtualsLaunchDetail extends VirtualsLaunchListItem {
 	description: string | null;
 	overview: string | null;
 	walletAddress: string | null;
+	tokenAddress?: string | null;
 	preToken: string | null;
 	preTokenPair: string | null;
 	socials?: Record<string, Record<string, string>> | null;
+	category?: string | null;
+	role?: string | null;
+	virtualId?: string | null;
+	holderCount?: number | null;
+	mcapInVirtual?: number | null;
 	creator?: VirtualsCreator | null;
 	tokenomics?: Array<VirtualsTokenomic> | null;
+	genesis?: VirtualsGenesis | null;
+	tbaAddress?: string | null;
+	top10HolderPercentage?: number | null;
+	level?: number | null;
+}
+
+interface VirtualsGenesis {
+	id: number;
+	startsAt: string;
+	endsAt: string;
+	status: string;
+	genesisId: string;
+	genesisTx: string;
+	genesisAddress: string;
+	result: {
+		totalPointsRefunded: number;
+		totalVirtualsRefunded: number;
+	} | null;
+	processedParticipants: string;
+	createdAt: string;
+	updatedAt: string;
 }
 
 interface VirtualsApiResponse<T> {
@@ -128,37 +178,17 @@ const virtualsLinkGenerator: LaunchpadLinkGenerator = {
 				useFirecrawl: false,
 			});
 		}
-		if (params.uid) {
-			links.push({
-				url: `https://app.virtuals.io/virtual/${params.uid}`,
-				name: "Launch on Virtuals Protocol App",
-				useFirecrawl: true,
-			});
-		} else if (params.launchpadSpecificId) {
-			links.push({
-				url: `https://app.virtuals.io/virtual/${params.launchpadSpecificId}`,
-				name: "Launch on Virtuals Protocol App (by ID)",
-				useFirecrawl: true,
-			});
-		}
 
-		if (params.tokenAddress && params.chain) {
-			if (params.chain.toUpperCase() === "SOLANA") {
-				links.push({
-					url: `https://solscan.io/token/${params.tokenAddress}`,
-					name: "Token on Solscan",
-					useFirecrawl: true,
-					firecrawlOptions: { formats: ["markdown"], maxPages: 1 },
-				});
-			} else if (params.chain.toUpperCase() === "BASE") {
-				links.push({
-					url: `https://basescan.org/token/${params.tokenAddress}`,
-					name: "Token on Basescan",
-					useFirecrawl: true,
-					firecrawlOptions: { formats: ["markdown"], maxPages: 1 },
-				});
-			}
-		}
+		// Add other custom links here as needed
+		// Example:
+		// if (params.tokenAddress) {
+		//   links.push({
+		//     url: `https://some-api.com/token/${params.tokenAddress}`,
+		//     name: "Token API Data",
+		//     useFirecrawl: false,
+		//   });
+		// }
+
 		return links;
 	},
 };
@@ -167,60 +197,94 @@ async function fetchLaunchDetails(
 	launchId: number,
 ): Promise<VirtualsLaunchDetail | null | "NOT_FOUND"> {
 	try {
-		const url = `${VIRTUALS_API_BASE_URL}/${launchId}?populate[0]=image&populate[1]=tokenomics&populate[2]=creator.userSocials&populate[3]=socials`;
+		const url = `${VIRTUALS_API_BASE_URL}/${launchId}?populate[0]=image&populate[1]=genesis`;
 		console.log(
 			`[${LAUNCHPAD_NAME}] Fetching details for launch ID: ${launchId} from ${url}`,
 		);
-		const responseContent = await fetchUrlContent(url);
-		// Detect 404 error from fetchUrlContent
-		if (
-			responseContent.includes("HTTP error! status: 404") ||
-			responseContent.includes(
-				"Error fetching content: HTTP error! status: 404",
-			)
-		) {
-			// Do not log here; let the caller log a user-facing message for 404
-			return "NOT_FOUND";
-		}
 		try {
-			const parsed = JSON.parse(
-				responseContent,
-			) as VirtualsApiResponse<VirtualsLaunchDetail>;
-			return parsed.data;
-		} catch (jsonError) {
+			const responseContent = await fetchUrlContent(url);
+			// Detect 404 error from fetchUrlContent
+			if (
+				responseContent.includes("HTTP error! status: 404") ||
+				responseContent.includes(
+					"Error fetching content: HTTP error! status: 404",
+				)
+			) {
+				// Do not log here; let the caller log a user-facing message for 404
+				return "NOT_FOUND";
+			}
+			try {
+				const parsed = JSON.parse(
+					responseContent,
+				) as VirtualsApiResponse<VirtualsLaunchDetail>;
+				return parsed.data;
+			} catch (jsonError) {
+				console.error(
+					`[${LAUNCHPAD_NAME}] Error parsing JSON for launch ID ${launchId}:`,
+					jsonError,
+					"Raw response:",
+					responseContent,
+				);
+				return null;
+			}
+		} catch (error) {
 			console.error(
-				`[${LAUNCHPAD_NAME}] Error parsing JSON for launch ID ${launchId}:`,
-				jsonError,
-				"Raw response:",
-				responseContent,
+				`[${LAUNCHPAD_NAME}] Error fetching details for launch ID ${launchId}:`,
+				error,
 			);
 			return null;
 		}
 	} catch (error) {
 		console.error(
-			`[${LAUNCHPAD_NAME}] Error fetching details for launch ID ${launchId}:`,
+			`[${LAUNCHPAD_NAME}] Outer error fetching details for launch ID ${launchId}:`,
 			error,
 		);
 		return null;
 	}
 }
 
-async function processVirtualsLaunch(
+export async function processVirtualsLaunch(
 	launchDetail: VirtualsLaunchDetail,
-): Promise<void> {
+	overwrite = false,
+): Promise<{ skipped: boolean; skipReason?: string }> {
+	const status = launchDetail.status?.toUpperCase();
+	console.log("launchDetail.genesis.status:", launchDetail.genesis?.status);
+	if (
+		launchDetail.genesis &&
+		status === "GENESIS" &&
+		launchDetail.genesis.status !== "FINALIZED" &&
+		launchDetail.genesis.status !== "STARTED" &&
+		launchDetail.genesis.status !== "INITIALIZED"
+	) {
+		const skipMsg = `[${LAUNCHPAD_NAME}] Skipping Genesis launch ${launchDetail.id} due to status: ${launchDetail.genesis?.status}`;
+		console.log(skipMsg);
+		return {
+			skipped: true,
+			skipReason: `Skipping Genesis launch ${launchDetail.id} due to status: ${launchDetail.genesis?.status}`,
+		};
+	}
+
 	console.log(
 		`[${LAUNCHPAD_NAME}] Processing launch: ${launchDetail.name} (${launchDetail.id})`,
 	);
 
 	const title = `${launchDetail.name} ($${launchDetail.symbol || "N/A"})`;
-	const launchUrl = `https://app.virtuals.io/virtual/${launchDetail.uid || launchDetail.id}`;
+	let launchUrl: string;
+	if (status === "GENESIS" && launchDetail.genesis && launchDetail.genesis.id) {
+		launchUrl = `https://app.virtuals.io/geneses/${launchDetail.genesis.id}`;
+	} else if (status === "UNDERGRAD") {
+		launchUrl = `https://app.virtuals.io/prototypes/${launchDetail.preToken}`;
+	} else if (status === "AVAILABLE") {
+		launchUrl = `https://app.virtuals.io/virtuals/${launchDetail.id}`;
+	} else {
+		launchUrl = "";
+	}
 	const imageUrl =
 		launchDetail.image?.formats?.thumbnail?.url ||
 		launchDetail.image?.url ||
 		null;
 	const launchedAt = new Date(launchDetail.createdAt);
 	const chain = launchDetail.chain?.toUpperCase();
-	const status = launchDetail.status?.toUpperCase();
 
 	let descriptionContent = launchDetail.description || "";
 	if (launchDetail.overview) {
@@ -229,9 +293,7 @@ async function processVirtualsLaunch(
 
 	const creatorAddress = launchDetail.walletAddress;
 	const tokenAddress =
-		status === "UNDERGRAD" || status === "AVAILABLE"
-			? launchDetail.preToken
-			: null;
+		launchDetail.tokenAddress ?? launchDetail.preToken ?? null;
 
 	const fetchedInfo = await fetchContentUtil(
 		descriptionContent,
@@ -239,26 +301,103 @@ async function processVirtualsLaunch(
 		virtualsLinkGenerator,
 	);
 
-	const fullDescription = `
+	const launchedAtDate = new Date(launchedAt);
+	const tokenName = `${launchDetail.name} ($${launchDetail.symbol || "N/A"})`;
+	let tokenUrl: string;
+
+	if (status === "GENESIS") {
+		if (
+			launchDetail.genesis &&
+			(launchDetail.genesis.status === "FINALIZED" ||
+				launchDetail.genesis.status === "STARTED" ||
+				launchDetail.genesis.status === "INITIALIZED")
+		) {
+			tokenUrl = `https://app.virtuals.io/geneses/${launchDetail.genesis.id}`;
+		} else {
+			console.log(
+				`[${LAUNCHPAD_NAME}] Skipping Genesis launch ${launchDetail.id} due to status: ${launchDetail.genesis?.status}`,
+			);
+			return {
+				skipped: true,
+				skipReason: `Skipping Genesis launch ${launchDetail.id} due to status: ${launchDetail.genesis?.status}`,
+			};
+		}
+	} else if (status === "UNDERGRAD") {
+		tokenUrl = `https://app.virtuals.io/prototypes/${launchDetail.preToken}`;
+	} else if (status === "AVAILABLE") {
+		tokenUrl = `https://app.virtuals.io/virtuals/${launchDetail.id}`;
+	} else {
+		tokenUrl = "";
+	}
+
+	let fullDescription = "N/A";
+
+	if (chain === "BASE") {
+		fullDescription = `
+# ${tokenName}
+URL on launchpad: ${tokenUrl ?? "N/A"}
+Launched at: ${launchedAtDate.toUTCString()}
+Launched through the launchpad: ${LAUNCHPAD_NAME}
+
+## Token details and tokenomics
+Token address: ${tokenAddress ? getAddress(tokenAddress) : "N/A"}
+Token symbol: $${launchDetail.symbol}
+Token supply: 1 billion
+Top holders: ${tokenAddress ? `https://basescan.org/token/${getAddress(tokenAddress)}#balances` : "N/A"}
+Liquidity contract: N/A
+Creator initial number of tokens: N/A
+
+## Creator info
+Creator address: ${creatorAddress}
+Creator on basescan.org: https://basescan.org/address/${creatorAddress}#asset-tokens
+Creator on virtuals.io: https://app.virtuals.io/profile/${creatorAddress}
+Creator on zerion.io: https://app.zerion.io/${creatorAddress}/overview
+Creator on debank.com: https://debank.com/profile/${creatorAddress}
+
+## Description at launch
 ${descriptionContent}
 
-<socials_info>
-${JSON.stringify(launchDetail.socials || {}, null, 2)}
-</socials_info>
-
-<creator_info>
-${JSON.stringify(launchDetail.creator || {}, null, 2)}
-</creator_info>
-
+## Additional information extracted from relevant pages
 ${fetchedInfo}
 
 <full_details>
 ${JSON.stringify(launchDetail, null, 2)}
 </full_details>
-    `.trim();
+`.trim();
+	} else if (chain === "SOLANA") {
+		fullDescription = `
+# ${tokenName}
+URL on launchpad: ${tokenUrl}
+Launched at: ${launchedAtDate.toUTCString()}
+Launched through the launchpad: ${LAUNCHPAD_NAME}
 
-	let creatorInitialTokensHeld: string | null = null;
-	let tokensForSale: string | null = null;
+## Token details and tokenomics
+Token address: ${tokenAddress}
+Token symbol: $${launchDetail.symbol}
+Token supply: 1 billion
+Top holders: https://solscan.io/token/${tokenAddress}#holders
+Liquidity contract: N/A
+Creator initial number of tokens: N/A
+
+## Creator info
+Creator address: ${creatorAddress ?? "N/A"}
+Creator on solscan.io: https://solscan.io/account/${creatorAddress}
+Creator on virtuals.io: https://app.virtuals.io/profile/${creatorAddress}
+Creator on birdeye.so: https://birdeye.so/profile/${creatorAddress}
+
+${descriptionContent}
+
+## Additional information extracted from relevant pages
+${fetchedInfo}
+
+<full_details>
+${JSON.stringify(launchDetail, null, 2)}
+</full_details>
+`.trim();
+	}
+
+	let creatorInitialTokensHeld: string | null | undefined;
+	let tokensForSale: string | null | undefined;
 	const totalSupply = "1000000000"; // Virtuals Protocol fixed supply is 1 billion
 
 	if (status === "GENESIS" && launchDetail.tokenomics) {
@@ -353,7 +492,7 @@ ${JSON.stringify(launchDetail, null, 2)}
 						evmPublicClient,
 						tokenAddress as `0x${string}`,
 						creatorAddress as `0x${string}`,
-						baseInitialTokens,
+						baseInitialTokens ?? "0",
 						undefined,
 						(launchDetail.preTokenPair as `0x${string}`) || undefined,
 					);
@@ -431,6 +570,7 @@ ${JSON.stringify(launchDetail, null, 2)}
 			}
 		}
 	}
+	return { skipped: false };
 }
 
 export async function fetchAndProcessVirtualsLaunches() {
@@ -472,9 +612,12 @@ export async function fetchAndProcessVirtualsLaunches() {
 	}
 }
 
-export async function debugVirtualsLaunchById(launchApiId: number | string) {
+export async function debugVirtualsLaunchById(
+	launchApiId: number | string,
+	overwrite = false,
+) {
 	console.log(
-		`[${LAUNCHPAD_NAME}] Debugging launch with API ID: ${launchApiId}`,
+		`[${LAUNCHPAD_NAME}] Debugging launch with API ID: ${launchApiId} (overwrite: ${overwrite})`,
 	);
 	const numericLaunchId =
 		typeof launchApiId === "string"
@@ -503,7 +646,12 @@ export async function debugVirtualsLaunchById(launchApiId: number | string) {
 			const existingLaunch = await db.query.launches.findFirst({
 				where: eq(launches.launchpadSpecificId, numericLaunchId.toString()),
 			});
-			if (existingLaunch) {
+			if (existingLaunch && overwrite) {
+				await db
+					.delete(launches)
+					.where(eq(launches.launchpadSpecificId, numericLaunchId.toString()));
+			}
+			if (existingLaunch && !overwrite) {
 				console.log(
 					`[${LAUNCHPAD_NAME}] Debug: Launch ${numericLaunchId} already exists. Skipping re-processing.`,
 				);
@@ -512,7 +660,18 @@ export async function debugVirtualsLaunchById(launchApiId: number | string) {
 					message: `Launch ID: ${numericLaunchId} already exists. Skipped re-processing.`,
 				};
 			}
-			await processVirtualsLaunch(launchDetail);
+
+			const processResult = await processVirtualsLaunch(
+				launchDetail,
+				overwrite,
+			);
+			if (processResult.skipped) {
+				return {
+					success: true,
+					message: processResult.skipReason || "Launch skipped.",
+				};
+			}
+
 			console.log(
 				`[${LAUNCHPAD_NAME}] Successfully processed debug launch ID: ${numericLaunchId}`,
 			);

@@ -220,7 +220,10 @@ export async function debugLaunchpadHistoricalEvents({
 				"~/server/launchpads/virtuals"
 			);
 			// 'from' is the API ID for Virtuals Protocol
-			const debugResult = await debugVirtualsLaunchById(from);
+			const debugResult = await debugVirtualsLaunchById(
+				from,
+				overwriteExisting,
+			);
 			resultMsg = debugResult.message;
 		} else {
 			throw new Error(
