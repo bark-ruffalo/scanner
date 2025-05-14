@@ -1,5 +1,6 @@
 import "server-only";
 import { fetchUrlContent } from "~/lib/content-utils";
+import { calculateBigIntPercentage } from "~/lib/utils";
 
 /**
  * API response structure for Virtuals Protocol token information
@@ -59,6 +60,55 @@ export interface VirtualsTokenInfo {
 	creator: string;
 	pairAddress: string | null;
 	chain: string;
+}
+
+/**
+ * Fetches the list of holders for a Virtuals Protocol token using the API endpoint.
+ * @param tokenAddress The token address (Base or Solana)
+ * @returns Array of [address, amount] tuples
+ */
+export async function getVirtualsTokenHolders(
+	tokenAddress: string,
+): Promise<Array<[string, number]>> {
+	const apiUrl = `https://api.virtuals.io/api/tokens/${tokenAddress}/holders`;
+	try {
+		const responseContent = await fetchUrlContent(apiUrl);
+		const parsed = JSON.parse(responseContent);
+		if (Array.isArray(parsed.data)) {
+			return parsed.data as Array<[string, number]>;
+		}
+		return [];
+	} catch (error) {
+		console.error(`Error fetching holders for token ${tokenAddress}:`, error);
+		return [];
+	}
+}
+
+/**
+ * Returns the number of tokens held by a specific address and the percentage of total supply (1B tokens).
+ * @param address The address to check
+ * @param tokenAddress The token address
+ * @returns { amount: bigint, percentage: number }
+ */
+export async function getAddressTokenHolding(
+	address: string,
+	tokenAddress: string,
+): Promise<{
+	amount: bigint;
+	percentage: number;
+	formattedPercentage: string;
+}> {
+	const holders = await getVirtualsTokenHolders(tokenAddress);
+	const entry = holders.find(
+		([addr]) => addr.toLowerCase() === address.toLowerCase(),
+	);
+	const amount = entry ? BigInt(Math.ceil(entry[1])) : 0n;
+	const percentObj = calculateBigIntPercentage(amount, 1000000000n);
+	return {
+		amount,
+		percentage: percentObj ? percentObj.percent : 0,
+		formattedPercentage: percentObj ? percentObj.formatted : "N/A",
+	};
 }
 
 // /**

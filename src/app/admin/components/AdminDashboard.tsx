@@ -388,6 +388,8 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 											<Link
 												href={`/launch/${launch.id}`}
 												className="text-blue-400 hover:underline"
+												target="_blank"
+												rel="noopener noreferrer"
 											>
 												{launch.title}
 											</Link>

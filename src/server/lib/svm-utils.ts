@@ -26,6 +26,7 @@ import { env } from "~/env";
 import {
 	SVM_DECIMALS,
 	calculateBigIntPercentage,
+	formatPercentage,
 	formatTokenBalance,
 } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
@@ -869,7 +870,7 @@ export async function updateSolanaTokenStatistics(
 		return {
 			creatorTokensHeld: currentBalanceRounded.toString(),
 			creatorTokenHoldingPercentage: holdingResult
-				? holdingResult.percent.toFixed(2)
+				? holdingResult.formatted
 				: null,
 			creatorTokenMovementDetails: movementDetails,
 			sentToZeroAddress: sentToZero,

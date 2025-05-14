@@ -11,7 +11,12 @@ import {
 } from "viem";
 import { base } from "viem/chains";
 import { env } from "~/env";
-import { EVM_DECIMALS, formatTokenBalance } from "~/lib/utils";
+import {
+	EVM_DECIMALS,
+	formatPercentage,
+	formatTokenBalance,
+} from "~/lib/utils";
+import { calculateBigIntPercentage } from "~/lib/utils";
 import type { TokenUpdateResult } from "~/server/queries";
 // Define ABI for standard ERC20 balanceOf function
 export const balanceOfAbi = parseAbiItem(
@@ -163,24 +168,26 @@ export async function updateEvmTokenStatistics(
 	console.log(`- Initial token allocation: ${Math.round(initialTokensNum)}`);
 
 	// Calculate what percentage of initial allocation is still held
-	const percentageOfInitialHeld =
-		initialTokensNum > 0 ? (currentTokensHeld / initialTokensNum) * 100 : 0;
-
-	console.log(
-		`- Percentage of initial allocation still held: ${percentageOfInitialHeld.toFixed(2)}%`,
+	const percentObj = calculateBigIntPercentage(
+		BigInt(Math.round(currentTokensHeld)),
+		BigInt(Math.round(initialTokensNum)),
 	);
-
+	const percentValue = percentObj ? percentObj.percent : 0;
+	const percentFormatted = percentObj ? percentObj.formatted : "N/A";
+	console.log(
+		`- Percentage of initial allocation still held: ${percentFormatted}`,
+	);
 	// Default result without token movement details
 	const result: TokenUpdateResult = {
 		creatorTokensHeld: roundedCurrentTokens,
-		creatorTokenHoldingPercentage: percentageOfInitialHeld.toFixed(2),
+		creatorTokenHoldingPercentage: percentFormatted,
 		tokenStatsUpdatedAt: new Date(),
 		// Store the launch-specific selling address if provided
 		mainSellingAddress: launchPairAddress ? launchPairAddress : undefined,
 	};
 
 	// Only analyze token movement if creator has at least 1% less than initial allocation
-	if (percentageOfInitialHeld < 99 && initialTokensNum > 0) {
+	if (percentValue < 99 && initialTokensNum > 0) {
 		try {
 			console.log(
 				"Creator has reduced their token holdings. Analyzing movements...",

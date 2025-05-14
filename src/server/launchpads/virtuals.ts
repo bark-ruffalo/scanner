@@ -13,6 +13,7 @@ import {
 	EVM_DECIMALS,
 	SVM_DECIMALS,
 	calculateBigIntPercentage,
+	formatPercentage,
 	formatTokenBalance,
 } from "~/lib/utils";
 import { db } from "~/server/db";
@@ -23,6 +24,7 @@ import { updateEvmTokenStatistics } from "~/server/lib/evm-utils";
 import { getConnection as getSolanaConnection } from "~/server/lib/svm-client";
 import { updateSolanaTokenStatistics } from "~/server/lib/svm-utils";
 import { getSolanaTokenBalance } from "~/server/lib/svm-utils"; // For fetching current balance
+import { getAddressTokenHolding } from "~/server/lib/virtuals-utils";
 import type { NewLaunchData } from "~/server/queries"; // type-only import
 import { addLaunch } from "~/server/queries";
 
@@ -137,6 +139,7 @@ interface VirtualsLaunchDetail extends VirtualsLaunchListItem {
 	tbaAddress?: string | null;
 	top10HolderPercentage?: number | null;
 	level?: number | null;
+	lpAddress?: string | null;
 }
 
 interface VirtualsGenesis {
@@ -295,6 +298,48 @@ export async function processVirtualsLaunch(
 	const tokenAddress =
 		launchDetail.tokenAddress ?? launchDetail.preToken ?? null;
 
+	// Fetch creator token holding info early for all launches
+	let creatorTokensHeldRaw: bigint | null = null;
+	let creatorTokensHeldForDesc: string | null = null;
+	let creatorTokenHoldingPercentageForDb: number | null = null;
+	let creatorTokenHoldingPercentageForDesc: string | null = null;
+	if (status === "GENESIS" && Array.isArray(launchDetail.tokenomics)) {
+		let totalBips = 0;
+		let totalTokens = 0n;
+		for (const t of launchDetail.tokenomics) {
+			if (t.name?.toLowerCase().includes("dev") && typeof t.bips === "number") {
+				totalBips += t.bips;
+				if (Array.isArray(t.recipients)) {
+					for (const r of t.recipients) {
+						if (typeof r.amount === "string") {
+							totalTokens += BigInt(r.amount);
+						}
+					}
+				}
+			}
+		}
+		creatorTokensHeldRaw = totalTokens;
+		creatorTokensHeldForDesc = formatTokenBalance(totalTokens);
+		const percentObj = calculateBigIntPercentage(totalTokens, 1000000000n);
+		creatorTokenHoldingPercentageForDb = percentObj ? percentObj.percent : 0;
+		creatorTokenHoldingPercentageForDesc = percentObj
+			? percentObj.formatted
+			: "N/A";
+	} else if (
+		creatorAddress &&
+		tokenAddress &&
+		(status === "UNDERGRAD" || status === "AVAILABLE")
+	) {
+		const holdingInfo = await getAddressTokenHolding(
+			creatorAddress,
+			tokenAddress,
+		);
+		creatorTokensHeldRaw = holdingInfo.amount;
+		creatorTokensHeldForDesc = formatTokenBalance(holdingInfo.amount);
+		creatorTokenHoldingPercentageForDb = holdingInfo.percentage;
+		creatorTokenHoldingPercentageForDesc = holdingInfo.formattedPercentage;
+	}
+
 	const fetchedInfo = await fetchContentUtil(
 		descriptionContent,
 		creatorAddress || "",
@@ -332,6 +377,24 @@ export async function processVirtualsLaunch(
 
 	let fullDescription = "N/A";
 
+	// --- Liquidity contract / main selling address logic ---
+	const lpAddress = launchDetail.lpAddress || null;
+	const preTokenPair = launchDetail.preTokenPair || null;
+	let liquidityContract: string | null = null;
+	if (lpAddress) {
+		liquidityContract = lpAddress;
+	} else if (preTokenPair) {
+		liquidityContract = preTokenPair;
+	} else {
+		liquidityContract = null;
+	}
+
+	let creatorInitialTokensLine = "";
+	if (status === "GENESIS" || status === "UNDERGRAD") {
+		creatorInitialTokensLine = `Creator initial number of tokens: ${creatorTokensHeldForDesc ? `${creatorTokensHeldForDesc} (${creatorTokenHoldingPercentageForDesc} of token supply)` : "N/A"}`;
+	}
+	// TODO: also find out initial tokens for AVAILABLE launches
+
 	if (chain === "BASE") {
 		fullDescription = `
 # ${tokenName}
@@ -344,9 +407,8 @@ Token address: ${tokenAddress ? getAddress(tokenAddress) : "N/A"}
 Token symbol: $${launchDetail.symbol}
 Token supply: 1 billion
 Top holders: ${tokenAddress ? `https://basescan.org/token/${getAddress(tokenAddress)}#balances` : "N/A"}
-Liquidity contract: N/A
-Creator initial number of tokens: N/A
-
+Liquidity contract: ${liquidityContract ? `https://basescan.org/address/${liquidityContract}#asset-tokens` : "N/A"}
+${creatorInitialTokensLine ? `${creatorInitialTokensLine}\n` : ""}
 ## Creator info
 Creator address: ${creatorAddress}
 Creator on basescan.org: https://basescan.org/address/${creatorAddress}#asset-tokens
@@ -376,9 +438,8 @@ Token address: ${tokenAddress}
 Token symbol: $${launchDetail.symbol}
 Token supply: 1 billion
 Top holders: https://solscan.io/token/${tokenAddress}#holders
-Liquidity contract: N/A
-Creator initial number of tokens: N/A
-
+Liquidity contract: ${liquidityContract ? `https://solscan.io/account/${liquidityContract}` : "N/A"}
+${creatorInitialTokensLine ? `${creatorInitialTokensLine}\n` : ""}
 ## Creator info
 Creator address: ${creatorAddress ?? "N/A"}
 Creator on solscan.io: https://solscan.io/account/${creatorAddress}
@@ -398,6 +459,8 @@ ${JSON.stringify(launchDetail, null, 2)}
 
 	let creatorInitialTokensHeld: string | null | undefined;
 	let tokensForSale: string | null | undefined;
+	let creatorInitialTokensHeldRaw: string | null | undefined = null;
+	let tokensForSaleRaw: string | null | undefined = null;
 	const totalSupply = "1000000000"; // Virtuals Protocol fixed supply is 1 billion
 
 	if (status === "GENESIS" && launchDetail.tokenomics) {
@@ -407,11 +470,17 @@ ${JSON.stringify(launchDetail, null, 2)}
 		if (devAllocation?.amount) {
 			const amountBigInt = BigInt(devAllocation.amount);
 			const decimals = chain === "SOLANA" ? SVM_DECIMALS : EVM_DECIMALS; // Assuming Genesis can be on Solana too
-			creatorInitialTokensHeld = (
+			const rawInitialTokens = (
 				amountBigInt / BigInt(10 ** decimals)
 			).toString();
-			const saleAmount = BigInt(totalSupply) - BigInt(creatorInitialTokensHeld);
-			tokensForSale = saleAmount > 0n ? saleAmount.toString() : "0";
+			creatorInitialTokensHeld = formatTokenBalance(
+				amountBigInt / BigInt(10 ** decimals),
+			); // for display
+			const saleAmount = BigInt(totalSupply) - BigInt(rawInitialTokens);
+			tokensForSale = formatTokenBalance(saleAmount > 0n ? saleAmount : 0n); // for display
+			// For DB, use rawInitialTokens and saleAmount.toString()
+			creatorInitialTokensHeldRaw = rawInitialTokens;
+			tokensForSaleRaw = saleAmount > 0n ? saleAmount.toString() : "0";
 		}
 	} else if (
 		chain === "SOLANA" &&
@@ -422,16 +491,24 @@ ${JSON.stringify(launchDetail, null, 2)}
 			const solanaConnection = getSolanaConnection();
 			const tokenMintPk = new PublicKey(tokenAddress);
 			const mintInfo = await getMint(solanaConnection, tokenMintPk);
-			creatorInitialTokensHeld = (
+			const rawInitialTokens = (
 				mintInfo.supply / BigInt(10 ** mintInfo.decimals)
 			).toString();
+			creatorInitialTokensHeld = formatTokenBalance(
+				mintInfo.supply / BigInt(10 ** mintInfo.decimals),
+			); // for display
 			tokensForSale = creatorInitialTokensHeld;
+			// For DB, use rawInitialTokens
+			creatorInitialTokensHeldRaw = rawInitialTokens;
+			tokensForSaleRaw = rawInitialTokens;
 		} catch (e) {
 			console.error(
 				`[${LAUNCHPAD_NAME}] Could not fetch mint info for Solana preToken ${tokenAddress}: ${e}`,
 			);
 			creatorInitialTokensHeld = null;
 			tokensForSale = null;
+			creatorInitialTokensHeldRaw = null;
+			tokensForSaleRaw = null;
 		}
 	}
 
@@ -456,10 +533,12 @@ ${JSON.stringify(launchDetail, null, 2)}
 		chain,
 		status,
 		creatorInitialTokensHeld:
-			status === "GENESIS" || (chain === "BASE" && creatorInitialTokensHeld)
-				? creatorInitialTokensHeld
+			creatorInitialTokensHeldRaw != null ? creatorInitialTokensHeldRaw : null,
+		creatorTokenHoldingPercentage:
+			creatorTokenHoldingPercentageForDb != null
+				? creatorTokenHoldingPercentageForDb.toString()
 				: null,
-		tokensForSale,
+		tokensForSale: tokensForSaleRaw != null ? tokensForSaleRaw : null,
 		totalTokenSupply: totalSupply,
 		summary: "-",
 		analysis: "-",
@@ -467,109 +546,11 @@ ${JSON.stringify(launchDetail, null, 2)}
 		basicInfoUpdatedAt: new Date(),
 		llmAnalysisUpdatedAt: new Date(),
 		tokenStatsUpdatedAt: new Date(),
+		mainSellingAddress: liquidityContract || null,
 	};
 
 	const addResult = await addLaunch(launchData);
 
-	if (addResult === "inserted" || addResult === "updated") {
-		if (
-			tokenAddress &&
-			creatorAddress &&
-			(status === "UNDERGRAD" || status === "AVAILABLE")
-		) {
-			try {
-				console.log(`[${LAUNCHPAD_NAME}] Updating token stats for ${title}...`);
-				if (chain === "BASE") {
-					let baseInitialTokens = launchData.creatorInitialTokensHeld;
-					if (!baseInitialTokens) {
-						console.warn(
-							`[${LAUNCHPAD_NAME}] Initial token holding for Base non-Genesis ${title} is unknown. Stats may be incomplete.`,
-						);
-						baseInitialTokens = "0";
-					}
-
-					const stats = await updateEvmTokenStatistics(
-						evmPublicClient,
-						tokenAddress as `0x${string}`,
-						creatorAddress as `0x${string}`,
-						baseInitialTokens ?? "0",
-						undefined,
-						(launchDetail.preTokenPair as `0x${string}`) || undefined,
-					);
-					await db
-						.update(launches)
-						.set({
-							creatorTokensHeld: stats.creatorTokensHeld,
-							creatorTokenHoldingPercentage:
-								stats.creatorTokenHoldingPercentage,
-							creatorTokenMovementDetails: stats.creatorTokenMovementDetails,
-							sentToZeroAddress: stats.sentToZeroAddress ?? false,
-							tokenStatsUpdatedAt: new Date(),
-						})
-						.where(
-							eq(launches.launchpadSpecificId, launchDetail.id.toString()),
-						);
-				} else if (chain === "SOLANA") {
-					const solanaConnection = getSolanaConnection();
-					const tokenMintPk = new PublicKey(tokenAddress);
-					const creatorPk = new PublicKey(creatorAddress);
-
-					let solInitialBalanceForStats = "0";
-					let solCurrentBalanceRaw = 0n;
-
-					try {
-						const mintInfo = await getMint(solanaConnection, tokenMintPk);
-						solInitialBalanceForStats = (
-							mintInfo.supply / BigInt(10 ** mintInfo.decimals)
-						).toString();
-
-						solCurrentBalanceRaw = await getSolanaTokenBalance(
-							solanaConnection,
-							tokenMintPk,
-							creatorPk,
-						);
-					} catch (balanceFetchError) {
-						console.error(
-							`[${LAUNCHPAD_NAME}] Error fetching balance/mint info for Solana stats ${title}:`,
-							balanceFetchError,
-						);
-					}
-
-					if (solInitialBalanceForStats !== "0" || solCurrentBalanceRaw > 0n) {
-						const stats = await updateSolanaTokenStatistics(
-							solanaConnection,
-							tokenMintPk,
-							creatorPk,
-							solInitialBalanceForStats,
-							solCurrentBalanceRaw,
-						);
-						await db
-							.update(launches)
-							.set({
-								creatorTokensHeld: stats.creatorTokensHeld,
-								creatorTokenHoldingPercentage:
-									stats.creatorTokenHoldingPercentage,
-								creatorTokenMovementDetails: stats.creatorTokenMovementDetails,
-								sentToZeroAddress: stats.sentToZeroAddress ?? false,
-								tokenStatsUpdatedAt: new Date(),
-							})
-							.where(
-								eq(launches.launchpadSpecificId, launchDetail.id.toString()),
-							);
-					} else {
-						console.warn(
-							`[${LAUNCHPAD_NAME}] Skipping Solana stats update for ${title} due to missing balance/mint info.`,
-						);
-					}
-				}
-			} catch (statsError) {
-				console.error(
-					`[${LAUNCHPAD_NAME}] Error updating token stats for ${title}:`,
-					statsError,
-				);
-			}
-		}
-	}
 	return { skipped: false };
 }
 

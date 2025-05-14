@@ -5,7 +5,12 @@ import { notFound } from "next/navigation";
 import type { ReactNode } from "react";
 import { BackButton } from "~/app/_components/BackButton";
 import { LaunchProcessLoader } from "~/app/launch/[id]/launch-process-loader";
-import { calculateBigIntPercentage, linkify } from "~/lib/utils";
+import {
+	calculateBigIntPercentage,
+	formatPercentage,
+	formatTokenBalance,
+	linkify,
+} from "~/lib/utils";
 import { getLaunchById, getLaunchMetadata } from "~/server/queries";
 
 export type PageProps = {
@@ -105,7 +110,7 @@ export default async function LaunchDetailPage({
 				needsTokenUpdate={needsTokenUpdate}
 				tokenAddress={tokenAddress}
 				creatorAddress={creatorAddress}
-				creatorInitialTokens={creatorInitialTokens}
+				creatorInitialTokens={creatorInitialTokens ?? "0"}
 			/>
 
 			<div className="container mx-auto p-4">
@@ -140,26 +145,27 @@ export default async function LaunchDetailPage({
 									<p>Creator token holdings: unknown</p>
 								) : (
 									<p>
-										{launch.creatorTokenHoldingPercentage && (
-											<>
-												{Math.round(
-													Number(launch.creatorTokenHoldingPercentage),
-												)}
-												% of the initial token allocation is held by the creator
-												{launch.creatorTokensHeld && (
-													<>
-														{" "}
-														({Number(launch.creatorTokensHeld).toLocaleString()}{" "}
-														tokens
-														{/* Add the percentage of total supply here */}
-														{percentageOfTotalSupplyFormatted &&
-															` / ${percentageOfTotalSupplyFormatted} of total supply`}
-														)
-													</>
-												)}
-												.
-											</>
-										)}
+										{typeof launch.creatorTokenHoldingPercentage === "string" &&
+											launch.creatorTokenHoldingPercentage !== "" && (
+												<>
+													{formatPercentage(
+														Number(launch.creatorTokenHoldingPercentage ?? "0"),
+													)}{" "}
+													of the initial token allocation is held by the creator
+													{launch.creatorTokensHeld && (
+														<>
+															{" "}
+															({formatTokenBalance(launch.creatorTokensHeld)}{" "}
+															tokens
+															{/* Add the percentage of total supply here */}
+															{percentageOfTotalSupplyFormatted &&
+																` / ${percentageOfTotalSupplyFormatted} of total supply`}
+															)
+														</>
+													)}
+													.
+												</>
+											)}
 									</p>
 								)}
 								{launch.creatorTokenMovementDetails && (

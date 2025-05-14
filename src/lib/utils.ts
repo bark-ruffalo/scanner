@@ -76,7 +76,21 @@ export function formatTokenBalance(amount: string | bigint): string {
 }
 
 /**
- * Calculates a percentage using BigInt values and returns it as a number with 2 decimal places.
+ * Formats a number as a percentage string, trimming unnecessary trailing zeros.
+ * @param percent The percentage value as a number (e.g., 4.3, 5, 12.75)
+ * @returns A string like "4.3%", "5%", or "12.75%"
+ */
+export function formatPercentage(percent: number): string {
+	// Use toFixed(2) for precision, then remove trailing zeros and dot if needed
+	const str = percent
+		.toFixed(2)
+		.replace(/\.0+$/, "")
+		.replace(/(\.[1-9]*)0+$/, "$1");
+	return `${str}%`;
+}
+
+/**
+ * Calculates a percentage using BigInt values and returns it as a number and a formatted string (without unnecessary trailing zeros).
  * @param numerator The top number in the fraction (BigInt)
  * @param denominator The bottom number in the fraction (BigInt)
  * @returns An object containing the percentage as a number and a formatted string, or null if calculation fails
@@ -98,7 +112,7 @@ export function calculateBigIntPercentage(
 		const percent = Number(percentageBasisPoints) / 100;
 		return {
 			percent,
-			formatted: `${percent.toFixed(2)}%`,
+			formatted: formatPercentage(percent),
 		};
 	} catch (error) {
 		console.error("Error calculating percentage:", error);
