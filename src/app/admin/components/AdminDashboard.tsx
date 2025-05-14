@@ -90,19 +90,23 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 					type: "success",
 				});
 			} else {
-				if (!tokenAddress || !creatorAddress || !creatorInitialTokensHeld) {
-					throw new Error("Missing token or creator info in DB");
-				}
-				await updateLaunchTokenStats(
+				const result = await updateLaunchTokenStats(
 					id,
-					tokenAddress,
-					creatorAddress,
-					creatorInitialTokensHeld,
+					tokenAddress ?? undefined,
+					creatorAddress ?? undefined,
+					creatorInitialTokensHeld ?? undefined,
 				);
-				setActionResults({
-					message: "Token stats updated successfully",
-					type: "success",
-				});
+				if (result?.skipped) {
+					setActionResults({
+						message: result.reason || "Update skipped.",
+						type: "success",
+					});
+				} else {
+					setActionResults({
+						message: "Token stats updated successfully",
+						type: "success",
+					});
+				}
 			}
 
 			router.refresh();

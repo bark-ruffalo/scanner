@@ -55,6 +55,19 @@ export async function updateLaunchTokenStats(
 			creatorInitialTokensHeld,
 		} = launch;
 
+		// If the launch is of GENESIS type, skip updating token info (token address shouldn't be known yet)
+		if (
+			typeof launch.status === "string" &&
+			launch.status.trim().toUpperCase() === "GENESIS"
+		) {
+			// Skipping update for GENESIS launches because token address is not expected to be known
+			return {
+				success: true,
+				skipped: true,
+				reason: "GENESIS launch, token address not known yet",
+			};
+		}
+
 		// If token or creator address is missing, fail as before
 		if (!launchTokenAddress || !launchCreatorAddress) {
 			throw new Error(
