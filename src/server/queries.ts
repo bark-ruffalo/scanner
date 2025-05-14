@@ -62,6 +62,17 @@ export async function getLaunches(filter?: string, minRating?: string) {
 	// Uses Drizzle's query builder (`db.query.launches`).
 	const result = await db.query.launches.findMany({
 		where: conditions.length > 0 ? and(...conditions) : undefined,
+		columns: {
+			id: true,
+			title: true,
+			launchpad: true,
+			rating: true,
+			updatedAt: true,
+			description: true,
+			tokenAddress: true,
+			creatorAddress: true,
+			creatorInitialTokensHeld: true,
+		},
 		// Orders the results by the `launchedAt` column in descending order (newest first).
 		orderBy: (launches, { desc }) => [desc(launches.launchedAt)],
 	});

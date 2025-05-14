@@ -180,7 +180,7 @@ export async function updateEvmTokenStatistics(
 	// Default result without token movement details
 	const result: TokenUpdateResult = {
 		creatorTokensHeld: roundedCurrentTokens,
-		creatorTokenHoldingPercentage: percentFormatted,
+		creatorTokenHoldingPercentage: percentValue.toString(),
 		tokenStatsUpdatedAt: new Date(),
 		// Store the launch-specific selling address if provided
 		mainSellingAddress: launchPairAddress ? launchPairAddress : undefined,
@@ -207,7 +207,10 @@ export async function updateEvmTokenStatistics(
 					})
 				: client; // Fall back to provided client if no URL
 
-			// Get the creator's transfer history (outgoing transfers)
+			// Get the latest block number
+			const latestBlock = await analysisClient.getBlockNumber();
+
+			// Get the creator's transfer history (outgoing transfers) ONLY for the latest block
 			const transferLogs = await analysisClient
 				.getLogs({
 					address: tokenAddress,
@@ -215,44 +218,14 @@ export async function updateEvmTokenStatistics(
 					args: {
 						from: creatorAddress,
 					},
-					// Limit the block range to avoid timeouts on public endpoints
-					fromBlock: 0n, // From genesis or earliest available
-					toBlock: "latest",
+					fromBlock: latestBlock,
+					toBlock: latestBlock,
 				})
-				.catch(async (error) => {
+				.catch((error) => {
 					console.error(
-						`Error fetching logs, trying with recent blocks only: ${error.message}`,
+						`Error fetching logs for latest block: ${error.message}`,
 					);
-
-					// Get the latest block number for fallback range
-					let recentBlocksStart = 0n;
-					try {
-						const latestBlock = await analysisClient.getBlockNumber();
-						// Use last ~2 weeks of blocks (approx 100k blocks)
-						recentBlocksStart = latestBlock - 100000n;
-						if (recentBlocksStart < 0n) recentBlocksStart = 0n;
-					} catch (blockError) {
-						console.error(`Failed to get latest block number: ${blockError}`);
-					}
-
-					// Fallback to recent blocks only if first attempt fails
-					return analysisClient
-						.getLogs({
-							address: tokenAddress,
-							event: transferEventAbi as unknown as AbiItem & { type: "event" },
-							args: {
-								from: creatorAddress,
-							},
-							// Only check recent blocks as fallback
-							fromBlock: recentBlocksStart,
-							toBlock: "latest",
-						})
-						.catch((secondError) => {
-							console.error(
-								`Second attempt also failed: ${secondError.message}`,
-							);
-							return []; // Return empty array if both attempts fail
-						});
+					return [];
 				});
 
 			if (transferLogs.length === 0) {

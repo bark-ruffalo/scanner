@@ -54,54 +54,86 @@ export async function updateLaunchTokenStats(
 			creatorAddress: launchCreatorAddress,
 			creatorInitialTokensHeld,
 		} = launch;
-		if (
-			!launchTokenAddress ||
-			!launchCreatorAddress ||
-			!creatorInitialTokensHeld
-		) {
-			throw new Error("Launch is missing required token information");
+
+		// If token or creator address is missing, fail as before
+		if (!launchTokenAddress || !launchCreatorAddress) {
+			throw new Error(
+				"Launch is missing required token or creator address information",
+			);
 		}
 
-		if (launch.launchpad === "VIRTUALS Protocol (Base)") {
-			// For Base launches, update using EVM utilities
-			const tokenStats = await updateEvmTokenStatistics(
-				publicClient,
-				launchTokenAddress as `0x${string}`,
-				launchCreatorAddress as `0x${string}`,
-				creatorInitialTokensHeld,
-				undefined,
-				launch.mainSellingAddress as `0x${string}` | undefined,
-			);
+		// If creatorInitialTokensHeld is missing, skip percentage calculation but still update current balance
+		const missingInitial = !creatorInitialTokensHeld;
 
-			await updateTokenStatisticsInDb(launchId, tokenStats);
-		} else if (launch.launchpad === "VIRTUALS Protocol (Solana)") {
+		if (launch.chain === "BASE") {
+			// For Base launches, update using EVM utilities
+			if (missingInitial) {
+				// Only update current balance, set percentage to null
+				const { getEvmErc20BalanceAtBlock } = await import(
+					"~/server/lib/evm-utils"
+				);
+				const { publicClient } = await import("~/server/lib/evm-client");
+				const currentBalance = await getEvmErc20BalanceAtBlock(
+					publicClient,
+					launchTokenAddress as `0x${string}`,
+					launchCreatorAddress as `0x${string}`,
+				);
+				await updateTokenStatisticsInDb(launchId, {
+					creatorTokensHeld: currentBalance.toString(),
+					creatorTokenHoldingPercentage: null,
+					tokenStatsUpdatedAt: new Date(),
+				});
+			} else {
+				// Normal path: update all stats
+				const { updateEvmTokenStatistics } = await import(
+					"~/server/lib/evm-utils"
+				);
+				const { publicClient } = await import("~/server/lib/evm-client");
+				const tokenStats = await updateEvmTokenStatistics(
+					publicClient,
+					launchTokenAddress as `0x${string}`,
+					launchCreatorAddress as `0x${string}`,
+					creatorInitialTokensHeld,
+					undefined,
+					launch.mainSellingAddress as `0x${string}` | undefined,
+				);
+				await updateTokenStatisticsInDb(launchId, tokenStats);
+			}
+		} else if (launch.chain === "SOLANA") {
 			// For Solana launches, update using Solana utilities
+			const { PublicKey } = await import("@solana/web3.js");
 			const { getConnection } = await import("~/server/lib/svm-client");
-			const { updateSolanaTokenStatistics, getSolanaTokenBalance } =
+			const { getSolanaTokenBalance, updateSolanaTokenStatistics } =
 				await import("~/server/lib/svm-utils");
 
 			const connection = getConnection();
 			const tokenMintPk = new PublicKey(launchTokenAddress);
 			const creatorPk = new PublicKey(launchCreatorAddress);
-
-			// Fetch the current raw balance before calling updateSolanaTokenStatistics
 			const currentBalanceRaw = await getSolanaTokenBalance(
 				connection,
 				tokenMintPk,
 				creatorPk,
 			);
 
-			const tokenStats = await updateSolanaTokenStatistics(
-				connection,
-				tokenMintPk,
-				creatorPk,
-				creatorInitialTokensHeld,
-				currentBalanceRaw, // Pass the fetched current raw balance
-			);
-
-			await updateTokenStatisticsInDb(launchId, tokenStats);
+			if (missingInitial) {
+				// Only update current balance, set percentage to null
+				await updateTokenStatisticsInDb(launchId, {
+					creatorTokensHeld: currentBalanceRaw.toString(),
+					creatorTokenHoldingPercentage: null,
+					tokenStatsUpdatedAt: new Date(),
+				});
+			} else {
+				const tokenStats = await updateSolanaTokenStatistics(
+					connection,
+					tokenMintPk,
+					creatorPk,
+					creatorInitialTokensHeld,
+					currentBalanceRaw,
+				);
+				await updateTokenStatisticsInDb(launchId, tokenStats);
+			}
 		} else {
-			throw new Error(`Unsupported launchpad: ${launch.launchpad}`);
+			throw new Error(`Unsupported chain: ${launch.chain}`);
 		}
 
 		revalidatePath(`/launch/${launchId}`);

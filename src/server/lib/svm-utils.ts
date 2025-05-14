@@ -870,7 +870,7 @@ export async function updateSolanaTokenStatistics(
 		return {
 			creatorTokensHeld: currentBalanceRounded.toString(),
 			creatorTokenHoldingPercentage: holdingResult
-				? holdingResult.formatted
+				? holdingResult.percent.toString()
 				: null,
 			creatorTokenMovementDetails: movementDetails,
 			sentToZeroAddress: sentToZero,

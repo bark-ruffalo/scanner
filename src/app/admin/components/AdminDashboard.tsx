@@ -21,6 +21,9 @@ interface Launch {
 	rating: number;
 	updatedAt: Date | null;
 	description: string;
+	tokenAddress?: string | null;
+	creatorAddress?: string | null;
+	creatorInitialTokensHeld?: string | null;
 }
 
 interface AdminDashboardProps {
@@ -72,7 +75,9 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 
 	const handleUpdateStats = async (
 		id: number,
-		description: string,
+		tokenAddress?: string | null,
+		creatorAddress?: string | null,
+		creatorInitialTokensHeld?: string | null,
 		isAll = false,
 	) => {
 		try {
@@ -85,30 +90,14 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 					type: "success",
 				});
 			} else {
-				// Extract token info from description
-				const tokenAddressMatch =
-					description.match(/Token address: (0x[a-fA-F0-9]{40})/) || // EVM
-					description.match(/Token address: ([1-9A-HJ-NP-Za-km-z]{32,44})/); // Solana
-				const creatorMatch =
-					description.match(/Creator address: (0x[a-fA-F0-9]{40})/) || // EVM
-					description.match(/Creator address: ([1-9A-HJ-NP-Za-km-z]{32,44})/); // Solana
-				const initialTokensMatch = description.match(
-					/Creator initial number of tokens: ([\d,]+)/,
-				);
-
-				if (
-					!tokenAddressMatch?.[1] ||
-					!creatorMatch?.[1] ||
-					!initialTokensMatch?.[1]
-				) {
-					throw new Error("Could not extract token info from description");
+				if (!tokenAddress || !creatorAddress || !creatorInitialTokensHeld) {
+					throw new Error("Missing token or creator info in DB");
 				}
-
 				await updateLaunchTokenStats(
 					id,
-					tokenAddressMatch[1],
-					creatorMatch[1],
-					initialTokensMatch[1].replace(/,/g, ""),
+					tokenAddress,
+					creatorAddress,
+					creatorInitialTokensHeld,
 				);
 				setActionResults({
 					message: "Token stats updated successfully",
@@ -351,7 +340,9 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 							<button
 								type="button"
 								className="rounded bg-blue-600 px-4 py-2 text-white hover:bg-blue-700 disabled:opacity-50"
-								onClick={() => handleUpdateStats(0, "", true)}
+								onClick={() =>
+									handleUpdateStats(0, undefined, undefined, undefined, true)
+								}
 								disabled={isProcessing}
 							>
 								Update All Token Stats
@@ -427,7 +418,12 @@ export function AdminDashboard({ launches }: AdminDashboardProps) {
 													type="button"
 													className="rounded bg-blue-600 px-3 py-1 text-white hover:bg-blue-700 disabled:opacity-50"
 													onClick={() =>
-														handleUpdateStats(launch.id, launch.description)
+														handleUpdateStats(
+															launch.id,
+															launch.tokenAddress,
+															launch.creatorAddress,
+															launch.creatorInitialTokensHeld,
+														)
 													}
 													disabled={isProcessing}
 												>
