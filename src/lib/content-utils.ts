@@ -109,19 +109,16 @@ export async function fetchFirecrawlContent(
 	url: string,
 	options?: FirecrawlOptions,
 ): Promise<string> {
-	// Skip Firecrawl API calls in development mode to save on API costs
-	if (env.NODE_ENV === "development") {
-		return `Skipped Firecrawl fetch in development mode for URL: ${url}`;
-	}
+	console.warn(`fetchFirecrawlContent: ${url}`);
 	try {
+		const lowerUrl = url.toLowerCase();
 		// Skip URLs that are likely to cause issues
-		if (url.includes("twitter.com") || url.includes("x.com")) {
+		if (lowerUrl.includes("twitter.com") || lowerUrl.includes("x.com")) {
 			console.warn("Skipping social media URL: requires authentication");
 			return `Skipped social media URL (${url}) - requires authentication`;
 		}
 
 		// Skip images and other binary content
-		const lowerUrl = url.toLowerCase();
 		if (
 			lowerUrl.includes(".jpg") ||
 			lowerUrl.includes(".jpeg") ||
@@ -138,6 +135,11 @@ export async function fetchFirecrawlContent(
 		) {
 			console.warn("Skipping image/binary URL: likely not text content");
 			return `Skipped image/binary URL (${url}) - likely not text content`;
+		}
+
+		// Skip Firecrawl API calls in development mode to save on API costs
+		if (env.NODE_ENV === "development") {
+			return `Skipped Firecrawl fetch in development mode for URL: ${url}`;
 		}
 
 		// Validate URL
