@@ -27,6 +27,8 @@ Consider the launchpad information provided in the "launchpad_info" section when
 - Factor in the specific launchpad mechanisms and processes into your analysis
 - Be aware of the typical token distribution patterns for this specific launchpad
 - Do not mention the liquidity lock as a positive since most launchpads have this mechanism for graduating projects
+- For genesis launches on Virtuals Protocol, the tokenomics will be available in the full_details section, under the "tokenomics" key. The web app calculates developer allocation based on all fields containing these strings: "core", "team", "develop", "advisor", "adviser", "investor", "founder", "operations", "treasury", "partner", "builder", "production"; as this is not an accurate method, trying to understand the information from the tokenomics key is better.
+- For genesis launches on Virtuals Protocol, it's not a red flag if these fields are missing, since the token will only be created if enough investors subscribe to the launch: "Token address", "Liquidity contract", "Top holders"
 {{/launchpadInfo}}
 
 # Rules for summary
@@ -47,6 +49,7 @@ Consider the launchpad information provided in the "launchpad_info" section when
 - if the creator's allocation is less than 10% or more than 50% of the total supply, you should rate it much lower unless the tokenomics explains why it's reasonable
 - if the creator's allocation is less than 5% and this pretends to be a serious investment instead of a memecoin, return 0
 - if the creator's allocation is more than 80% of the total supply, return 0
+- the token supply is irrelevant, since it's the actual fully-diluted market cap that matters to investors
 </rules>
 
 Analyze if the project from the "investment" section is good, then rate it as an investment opportunity from 0 to 10 and summarize it. Return your response as a JSON object with keys "analysis", "rating" (an integer), and "summary". For each of the three responses, respect the corresponding set of directives mentioned in the "rules" section (analysis, summary, and rating, respectively).
