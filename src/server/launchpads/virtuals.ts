@@ -200,7 +200,7 @@ async function fetchLaunchDetails(
 	launchId: number,
 ): Promise<VirtualsLaunchDetail | null | "NOT_FOUND"> {
 	try {
-		const url = `${VIRTUALS_API_BASE_URL}/${launchId}?populate[0]=image&populate[1]=genesis`;
+		const url = `${VIRTUALS_API_BASE_URL}/${launchId}?populate[0]=image&populate[1]=genesis&populate[2]=tokenomics`;
 		console.log(
 			`[${LAUNCHPAD_NAME}] Fetching details for launch ID: ${launchId} from ${url}`,
 		);
@@ -220,6 +220,31 @@ async function fetchLaunchDetails(
 				const parsed = JSON.parse(
 					responseContent,
 				) as VirtualsApiResponse<VirtualsLaunchDetail>;
+				// Added more detailed logging
+				console.log(
+					`[${LAUNCHPAD_NAME}] Fetched launchDetail for ID ${launchId}. Full parsed.data:`,
+					JSON.stringify(parsed.data, null, 2),
+				);
+				if (parsed.data && "tokenomics" in parsed.data) {
+					console.log(
+						`[${LAUNCHPAD_NAME}] Fetched launchDetail for ID ${launchId}. Tokenomics from parsed.data:`,
+						JSON.stringify(parsed.data.tokenomics, null, 2),
+					);
+				} else {
+					console.log(
+						`[${LAUNCHPAD_NAME}] Fetched launchDetail for ID ${launchId}. Tokenomics field NOT PRESENT in parsed.data.`,
+					);
+				}
+				if (parsed.data && "genesis" in parsed.data) {
+					console.log(
+						`[${LAUNCHPAD_NAME}] Fetched launchDetail for ID ${launchId}. Genesis from parsed.data:`,
+						JSON.stringify(parsed.data.genesis, null, 2),
+					);
+				} else {
+					console.log(
+						`[${LAUNCHPAD_NAME}] Fetched launchDetail for ID ${launchId}. Genesis field NOT PRESENT in parsed.data.`,
+					);
+				}
 				return parsed.data;
 			} catch (jsonError) {
 				console.error(
@@ -298,33 +323,117 @@ export async function processVirtualsLaunch(
 	const tokenAddress =
 		launchDetail.tokenAddress ?? launchDetail.preToken ?? null;
 
-	// Fetch creator token holding info early for all launches
-	let creatorTokensHeldRaw: bigint | null = null;
-	let creatorTokensHeldForDesc: string | null = null;
-	let creatorTokenHoldingPercentageForDb: number | null = null;
-	let creatorTokenHoldingPercentageForDesc: string | null = null;
-	if (status === "GENESIS" && Array.isArray(launchDetail.tokenomics)) {
-		let totalBips = 0;
-		let totalTokens = 0n;
-		for (const t of launchDetail.tokenomics) {
-			if (t.name?.toLowerCase().includes("dev") && typeof t.bips === "number") {
-				totalBips += t.bips;
-				if (Array.isArray(t.recipients)) {
-					for (const r of t.recipients) {
-						if (typeof r.amount === "string") {
-							totalTokens += BigInt(r.amount);
-						}
-					}
+	// Consolidated token allocation logic
+	let dbCreatorInitialTokensHeldRaw: string | null = null;
+	let dbCreatorTokenHoldingPercentage: string | null = null;
+	let dbTokensForSaleRaw: string | null = null;
+	let descCreatorTokensHeld = "N/A";
+	let descCreatorTokenHoldingPercentage = "N/A";
+
+	const totalSupply = "1000000000"; // Virtuals Protocol fixed supply is 1 billion
+	const totalSupplyBigInt = BigInt(totalSupply);
+
+	// Added more detailed logging
+	console.log(
+		`[${LAUNCHPAD_NAME}] Processing launch ${launchDetail.id} (${launchDetail.name}). Status: ${status}. Full launchDetail object:`,
+		JSON.stringify(launchDetail, null, 2),
+	);
+	if (launchDetail && "tokenomics" in launchDetail) {
+		console.log(
+			`[${LAUNCHPAD_NAME}] Processing launch ${launchDetail.id}. Tokenomics from launchDetail:`,
+			JSON.stringify(launchDetail.tokenomics, null, 2),
+		);
+	} else {
+		console.log(
+			`[${LAUNCHPAD_NAME}] Processing launch ${launchDetail.id}. Tokenomics field NOT PRESENT in launchDetail.`,
+		);
+	}
+
+	if (
+		status === "GENESIS" &&
+		Array.isArray(launchDetail.tokenomics) &&
+		launchDetail.tokenomics.length > 0
+	) {
+		console.log(
+			`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} is GENESIS with tokenomics. Count: ${launchDetail.tokenomics.length}. Tokenomics content:`,
+			JSON.stringify(launchDetail.tokenomics, null, 2),
+		);
+		const devAllocationTerms = [
+			"core",
+			"team",
+			"develop",
+			"advisor",
+			"adviser",
+			"investor",
+			"founder",
+			"operations",
+			"treasury",
+			"partner",
+			"builder",
+			"production",
+			"vault",
+		];
+		// First, find the allocation category based on name or isDefault flag
+		const devAllocationCategory = launchDetail.tokenomics.find(
+			(t) =>
+				devAllocationTerms.some((term) =>
+					t.name?.toLowerCase().includes(term),
+				) || t.isDefault === true,
+		);
+
+		if (devAllocationCategory) {
+			console.log(
+				`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} (GENESIS) - Found potential dev allocation category: ${devAllocationCategory.name}`,
+			);
+			const firstRecipient = devAllocationCategory.recipients?.[0];
+
+			if (firstRecipient && typeof firstRecipient.amount === "string") {
+				const amountStr = firstRecipient.amount; // Now type-safe
+				const creatorTokensInSmallestUnit = BigInt(amountStr);
+				const decimals = chain === "SOLANA" ? SVM_DECIMALS : EVM_DECIMALS;
+
+				const creatorTokensInWholeUnit =
+					creatorTokensInSmallestUnit / BigInt(10 ** decimals);
+				dbCreatorInitialTokensHeldRaw = creatorTokensInWholeUnit.toString();
+				descCreatorTokensHeld = formatTokenBalance(creatorTokensInSmallestUnit);
+
+				const percentObj = calculateBigIntPercentage(
+					creatorTokensInSmallestUnit,
+					totalSupplyBigInt,
+				);
+
+				if (percentObj) {
+					dbCreatorTokenHoldingPercentage = percentObj.percent.toString();
+					descCreatorTokenHoldingPercentage = percentObj.formatted;
 				}
+
+				const totalSupplyInSmallestUnit =
+					totalSupplyBigInt * BigInt(10 ** decimals);
+				const tokensForSaleInSmallestUnit =
+					totalSupplyInSmallestUnit - creatorTokensInSmallestUnit;
+				const tokensForSaleInWholeUnit =
+					tokensForSaleInSmallestUnit < 0n
+						? 0n
+						: tokensForSaleInSmallestUnit / BigInt(10 ** decimals);
+				dbTokensForSaleRaw = tokensForSaleInWholeUnit.toString();
+				console.log(
+					`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} (GENESIS) - Dev allocation processed. Creator tokens (raw whole): ${dbCreatorInitialTokensHeldRaw}, Percentage: ${descCreatorTokenHoldingPercentage}, Tokens for sale (raw whole): ${dbTokensForSaleRaw}`,
+				);
+			} else {
+				console.log(
+					`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} (GENESIS) - Dev allocation category "${devAllocationCategory.name}" found, but recipients array is missing/empty, first recipient is missing, or amount in first recipient is not a string/missing. Recipients: ${JSON.stringify(devAllocationCategory.recipients, null, 2)}`,
+				);
 			}
+		} else {
+			console.log(
+				`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} (GENESIS) - No dev/team/core allocation category found matching terms: ${devAllocationTerms.join(", ")}. Checked tokenomics items: ${launchDetail.tokenomics.map((t) => `Name: ${t.name}, isDefault: ${t.isDefault}`).join(" | ")}`,
+			);
 		}
-		creatorTokensHeldRaw = totalTokens;
-		creatorTokensHeldForDesc = formatTokenBalance(totalTokens);
-		const percentObj = calculateBigIntPercentage(totalTokens, 1000000000n);
-		creatorTokenHoldingPercentageForDb = percentObj ? percentObj.percent : 0;
-		creatorTokenHoldingPercentageForDesc = percentObj
-			? percentObj.formatted
-			: "N/A";
+	} else if (status === "GENESIS") {
+		console.log(
+			`[${LAUNCHPAD_NAME}] Launch ${launchDetail.id} is GENESIS but tokenomics array is missing, empty, or not an array. Actual tokenomics value:`,
+			JSON.stringify(launchDetail.tokenomics, null, 2),
+		);
 	} else if (
 		creatorAddress &&
 		tokenAddress &&
@@ -334,10 +443,46 @@ export async function processVirtualsLaunch(
 			creatorAddress,
 			tokenAddress,
 		);
-		creatorTokensHeldRaw = holdingInfo.amount;
-		creatorTokensHeldForDesc = formatTokenBalance(holdingInfo.amount);
-		creatorTokenHoldingPercentageForDb = holdingInfo.percentage;
-		creatorTokenHoldingPercentageForDesc = holdingInfo.formattedPercentage;
+
+		if (holdingInfo && holdingInfo.amount != null) {
+			const creatorTokensInSmallestUnit = holdingInfo.amount;
+			const decimals = chain === "SOLANA" ? SVM_DECIMALS : EVM_DECIMALS;
+
+			const creatorTokensInWholeUnit =
+				creatorTokensInSmallestUnit / BigInt(10 ** decimals);
+			dbCreatorInitialTokensHeldRaw = creatorTokensInWholeUnit.toString();
+			descCreatorTokensHeld = formatTokenBalance(creatorTokensInSmallestUnit);
+
+			if (holdingInfo.percentage != null) {
+				dbCreatorTokenHoldingPercentage = holdingInfo.percentage.toString();
+				descCreatorTokenHoldingPercentage =
+					holdingInfo.formattedPercentage ??
+					formatPercentage(holdingInfo.percentage);
+			} else {
+				const totalSupplyInSmallestUnit =
+					totalSupplyBigInt * BigInt(10 ** decimals);
+				if (totalSupplyInSmallestUnit > 0n) {
+					const percentObjCalc = calculateBigIntPercentage(
+						creatorTokensInSmallestUnit,
+						totalSupplyBigInt,
+					); // smallest_value, total_whole
+					if (percentObjCalc) {
+						dbCreatorTokenHoldingPercentage = percentObjCalc.percent.toString();
+						descCreatorTokenHoldingPercentage = percentObjCalc.formatted;
+					}
+				}
+			}
+
+			const totalSupplyInSmallestUnit =
+				totalSupplyBigInt * BigInt(10 ** decimals);
+			const tokensForSaleInSmallestUnit =
+				totalSupplyInSmallestUnit - creatorTokensInSmallestUnit;
+			const actualTokensForSaleSmallest =
+				tokensForSaleInSmallestUnit < 0n ? 0n : tokensForSaleInSmallestUnit;
+			const tokensForSaleInWholeUnit =
+				actualTokensForSaleSmallest / BigInt(10 ** decimals);
+			dbTokensForSaleRaw = tokensForSaleInWholeUnit.toString();
+		}
 	}
 
 	const fetchedInfo = await fetchContentUtil(
@@ -390,10 +535,11 @@ export async function processVirtualsLaunch(
 	}
 
 	let creatorInitialTokensLine = "";
-	if (status === "GENESIS" || status === "UNDERGRAD") {
-		creatorInitialTokensLine = `Creator initial number of tokens: ${creatorTokensHeldForDesc ? `${creatorTokensHeldForDesc} (${creatorTokenHoldingPercentageForDesc} of token supply)` : "N/A"}`;
+	if (descCreatorTokensHeld !== "N/A") {
+		// Show if data is available, regardless of status if calculated
+		creatorInitialTokensLine = `Creator initial number of tokens: ${descCreatorTokensHeld} (${descCreatorTokenHoldingPercentage} of token supply)`;
 	}
-	// TODO: also find out initial tokens for AVAILABLE launches
+	// TODO: also find out initial tokens for AVAILABLE launches (Now handled by consolidated logic if creatorAddress and tokenAddress exist)
 
 	if (chain === "BASE") {
 		fullDescription = `
@@ -453,77 +599,7 @@ ${JSON.stringify(launchDetail, null, 2)}
 `.trim();
 	}
 
-	let creatorInitialTokensHeld: string | null | undefined;
-	let tokensForSale: string | null | undefined;
-	let creatorInitialTokensHeldRaw: string | null | undefined = null;
-	let tokensForSaleRaw: string | null | undefined = null;
-	const totalSupply = "1000000000"; // Virtuals Protocol fixed supply is 1 billion
-
-	if (status === "GENESIS" && launchDetail.tokenomics) {
-		const devAllocationTerms = [
-			"core",
-			"team",
-			"develop",
-			"advisor",
-			"adviser",
-			"investor",
-			"founder",
-			"operations",
-			"treasury",
-			"partner",
-			"builder",
-			"production",
-		];
-		const devAllocation = launchDetail.tokenomics.find(
-			(t) =>
-				devAllocationTerms.some((term) =>
-					t.name?.toLowerCase().includes(term),
-				) || t.isDefault === true,
-		);
-		if (devAllocation?.amount) {
-			const amountBigInt = BigInt(devAllocation.amount);
-			const decimals = chain === "SOLANA" ? SVM_DECIMALS : EVM_DECIMALS; // Assuming Genesis can be on Solana too
-			const rawInitialTokens = (
-				amountBigInt / BigInt(10 ** decimals)
-			).toString();
-			creatorInitialTokensHeld = formatTokenBalance(
-				amountBigInt / BigInt(10 ** decimals),
-			); // for display
-			const saleAmount = BigInt(totalSupply) - BigInt(rawInitialTokens);
-			tokensForSale = formatTokenBalance(saleAmount > 0n ? saleAmount : 0n); // for display
-			// For DB, use rawInitialTokens and saleAmount.toString()
-			creatorInitialTokensHeldRaw = rawInitialTokens;
-			tokensForSaleRaw = saleAmount > 0n ? saleAmount.toString() : "0";
-		}
-	} else if (
-		chain === "SOLANA" &&
-		tokenAddress &&
-		(status === "UNDERGRAD" || status === "AVAILABLE")
-	) {
-		try {
-			const solanaConnection = getSolanaConnection();
-			const tokenMintPk = new PublicKey(tokenAddress);
-			const mintInfo = await getMint(solanaConnection, tokenMintPk);
-			const rawInitialTokens = (
-				mintInfo.supply / BigInt(10 ** mintInfo.decimals)
-			).toString();
-			creatorInitialTokensHeld = formatTokenBalance(
-				mintInfo.supply / BigInt(10 ** mintInfo.decimals),
-			); // for display
-			tokensForSale = creatorInitialTokensHeld;
-			// For DB, use rawInitialTokens
-			creatorInitialTokensHeldRaw = rawInitialTokens;
-			tokensForSaleRaw = rawInitialTokens;
-		} catch (e) {
-			console.error(
-				`[${LAUNCHPAD_NAME}] Could not fetch mint info for Solana preToken ${tokenAddress}: ${e}`,
-			);
-			creatorInitialTokensHeld = null;
-			tokensForSale = null;
-			creatorInitialTokensHeldRaw = null;
-			tokensForSaleRaw = null;
-		}
-	}
+	// Removed old token calculation block (lines 456-526) as it's now consolidated above.
 
 	const launchData: NewLaunchData = {
 		launchpad: LAUNCHPAD_NAME,
@@ -545,14 +621,10 @@ ${JSON.stringify(launchDetail, null, 2)}
 			: null,
 		chain,
 		status,
-		creatorInitialTokensHeld:
-			creatorInitialTokensHeldRaw != null ? creatorInitialTokensHeldRaw : null,
-		creatorTokenHoldingPercentage:
-			creatorTokenHoldingPercentageForDb != null
-				? creatorTokenHoldingPercentageForDb.toString()
-				: null,
-		tokensForSale: tokensForSaleRaw != null ? tokensForSaleRaw : null,
-		totalTokenSupply: totalSupply,
+		creatorInitialTokensHeld: dbCreatorInitialTokensHeldRaw,
+		creatorTokenHoldingPercentage: dbCreatorTokenHoldingPercentage,
+		tokensForSale: dbTokensForSaleRaw,
+		totalTokenSupply: totalSupply, // This 'totalSupply' is from the consolidated block
 		summary: "-",
 		analysis: "-",
 		rating: -1,

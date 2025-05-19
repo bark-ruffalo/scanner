@@ -27,7 +27,7 @@ Consider the launchpad information provided in the "launchpad_info" section when
 - Factor in the specific launchpad mechanisms and processes into your analysis
 - Be aware of the typical token distribution patterns for this specific launchpad
 - Do not mention the liquidity lock as a positive since most launchpads have this mechanism for graduating projects
-- For genesis launches on Virtuals Protocol, the tokenomics will be available in the full_details section, under the "tokenomics" key. The web app calculates developer allocation based on all fields containing these strings: "core", "team", "develop", "advisor", "adviser", "investor", "founder", "operations", "treasury", "partner", "builder", "production"; as this is not an accurate method, trying to understand the information from the tokenomics key is better.
+- For genesis launches on Virtuals Protocol, the tokenomics will be available in the full_details section, under the "tokenomics" key. The web app calculates developer allocation based on all fields containing these strings: "core", "team", "develop", "advisor", "adviser", "investor", "founder", "operations", "treasury", "partner", "builder", "production", "vault"; as this is not an accurate method, trying to understand the information from the tokenomics key is better.
 - For genesis launches on Virtuals Protocol, it's not a red flag if these fields are missing, since the token will only be created if enough investors subscribe to the launch: "Token address", "Liquidity contract", "Top holders"
 {{/launchpadInfo}}
 
