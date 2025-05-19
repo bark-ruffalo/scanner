@@ -401,14 +401,12 @@ export async function processVirtualsLaunch(
 URL on launchpad: ${tokenUrl ?? "N/A"}
 Launched at: ${launchedAtDate.toUTCString()}
 Launched through the launchpad: ${LAUNCHPAD_NAME}
+Launch status: ${status}
 
 ## Token details and tokenomics
-Token address: ${tokenAddress ? getAddress(tokenAddress) : "N/A"}
-Token symbol: $${launchDetail.symbol}
+${tokenAddress ? `Token address: ${getAddress(tokenAddress)}\n` : ""}${tokenAddress ? `Top holders: https://basescan.org/token/${getAddress(tokenAddress)}#balances\n` : ""}${liquidityContract ? `Liquidity contract: https://basescan.org/address/${liquidityContract}#asset-tokens\n` : ""}Token symbol: $${launchDetail.symbol}
 Token supply: 1 billion
-Top holders: ${tokenAddress ? `https://basescan.org/token/${getAddress(tokenAddress)}#balances` : "N/A"}
-Liquidity contract: ${liquidityContract ? `https://basescan.org/address/${liquidityContract}#asset-tokens` : "N/A"}
-${creatorInitialTokensLine ? `${creatorInitialTokensLine}\n` : ""}
+${creatorInitialTokensLine ? `Creator initial number of tokens: ${creatorInitialTokensLine}\n` : ""}
 ## Creator info
 Creator address: ${creatorAddress}
 Creator on basescan.org: https://basescan.org/address/${creatorAddress}#asset-tokens
@@ -432,14 +430,12 @@ ${JSON.stringify(launchDetail, null, 2)}
 URL on launchpad: ${tokenUrl}
 Launched at: ${launchedAtDate.toUTCString()}
 Launched through the launchpad: ${LAUNCHPAD_NAME}
+Launch status: ${status}
 
 ## Token details and tokenomics
-Token address: ${tokenAddress}
-Token symbol: $${launchDetail.symbol}
+${tokenAddress ? `Token address: ${tokenAddress}\n` : ""}${tokenAddress ? `Top holders: https://solscan.io/token/${tokenAddress}#holders\n` : ""}${liquidityContract ? `Liquidity contract: https://solscan.io/account/${liquidityContract}\n` : ""}Token symbol: $${launchDetail.symbol}
 Token supply: 1 billion
-Top holders: https://solscan.io/token/${tokenAddress}#holders
-Liquidity contract: ${liquidityContract ? `https://solscan.io/account/${liquidityContract}` : "N/A"}
-${creatorInitialTokensLine ? `${creatorInitialTokensLine}\n` : ""}
+${creatorInitialTokensLine ? `Creator initial number of tokens: ${creatorInitialTokensLine}\n` : ""}
 ## Creator info
 Creator address: ${creatorAddress ?? "N/A"}
 Creator on solscan.io: https://solscan.io/account/${creatorAddress}
@@ -464,8 +460,25 @@ ${JSON.stringify(launchDetail, null, 2)}
 	const totalSupply = "1000000000"; // Virtuals Protocol fixed supply is 1 billion
 
 	if (status === "GENESIS" && launchDetail.tokenomics) {
+		const devAllocationTerms = [
+			"core",
+			"team",
+			"develop",
+			"advisor",
+			"adviser",
+			"investor",
+			"founder",
+			"operations",
+			"treasury",
+			"partner",
+			"builder",
+			"production",
+		];
 		const devAllocation = launchDetail.tokenomics.find(
-			(t) => t.name?.toLowerCase() === "developer" || t.isDefault === true,
+			(t) =>
+				devAllocationTerms.some((term) =>
+					t.name?.toLowerCase().includes(term),
+				) || t.isDefault === true,
 		);
 		if (devAllocation?.amount) {
 			const amountBigInt = BigInt(devAllocation.amount);
