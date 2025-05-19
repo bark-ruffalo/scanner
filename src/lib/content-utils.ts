@@ -120,6 +120,26 @@ export async function fetchFirecrawlContent(
 			return `Skipped social media URL (${url}) - requires authentication`;
 		}
 
+		// Skip images and other binary content
+		const lowerUrl = url.toLowerCase();
+		if (
+			lowerUrl.includes(".jpg") ||
+			lowerUrl.includes(".jpeg") ||
+			lowerUrl.includes(".png") ||
+			lowerUrl.includes(".gif") ||
+			lowerUrl.includes(".bmp") ||
+			lowerUrl.includes(".pdf") ||
+			lowerUrl.includes(".doc") ||
+			lowerUrl.includes(".docx") ||
+			lowerUrl.includes(".xls") ||
+			lowerUrl.includes(".xlsx") ||
+			lowerUrl.includes(".zip") ||
+			lowerUrl.includes(".rar")
+		) {
+			console.warn("Skipping image/binary URL: likely not text content");
+			return `Skipped image/binary URL (${url}) - likely not text content`;
+		}
+
 		// Validate URL
 		try {
 			new URL(url);
